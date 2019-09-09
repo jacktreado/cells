@@ -4,3 +4,6 @@
 bash/*/slurm
 bash/*/bin
 bash/*/tasks
+*~
+.DS_Store
+*.exe
