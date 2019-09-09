@@ -1,0 +1,6 @@
+*.o
+*.xyz
+*.test
+bash/*/slurm
+bash/*/bin
+bash/*/tasks
