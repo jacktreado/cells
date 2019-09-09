@@ -19,8 +19,8 @@ int main(){
 	int i,t,d;
 	double postmp,veltmp,anew;
 	double dx,dy,dnorm,dscale;
-	string positionsStr = "/Users/JackTreado/Jamming/Flowers/sim/cells/examples/packingFIRE/packingRampPositions.dat";
-	string energyStr = "/Users/JackTreado/Jamming/Flowers/sim/cells/examples/packingFIRE/packingRampEnergy.dat";
+	string positionsStr = "examples/packingFIRE/packingRampPositions.dat";
+	string energyStr = "examples/packingFIRE/packingRampEnergy.dat";
 
 	// input params
 	int NCELLS 	= 12;
