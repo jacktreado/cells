@@ -1,7 +1,8 @@
 /*
 
 	Main file to compress initially dilute DPM particles to
-	a mechanically stable (MS) state
+	a mechanically stable (MS) state. Will ramp asphericity from
+	minimum asphericity (of regular polygons) to target asphericity
 
 	* * * no attraction (a = 0) or bending (kb = 0) * * *
 
@@ -33,23 +34,22 @@ using namespace std;
 const double PI = 4.0*atan(1);
 
 // simulation constants
-const int NT 				= 5e6; 			// number of time steps
-const double T0 			= 1e-4;			// temperature scale
+const int NT 				= 1e7; 			// number of time steps
+const double T0 			= 1e-8;			// temperature scale
 const double sizeRatio 		= 1.4;			// size ratio between large and small particles
 const double timeStepMag 	= 0.05;			// time step in MD units
 const double initialPhi		= 0.5;			// initial packing fraction
-const double deltaPhi0 		= 0.02;			// intial packing fraction step
-const double deltaPhiJ		= 0.0075;		// target packing fraction step
-const double phiJGuess 		= 1.00;			// guess final packing fraction
-const double kineticTol 	= 1e-16;		// kinetic/potential energy tolerance
-const double forceTol 		= 1e-10;		// force (i.e. gradient) tolerance
+const double deltaPhi 		= 0.002;		// packing fraction step
+const double deltaCalA		= 0.001;		// asphericity increase step
+const double kineticTol 	= 1e-30;		// kinetic energy tolerance
+const double potentialTol 	= 1e-16;		// potential energy tolerance
 
 // force parameters
-const double kl 			= 1.0;			// perimeter force constant
-const double ka 			= 1.0;			// area force constant
+const double kl 			= 2.0;			// perimeter force constant
+const double ka 			= 2.0;			// area force constant
 const double gam 			= 0.0;			// surface tension force constant
 const double kb 			= 0.0;			// bending energy constant
-const double kint 			= 2.5;			// interaction energy constant
+const double kint 			= 1.0;			// interaction energy constant
 const double del 			= 0.1;			// width of circulo lines
 const double C 				= 0.0;			// attraction parameter (strength)
 const double l 				= 0.0;			// attraction parameter (distance)
@@ -97,8 +97,8 @@ int main(int argc, char const *argv[])
 	cellPacking2D packingObject(NCELLS,NT,NPRINT,L,seed);
 
 	// set values in setting up packing
-	cout << "	** Initializing particle quantities" << endl;
-	packingObject.initializeBidisperse(NV,sizeRatio,asphericity);
+	cout << "	** Initializing particle quantities, particles are initially regular polygons" << endl;
+	packingObject.initializeBidisperse(NV,sizeRatio);
 	packingObject.initializeForceConstants(kl,ka,gam,kb,kint);
 	packingObject.initializeInteractionParams(del,C,l);
 
@@ -132,12 +132,14 @@ int main(int argc, char const *argv[])
 	cout << endl << endl;
 	cout << "================================================" << endl << endl;
 	cout << "	Beginning compression algorithm using velocity-Verlet and FIRE" << endl;
-	cout << " 		* NCELLS 		= " 	<< NCELLS << " and smaller cells have NV = " << NV << " vertices" << endl;
-	cout << "		* NT total 		= " 	<< NT << endl;
-	cout << "		* NPRINT 		= " 	<< NPRINT << endl;
-	cout << "		* asphericity 	= " 	<< asphericity << endl;
-	cout << " 		* timeScale 	= " 	<< packingObject.timeScale() << endl;
-	cout << "		* timeStepMag 	= " 	<< timeStepMag << endl;
+	cout << " 		* NCELLS 				= " 	<< NCELLS << " and smaller cells have NV = " << NV << " vertices" << endl;
+	cout << "		* NT total 				= " 	<< NT << endl;
+	cout << "		* NPRINT 				= " 	<< NPRINT << endl;
+	cout << "		* target asphericity 	= " 	<< asphericity << endl;
+	cout << " 		* timeScale 			= " 	<< packingObject.timeScale() << endl;
+	cout << "		* timeStepMag 			= " 	<< timeStepMag << endl;
+	cout << "		* delta phi 			= "	 	<< deltaPhi << endl;
+	cout << "		* delta calA 			= " 	<< deltaCalA << endl;
 	cout << "================================================" << endl;
 	cout << endl << endl;
 
@@ -147,7 +149,7 @@ int main(int argc, char const *argv[])
 
 	// run simulation 
 	cout << "	** Compressing to a jammed state" << endl;
-	packingObject.msFire(deltaPhi0,deltaPhiJ,phiJGuess,kineticTol,forceTol);
+	packingObject.jammingFireRamp(deltaPhi,deltaCalA,asphericity,kineticTol,potentialTol);
 
 	// once completed, print stats
 	cout << "	** Compression protocol completed, printing stats to file." << endl;

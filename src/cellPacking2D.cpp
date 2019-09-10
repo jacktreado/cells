@@ -643,11 +643,9 @@ double cellPacking2D::packingFraction(){
 	int ci;
 	double val = 0.0;
 
-	// loop over cells
-	for (ci=0; ci<NCELLS; ci++){
-		// val += cell(ci).area() + cell(ci).getdel()*cell(ci).perimeter() + cell(ci).getdel()*cell(ci).getdel()*cell(ci).getNV()*tan(PI/cell(ci).getNV());
-		val += cell(ci).area();
-	}
+	// loop over cells, packing fraction is : triangular area + delta*perimeter area + area of circular corners
+	for (ci=0; ci<NCELLS; ci++)
+		val += cell(ci).area() + cell(ci).getdel()*cell(ci).perimeter() + PI*cell(ci).getdel()*cell(ci).getdel();
 
 	// // loop over vertices in cells and calculate true packing fraction
 	// for (ci=0; ci<NCELLS; ci++){
