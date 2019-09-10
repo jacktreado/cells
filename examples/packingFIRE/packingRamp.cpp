@@ -25,7 +25,7 @@ int main(){
 	// input params
 	int NCELLS 	= 12;
 	int NT 		= 1e7;
-	int NPRINT 	= 5e2;
+	int NPRINT 	= 1e4;
 	double L 	= 10.0*NCELLS;
 
 	// instantiate object
