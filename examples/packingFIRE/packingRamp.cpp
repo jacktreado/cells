@@ -40,8 +40,8 @@ int main(){
 	double asphericity,T0,sizeRatio;
 
 	// force and rest params
-	kl 			= 1.0;
-	ka 			= 1.0;
+	kl 			= 2.0;
+	ka 			= 2.0;
 	gam 		= 0.0;
 	kb 			= 0.0;
 	kint 		= 1.0;
