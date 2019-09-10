@@ -85,7 +85,7 @@ int main(){
 	*****************/
 
 	// simulation params
-	double timeStepMag 			= 0.1;
+	double timeStepMag 			= 0.05;
 	double initialPhi 			= 0.5;
 	double deltaPhi 			= 0.002;
 	double kineticTol 			= 1e-30;
