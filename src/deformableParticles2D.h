@@ -141,7 +141,8 @@ public:
 	double area(int vertex);
 	double area();									// area of cell
 	double perimeter();								// perimeter of cell
-	double asphericity();							// asphericity parameter
+	double asphericity();							// instantaneous asphericity parameter
+	double calA0();									// preferred asphericity
 	double segmentLength(int vertex);				// distance between vertex i and i+1
 	double segment(int vertex, int dim);			// vector connecting i and i+1
 	double dotProduct(int v1, int v2);				// dot product between vertices v1 and v2

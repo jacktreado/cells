@@ -305,8 +305,8 @@ void cellPacking2D::initializeMonodisperse(int NV, double asphericity){
 // bidisperse system initialized to regular polygons
 void cellPacking2D::initializeBidisperse(int NV, double sizeRatio){
 	// local variables
-	int i,nv,nvLarge,smallIndex,asphericity;
-	double a0;
+	int i,nv,nvLarge,smallIndex;
+	double a0,asphericity;
 
 	// check that NCELLS has been initialized
 	if (NCELLS <= 0){
@@ -324,7 +324,7 @@ void cellPacking2D::initializeBidisperse(int NV, double sizeRatio){
 	}
 
 	// calculate smaller nv to enforce bidispersity
-	nvLarge = floor(sizeRatio*NV);
+	nvLarge = round(sizeRatio*NV);
 	smallIndex = NCELLS/2;
 
 	// setup each cell
@@ -345,10 +345,7 @@ void cellPacking2D::initializeBidisperse(int NV, double sizeRatio){
 
 		// calculate a0 based on fact that they are regular polygons
 		asphericity = nv*tan(PI/nv)/PI;
-		a0 = (nv*nv)/(4.0*PI*asphericity);
-
-		// set a0 to enforce asphericity in cell i
-		cell(i).seta0(a0);
+		cell(i).setAsphericity(asphericity);
 	}
 }
 
@@ -375,7 +372,7 @@ void cellPacking2D::initializeBidisperse(int NV, double sizeRatio, double aspher
 	}
 
 	// calculate smaller nv to enforce bidispersity
-	nvLarge = floor(sizeRatio*NV);
+	nvLarge = round(sizeRatio*NV);
 	smallIndex = NCELLS/2;
 
 	// setup each cell
@@ -468,10 +465,8 @@ void cellPacking2D::squareLattice(){
 		cell(ci).regularPolygon();
 
 		// output cell asphericities
-		cout << "initializing cell " << ci << " on square lattice, initial asphericity = " << cell(ci).asphericity() << " and calA0 = " << (cell(ci).getNV()*cell(ci).getNV()*cell(ci).getl0()*cell(ci).getl0())/(4.0*PI*cell(ci).geta0()) << endl;
-
-		// give small perturbation to vertices
-		cell(ci).vertexPerturbation(0.3);
+		cout << "initializing cell " << ci << " on square lattice, initial asphericity = " << cell(ci).asphericity();
+		cout << " and calA0 = " << ((double)cell(ci).getNV()*cell(ci).getNV()*cell(ci).getl0()*cell(ci).getl0())/(4.0*PI*cell(ci).geta0()) << endl;
 	}
 
 	// calculate packing fraction
@@ -1220,8 +1215,7 @@ void cellPacking2D::msFire(double dphi0, double dphiJ, double phiJGuess, double 
 // prepare jammed packing by ramping asphericity
 void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericityTarget, double Ktol, double Utol){
 	// local variables
-	int i, ci, nr, kr, isjammed, k, kmax, plotIt;
-	double currCalA;
+	int i, ci, nr, kr, isjammed, k, kmax, plotIt, asphericityLow;
 
 	// plotting
 	plotIt = 1;
@@ -1233,7 +1227,7 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 	isjammed = 0;
 
 	// initialize current calA
-	currCalA = cell(0).asphericity();
+	asphericityLow = 1;
 
 	// set k and kmax
 	k = 0;
@@ -1246,18 +1240,29 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 		cout << "===================================================" << endl << endl << endl;
 		cout << " 	Jamming by isotropic compression" << endl << endl;
 		cout << "===================================================" << endl;
-		cout << "	* k 		= " << k << endl;
-		cout << "	* phi 		= " << phi << endl;
-		cout << "	* calA 		= " << currCalA << endl;
+		cout << "	* k 			= " << k << endl;
+		cout << "	* phi 			= " << phi << endl;
+		cout << "	* dCalA 		= " << dCalA << endl;
+		cout << "	* calA0 (0) 		= " << cell(0).calA0()<< endl;
+		cout << "	* calA0 (end) 		= " << cell(NCELLS-1).calA0() << endl;
+		cout << "	* low calA 		= " << asphericityLow << endl;
+		cout << "	* target calA0 		= " << asphericityTarget << endl;
 		cout << endl << endl;
 
 		// update calA if below target
-		if (currCalA < asphericityTarget){
-			currCalA += dCalA;
+		if (asphericityLow == 1){
+			// reset calA check
+			asphericityLow = 0;
 
-			for (ci=0; ci<NCELLS; ci++)
-				setAsphericity(ci,cell(ci).asphericity()+dCalA);
+			// update relevant cal A values
+			for (ci=0; ci < NCELLS; ci++){
+				if (cell(ci).calA0() < asphericityTarget){
+					asphericityLow = 1;
+					setAsphericity(ci,cell(ci).calA0()+dCalA);
+				}
+			}
 		}
+		
 
 		// update packing fraction
 		phi = packingFraction();
@@ -1276,22 +1281,24 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 
 		if (isjammed){
 
-			// if cal A is low, increase until target reached
-			if (currCalA < asphericityTarget){
-				while (currCalA < asphericityTarget){
-					// increase iterator
-					k++;
+			// increase cal A for all cells below target calA0
+			if (asphericityLow == 1){
+				// reset asphericityLow
+				asphericityLow = 0;
 
-					// update calA
-					currCalA += dCalA;
+				// increase iterator
+				k++;
 
-					// update asphericity of cells
-					for (ci=0; ci<NCELLS; ci++)
-						setAsphericity(ci,cell(ci).asphericity()+dCalA);
-
-					// relax energy
-					potentialRelaxFire(Ktol,Utol,plotIt,k);
+				// update asphericities
+				for (ci=0; ci < NCELLS; ci++){
+					if (cell(ci).calA0() < asphericityTarget){
+						asphericityLow = 1;
+						setAsphericity(ci,cell(ci).calA0()+dCalA);
+					}
 				}
+
+				// relax energy
+				potentialRelaxFire(Ktol,Utol,plotIt,k);
 			}
 			else{
 				cout << "Mechanically-stable state found!" << endl;

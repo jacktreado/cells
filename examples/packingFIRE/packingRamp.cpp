@@ -75,7 +75,7 @@ int main(){
 	packingObject.openPackingObject(positionsStr);
 	packingObject.openEnergyObject(energyStr);
 	// packingObject.printSystemPositions(0);
-	return 0;
+	// return 0;
 
 
 	/****************

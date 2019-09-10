@@ -153,7 +153,7 @@ void deformableParticles2D::operator=(deformableParticles2D& onTheRight){
 	gam 	= 0.0;
 	kb 		= 0.0;
 	kint 	= 0.0;
-	l0 		= 0.0;
+	l0 		= 1.0;
 	a0 		= 0.0;
 	del 	= 0.0;
 	C 		= 0.0;
@@ -299,14 +299,18 @@ void deformableParticles2D::regularPolygon(){
 	}
 
 	// set radius of polygon
-	polyRad = sqrt((2*a0)/(NV*sin(2*PI/NV)));
+	polyRad = sqrt((2.0*a0)/(NV*sin(2.0*PI/NV)));
 
 	// loop over vertices, set positions using rotations
 	for (i=0; i<NV; i++){
-		angleArg = (2*PI*i)/NV;
+		angleArg = (2.0*PI*i)/NV;
 		setVRel(i,0,-polyRad*sin(angleArg));
 		setVRel(i,1,polyRad*cos(angleArg));
 	}
+
+	// output
+	cout << " 	-- creating regular polygon with a0 = " << a0 << ", and area = " << area() << " and perimeter = " << perimeter() << endl;
+	cout << "	-- first segment length = " << segmentLength(0) << " and first area = " << area(0) << endl;
 }
 
 // initialize vertex positions so cell begins as regular polygon
@@ -840,6 +844,12 @@ double deformableParticles2D::perimeter(){
 // calculate instantaneous asphericity
 double deformableParticles2D::asphericity(){
 	return pow(perimeter(),2)/(4*PI*area());
+}
+
+
+// calculate preferred asphericity
+double deformableParticles2D::calA0(){
+	return pow(NV*l0,2.0)/(4*PI*a0);
 }
 
 

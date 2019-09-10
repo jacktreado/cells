@@ -7,3 +7,4 @@ bash/*/tasks
 *~
 .DS_Store
 *.exe
+*.dat
