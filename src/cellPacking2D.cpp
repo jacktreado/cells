@@ -633,24 +633,14 @@ double cellPacking2D::timeScale(){
 
 
 // Calculate the packing fraction
-// 	* NOTE: for now, will only calculate packing fraction once, then once it is changed we simply scale by factor, but
-// 			will not explicitly calculate, as it is computationally expensive to add little calculation of halo formed by
-// 			spherocylinders with width delta. 
-// 	* Calculation below assumes particles are regular polygons
-// 	* packing fraction phi added as scalar variable
 double cellPacking2D::packingFraction(){
 	// local variables
 	int ci;
 	double val = 0.0;
 
-	// loop over cells, packing fraction is : triangular area + delta*perimeter area + area of circular corners
+	// loop over cells, packing fraction is : triangular area + 0.5*delta*perimeter area + area of circular corners
 	for (ci=0; ci<NCELLS; ci++)
-		val += cell(ci).area() + cell(ci).getdel()*cell(ci).perimeter() + PI*cell(ci).getdel()*cell(ci).getdel();
-
-	// // loop over vertices in cells and calculate true packing fraction
-	// for (ci=0; ci<NCELLS; ci++){
-
-	// }
+		val += cell(ci).area() + (0.5*cell(ci).getdel())*cell(ci).perimeter() + PI*0.25*cell(ci).getdel()*cell(ci).getdel();
 
 	// divide by box area
 	val /= pow(L,NDIM);
@@ -1314,8 +1304,10 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 		cout << "	ERROR: particle shapes could not relax to desired cal A in allotted time, ending." << endl;
 		exit(1);
 	}
-	else
-		cout << " Shape minimization a success! End asphericity is = " << meanAsphericity() << endl;
+	else{
+		cout << " Jamming a success! End asphericity is = " << meanAsphericity() << endl;
+		cout << "final k = " << k << endl;
+	}
 }
 
 void cellPacking2D::msDamping(double dphi, double Ktol, double Ftol, double dampingParameter){
