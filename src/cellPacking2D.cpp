@@ -349,9 +349,6 @@ void cellPacking2D::initializeBidisperse(int NV, double sizeRatio){
 
 		// set a0 to enforce asphericity in cell i
 		cell(i).seta0(a0);
-
-		// create as regular polygon
-		cell(i).regularPolygon();
 	}
 }
 
@@ -474,6 +471,9 @@ void cellPacking2D::squareLattice(){
 
 		// initialize as regular polygon
 		cell(ci).regularPolygon();
+
+		// output cell asphericities
+		cout << "initializing cell " << ci << " on square lattice, initial asphericity = " << cell(ci).asphericity() << " and calA0 = " << (cell(ci).getNV()*cell(ci).getNV()*cell(ci).getl0()*cell(ci).getl0())/(4.0*PI*cell(ci).geta0()) << endl;
 
 		// give small perturbation to vertices
 		cell(ci).vertexPerturbation(0.3);

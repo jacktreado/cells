@@ -19,8 +19,8 @@ int main(){
 	int i,t,d;
 	double postmp,veltmp,anew;
 	double dx,dy,dnorm,dscale;
-	string positionsStr = "examples/packingFIRE/packingRampPositions.dat";
-	string energyStr = "examples/packingFIRE/packingRampEnergy.dat";
+	string positionsStr = "examples/packingFIRE/packingRampPositions.test";
+	string energyStr = "examples/packingFIRE/packingRampEnergy.test";
 
 	// input params
 	int NCELLS 	= 12;
@@ -75,7 +75,7 @@ int main(){
 	packingObject.openPackingObject(positionsStr);
 	packingObject.openEnergyObject(energyStr);
 	// packingObject.printSystemPositions(0);
-	// return 0;
+	return 0;
 
 
 	/****************
