@@ -393,12 +393,7 @@ void cellPacking2D::initializeBidisperse(int NV, double sizeRatio, double aspher
 		cell(i).setNV(nv);
 		cell(i).initializeVertices();
 		cell(i).initializeCell();
-
-		// calculate a0 based on NV and asphericity
-		a0 = (nv*nv)/(4.0*PI*asphericity);
-
-		// set a0 to enforce asphericity in cell i
-		cell(i).seta0(a0);
+		cell(i).setAsphericity(asphericity);
 	}
 }
 
