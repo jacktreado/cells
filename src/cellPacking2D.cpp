@@ -1478,8 +1478,8 @@ int cellPacking2D::potentialRelaxFire(double kineticTol, double potentialTol, in
 	dUtol = 1e-4;
 	nucheck = 0;
 	Uconst = 0;
-	constTol = 1e-6;
-	NPLATEAU = 50;
+	constTol = 1e-8;
+	NPLATEAU = 1000;
 
 	// initial values of FIRE variables
 	np = 0;
@@ -1496,7 +1496,7 @@ int cellPacking2D::potentialRelaxFire(double kineticTol, double potentialTol, in
 			cout << " 	FIRE MINIMIZATION, t = " << t << ", frame = " << frameCount << endl << endl;
 			cout << "===================================================" << endl;
 
-			if (plotIt == 1){
+			if (plotIt == 1 && t > 0){
 				if (packingPrintObject.is_open()){
 					cout << "	* Printing vetex positions to file" << endl;
 					printSystemPositions(frameCount);
@@ -1506,6 +1506,7 @@ int cellPacking2D::potentialRelaxFire(double kineticTol, double potentialTol, in
 					cout << "	* Printing cell energy to file" << endl;
 					printSystemEnergy(frameCount,totalTime);
 				}
+				frameCount++;
 			}
 			
 			cout << "	* Run data:" << endl;
@@ -1521,7 +1522,7 @@ int cellPacking2D::potentialRelaxFire(double kineticTol, double potentialTol, in
 			cout << "	* Uconst	= " << Uconst << endl;
 			cout << "	* nucheck	= " << nucheck << endl;
 			cout << endl << endl;
-			frameCount++;
+			
 		}
 
 		// update total time observed
@@ -1547,12 +1548,26 @@ int cellPacking2D::potentialRelaxFire(double kineticTol, double potentialTol, in
 
 		// if minimized, return 1
 		if (Uconst == 1 || (Unew < potentialTol && totalKineticEnergy() < kineticTol)){
-			cout << "Energy sufficiently minimized at t = " << t << endl;
+			cout << "Energy sufficiently minimized/relaxed at t = " << t << endl;
 			cout << "Fmax = " << maxForceMagnitude() << endl;
 			cout << "U = " << Unew << endl;
 			cout << "K = " << totalKineticEnergy() << endl;
 			cout << "nc = " << totalNumberOfContacts() << endl;
 			cout << "Ending relaxation protocol" << endl;
+
+			if (plotIt == 1){
+				if (packingPrintObject.is_open()){
+					cout << "	* Printing vetex positions to file" << endl;
+					printSystemPositions(frameCount);
+				}
+				
+				if (energyPrintObject.is_open()){
+					cout << "	* Printing cell energy to file" << endl;
+					printSystemEnergy(frameCount,totalTime);
+				}
+				frameCount++;
+			}
+
 			return 1;
 		}
 	}

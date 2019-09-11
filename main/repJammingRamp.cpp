@@ -4,7 +4,7 @@
 	a mechanically stable (MS) state. Will ramp asphericity from
 	minimum asphericity (of regular polygons) to target asphericity
 
-	* * * no attraction (a = 0) or bending (kb = 0) * * *
+	* * * no attraction (C,l = 0) or bending (kb = 0) * * *
 
 	Input parameters:
 		-- NCELLS: 			number of cells

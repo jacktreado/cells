@@ -6,7 +6,8 @@ srcdir=$cellsdir/src
 maindir=$cellsdir/main
 
 # directory for all output for cell simulations
-outputdir=/home/jdt45/project/cells
+# (Use symbolic link so can work on any cluster)
+outputdir=~/project/cells
 
 # directory for simulations specific to jamming
 simtypedir=$outputdir/jamming
@@ -43,7 +44,7 @@ mkdir -p $simdatadir
 
 # compile into binary using packing.h
 binf=bin/"$runstr".o
-mainf=$maindir/dpmPackingMain.cpp
+mainf=$maindir/repJammingRamp.cpp
 echo Running $numSeeds sims of $NCELLS with $NV vertices, cal A = $asphericity, will pack to jamming
 
 # run compiler
