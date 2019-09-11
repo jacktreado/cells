@@ -45,11 +45,11 @@ const double kineticTol 	= 1e-20;		// kinetic energy tolerance
 const double potentialTol 	= 1e-16;		// potential energy tolerance
 
 // force parameters
-const double kl 			= 2.0;			// perimeter force constant
-const double ka 			= 2.0;			// area force constant
+const double kl 			= 1.0;			// perimeter force constant
+const double ka 			= 1.0;			// area force constant
 const double gam 			= 0.0;			// surface tension force constant
 const double kb 			= 0.0;			// bending energy constant
-const double kint 			= 1.0;			// interaction energy constant
+const double kint 			= 5.0;			// interaction energy constant
 const double del 			= 0.1;			// width of circulo lines
 const double C 				= 0.0;			// attraction parameter (strength)
 const double l 				= 0.0;			// attraction parameter (distance)
