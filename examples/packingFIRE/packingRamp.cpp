@@ -23,9 +23,9 @@ int main(){
 	string energyStr = "examples/packingFIRE/packingRampEnergy.test";
 
 	// input params
-	int NCELLS 	= 12;
+	int NCELLS 	= 10;
 	int NT 		= 1e7;
-	int NPRINT 	= 1e4;
+	int NPRINT 	= 5e2;
 	double L 	= 10.0*NCELLS;
 
 	// instantiate object
@@ -85,10 +85,10 @@ int main(){
 	*****************/
 
 	// simulation params
-	double timeStepMag 			= 0.05;
-	double initialPhi 			= 0.5;
+	double timeStepMag 			= 0.025;
+	double initialPhi 			= 0.7;
 	double deltaPhi 			= 0.002;
-	double kineticTol 			= 1e-30;
+	double kineticTol 			= 1e-16;
 	double potentialTol 		= 1e-16;
 	double fixedTemperature		= 1e-2;	
 	double dCalA				= 0.001;
@@ -125,7 +125,7 @@ int main(){
 	// packingObject.shapeRelaxRamp(asphericity,dCalA,kineticTol,potentialTol);
 
 	// compress system until jamming
-	packingObject.jammingFireRamp(deltaPhi,dCalA,asphericity,kineticTol,potentialTol);
+	packingObject.jammingFireRamp(deltaPhi,dCalA,asphericity,kb,kineticTol,potentialTol);
 
 	// end code
 	cout << "Finished running simulation in packingRamp.cpp" << endl;

@@ -159,7 +159,7 @@ public:
 
 	// printers
 	void printSystemPositions(int frame);
-	void printSystemEnergy(int frame, double totalTime);
+	void printSystemEnergy(int frame, double Uval, double Kval);
 	void printSystemStats();
 
 
@@ -175,14 +175,12 @@ public:
 	// looping functions
 	void msFire(double dphi0, double dphiJ, double phiJGuess, double Ktol, double Ftol);
 	void msDamping(double dphi, double Ktol, double Ftol, double dampingParameter);
-	int fireRelax(double Ftol, double dampingParameter, int plotIt, int& frameCount);
 	int potentialRelaxFire(double kineticTol, double potentialTol, int plotIt, int& frameCount);
 	void jammingDamping(double dphi, double Ktol, double Utol, double dampingParameter);	// NEEDS WORKS
 	void jammingFire(double dphi, double Ktol, double Utol);	// NEEDS WORKS
-	void jammingFireRamp(double dphi, double dCalA, double asphericityTarget, double Ktol, double Utol);
+	void jammingFireRamp(double dphi, double dCalA, double asphericityTarget, double kbTarget, double Ktol, double Utol);
 
 	// non-equilibrium MD functions
-	void isoExtension(double phiTarget, double dPhiRate, double dampingParameter);
 	void isoExtensionQS(double phiTarget, double dphi, double dampingParameter);
 
 
