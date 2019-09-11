@@ -1280,7 +1280,7 @@ int cellPacking2D::potentialRelaxFire(double kineticTol, double potentialTol, in
 
 		// check for constant U
 		dUcheck = abs(Unew - Uold);
-		if (dUcheck < constTol){
+		if (dUcheck < cell(0).getNV()*NCELLS*constTol){
 			nucheck++;
 			if (nucheck > NPLATEAU)
 				Uconst = 1;	
@@ -1292,7 +1292,7 @@ int cellPacking2D::potentialRelaxFire(double kineticTol, double potentialTol, in
 
 		// if minimized, return 1
 		// if (Uconst == 1 || (Unew < potentialTol && Knew < kineticTol) || (Unew > 2*potentialTol && Knew < kineticTol)){
-		if (Knew < kineticTol && (Uconst == 1 || Unew < potentialTol)){
+		if (Knew < cell(0).getNV()*NCELLS*kineticTol && (Uconst == 1 || Unew < cell(0).getNV()*NCELLS*potentialTol)){
 			cout << "Energy sufficiently minimized/relaxed at t = " << t << endl;
 			cout << "Fmax = " << maxForceMagnitude() << endl;
 			cout << "U = " << Unew << endl;
