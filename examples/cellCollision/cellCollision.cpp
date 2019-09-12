@@ -38,11 +38,11 @@ int main(){
 	}
 
 	// box variables
-	double L = 25.0;
+	double L = 35.0;
 
 	// Basic cell variables (cells will be identical)
 	int NV = 30;
-	double kl,ka,gam,kb,kint,l0,a0,del,a,segmentMass;
+	double kl,ka,gam,kb,kint,l0,a0,del,C,l,segmentMass;
 	double asphericity;
 	double polyRad;
 
@@ -50,13 +50,14 @@ int main(){
 	l0 = 1.0;
 
 	// set interaction distance to a fraction of l0
-	del = 0.4*l0;
+	del = 0.1*l0;
 
 	// set attraction parameter to be 0, which is in units of delta
-	a = 0.7;
+	C = 0.0;
+	l = 0.0;
 
 	// deformability
-	asphericity = 1.09;
+	asphericity = 1.06;
 	a0 = (NV*NV*l0*l0)/(4*PI*asphericity);
 
 	// size
@@ -65,10 +66,10 @@ int main(){
 	// using perimeter and area force
 	kl = 1.0;
 	ka = 1.0;
-	kb = 30.0;
+	kb = 2.0;
 
 	// set a strong interaction parameter
-	kint = 10.0;
+	kint = 1.0;
 
 	// NOT using surface tension and bending force
 	gam = 0.0;
@@ -87,22 +88,24 @@ int main(){
 	// set initial position of cells to be on either side of box,
 	// on slightly different lines so the cells bounce off of one another
 	// and scatter
-	cell1.setCPos(0,0.5*L - polyRad);
+	cell1.setCPos(0,0.3*L);
 	cell1.setCPos(1,0.55*L);
 
-	cell2.setCPos(0,0.5*L + polyRad);
+	cell2.setCPos(0,0.7*L);
 	cell2.setCPos(1,0.45*L);
 
 	// set values for dimensional quantities to set scales
 	cell1.setl0(l0);
 	cell1.seta0(a0);
 	cell1.setdel(del);
-	cell1.seta(a);
+	cell1.setC(C);
+	cell1.setl(l);
 
 	cell2.setl0(l0);
 	cell2.seta0(a0);
 	cell2.setdel(del);
-	cell2.seta(a);
+	cell2.setC(C);
+	cell2.setl(l);
 
 	// set force constants
 	cell1.setkl(kl);
@@ -122,20 +125,24 @@ int main(){
 	cell1.regularPolygon();
 	cell2.regularPolygon(a0);
 
+	cout << "perturbing perimeter slightly" << endl;
+	cell1.vertexPerturbation(0.4);
+	cell2.vertexPerturbation(0.4);
+
 	cout << "initial area = " << cell1.area() << endl;
 	cout << "a0 = " << a0 << endl;
 
 	// run cell collision event
-	int NT = 7000;
-	int NFRAMES = 500;
+	int NT = 10000;
+	int NFRAMES = 1000;
 	int NPRINT = floor(NT/(NFRAMES-1));
 	int printCount = 0;
 	int inContact = 0;
 	double timeScale = sqrt((segmentMass*l0*l0)/kint);
-	double dt = 0.025*timeScale;
+	double dt = 0.02*timeScale;
 
 	// use damping 
-	double dampingParam = 1.9*sqrt(segmentMass*kint);
+	double dampingParam = 0.0*sqrt(segmentMass*kint);
 
 	// print initial configuration
 	cout << "printing INITIAL vertex positions" << endl;
@@ -151,7 +158,7 @@ int main(){
 	cell2.printVertexPositions(vertexPrintObject,1);
 
 	// initialize velocities for collision
-	double vscale = 1.5*(l0/timeScale);
+	double vscale = 0.2*(l0/timeScale);
 
 	// initialize velocities for shape relaxation
 	for (i=0; i<NV; i++){
@@ -185,29 +192,17 @@ int main(){
 		cell1.updateCPos();
 		cell2.updateCPos();
 
+		// give velocity
+		if (t == 20){
+			cell1.setCVel(0,vscale);
+			cell1.setCVel(1,0.0);
+			cell2.setCVel(0,-vscale);
+			cell2.setCVel(1,0.0);
+		}
+
 		// update vertex forces
 		cell1.shapeForces();
 		cell2.shapeForces();
-
-		// segment interaction force
-		if (t >= NT/5){
-			if (t == NT/5){
-				cell1.setCVel(0,vscale);
-				cell1.setCVel(1,0.0);
-				cell2.setCVel(0,-vscale);
-				cell2.setCVel(1,0.0);
-			}
-			else if (t == 2*NT/5){
-				cell1.setCVel(0,-vscale);
-				cell1.setCVel(1,0.0);
-				cell2.setCVel(0,vscale);
-				cell2.setCVel(1,0.0);
-				a *= 1.3;
-				cell1.seta(a);
-				cell2.seta(a);
-			}
-			
-		}
 
 		// calculate interaction
 		inContact = cell1.segmentForce(cell2);
@@ -228,8 +223,7 @@ int main(){
 			cell2.printVertexPositions(vertexPrintObject,1);
 
 			cout << "	* Printing cell energy to file" << endl;
-			cell1.printCellEnergy(energyPrintObject,printCount+1);
-			cell2.printCellEnergy(energyPrintObject,printCount+1);
+			energyPrintObject << cell1.totalKineticEnergy() + cell2.totalKineticEnergy() << " " << cell1.totalPotentialEnergy() + cell2.totalPotentialEnergy() << endl;
 			cout << endl << endl;
 			printCount++;
 		}

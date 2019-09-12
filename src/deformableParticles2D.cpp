@@ -979,13 +979,13 @@ void deformableParticles2D::perimeterForce(){
 		im1 = (i-1+NV) % NV;
 
 		// get constants
-		Cim1 = 1-(l0/segmentLength(im1));
-		Ci = 1-(l0/segmentLength(i));
+		Cim1 = 1.0-(l0/segmentLength(im1));
+		Ci = 1.0-(l0/segmentLength(i));
 
 		// loop over dimensions, add to force
 		for (d=0; d<NDIM; d++){
 			ftmp = Ci*segment(i,d) - Cim1*segment(im1,d);
-			ftmp *= kl*NV;
+			ftmp *= kl;
 			setVForce(i,d,vforce(i,d)+ftmp);
 		}
 	}
@@ -1083,7 +1083,7 @@ void deformableParticles2D::surfaceTensionForce(){
 		for (d=0; d<NDIM; d++){
 			// get unit vector components
 			im1UnitVectorComponent = segment(im1,d)/segmentLength(im1);
-			iUnitVectorComponent = segment(i,d)/segmentLength(im1);
+			iUnitVectorComponent = segment(i,d)/segmentLength(i);
 			ftmp = -gam*(iUnitVectorComponent - im1UnitVectorComponent);
 
 			// add to force
@@ -1217,7 +1217,7 @@ int deformableParticles2D::segmentForce(deformableParticles2D &onTheRight){
 	vector<int> possibleMuEdges;			// set of feasible edges on cell mu (this)
 	vector<int> possibleNuEdges;			// set of feasible edges on cell nu (onTheRight)
 	double vertexCenterDotProduct;			// dot product between vertex location and center-to-center vector
-	double dpTol = 0.1;						// cutoff for dot product between vertex location and center-to-center vector
+	double dpTol = 0.2;						// cutoff for dot product between vertex location and center-to-center vector
 
 	// initialize force vectors here
 	vector< vector<double> > muForce;
@@ -1574,13 +1574,14 @@ int deformableParticles2D::segmentForce(deformableParticles2D &onTheRight){
 					uTmp = 0.5 * forceScale * pow(1 - distScale,2);
 
 					// distribute to vertex and line
+					/*
 					if (pointIsI){
 						// add to vertex
 						setUInt(i,uInt(i) + uTmp);
 
 						// distribute to line
 						onTheRight.setUInt(j,onTheRight.uInt(j) + (ti_j/lj)*uTmp);
-						onTheRight.setUInt(jp1,onTheRight.uInt(jp1) + (1 - (ti_j/lj))*uTmp);
+						onTheRight.setUInt(jp1,onTheRight.uInt(jp1) + (1.0 - (ti_j/lj))*uTmp);
 					}
 					else if (pointIsIp1){
 						// add to vertex
@@ -1588,12 +1589,12 @@ int deformableParticles2D::segmentForce(deformableParticles2D &onTheRight){
 
 						// distribute to line
 						onTheRight.setUInt(j,onTheRight.uInt(j) + (tip1_j/lj)*uTmp);
-						onTheRight.setUInt(jp1,onTheRight.uInt(jp1) + (1 - (tip1_j/lj))*uTmp);
+						onTheRight.setUInt(jp1,onTheRight.uInt(jp1) + (1.0 - (tip1_j/lj))*uTmp);
 					}
 					else if (pointIsJ){
 						// distribute to line
 						setUInt(i,uInt(i) + (tj_i/li)*uTmp);
-						setUInt(ip1,uInt(ip1) + (1 - (tj_i/li))*uTmp);
+						setUInt(ip1,uInt(ip1) + (1.0 - (tj_i/li))*uTmp);
 
 						// add to vertex
 						onTheRight.setUInt(j,onTheRight.uInt(j) + uTmp);
@@ -1601,11 +1602,15 @@ int deformableParticles2D::segmentForce(deformableParticles2D &onTheRight){
 					else if (pointIsJp1){
 						// distribute to line
 						setUInt(i,uInt(i) + (tjp1_i/li)*uTmp);
-						setUInt(ip1,uInt(ip1) + (1 - (tjp1_i/li))*uTmp);
+						setUInt(ip1,uInt(ip1) + (1.0 - (tjp1_i/li))*uTmp);
 
 						// add to vertex
 						onTheRight.setUInt(jp1,onTheRight.uInt(jp1) + uTmp);
 					}
+					*/
+					setUInt(i,uInt(i) + uTmp);
+					onTheRight.setUInt(j,onTheRight.uInt(j) + uTmp);
+
 				}
 				// IF C,l > 0, top of attractive well
 				else if (dminScalar > del*p1 && dminScalar < del*p2 && C > 0.0 && l > 0.0){
@@ -1689,6 +1694,9 @@ int deformableParticles2D::segmentForce(deformableParticles2D &onTheRight){
 		}
 	}
 
+
+
+	/*
 	// also loop over vertex - vertex interactions
 	for (ii=0; ii<possibleMuEdges.size(); ii++){
 		// get true vertex index
@@ -1699,6 +1707,12 @@ int deformableParticles2D::segmentForce(deformableParticles2D &onTheRight){
 
 		// loop over feasible edges on cell nu (onTheRight)
 		for (jj=0; jj<possibleNuEdges.size(); jj++){
+
+			// get true vertex index
+			j = possibleNuEdges.at(jj);
+
+			// enforce periodic vertex checking
+			jp1 = (j+1) % onTheRight.getNV();
 
 			// get distance between vertices
 			dminTest = 0.0;
@@ -1766,6 +1780,7 @@ int deformableParticles2D::segmentForce(deformableParticles2D &onTheRight){
 			}
 		}
 	}
+	*/
 
 	// add forces to mu vertices
 	for (i=0; i<NV; i++){
@@ -1784,6 +1799,120 @@ int deformableParticles2D::segmentForce(deformableParticles2D &onTheRight){
 	// return if or if not in contact
 	return inContact;
 }
+
+
+/*
+// force between vertices only
+// 		* interacting parts are disks centered at the vertices with 
+// 		* distances such that delta = line segment length
+
+int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight){
+	// return variable
+	int inContact = 0;
+
+	// local variables
+	int i,j,d;
+
+	// -------------------------
+	// 
+	// 	   Distance cutoff
+	//
+	// -------------------------
+
+	// section variables
+	double centerDistance = 0.0; 			// center-to-center distance
+	vector<double> deltaMuNu(NDIM,0.0);		// vector to store center-to-center distance vector
+	double muREff,nuREff,buffer;			// variables to determine effect cell contact distance
+	double distTmp = 0.0;					// temporary distance, for mimimum image convention (MIC)
+
+
+	// calculate connecting vector deltaMuNu
+	for (d=0; d<NDIM; d++){
+		// get distance
+		distTmp = onTheRight.cpos(d)-cpos(d);
+		distTmp = distTmp - L*round(distTmp/L);
+
+		// save distance in vector
+		deltaMuNu.at(d) = distTmp;
+
+		// calculate vector norm
+		centerDistance += pow(distTmp,2);
+	}
+	centerDistance = sqrt(centerDistance);
+
+	// get effect radii
+	muREff = sqrt(area()/PI);
+	nuREff = sqrt(onTheRight.area()/PI);
+	buffer = 0.1*perimeter();
+
+	// if not close enough, return 0
+	if ((muREff + nuREff + del + buffer) < centerDistance)
+		return 0;
+
+	// -------------------------
+	// 
+	// 	   Feasible edges
+	//
+	// -------------------------
+
+	// section variables
+	vector<int> possibleMuEdges;			// set of feasible edges on cell mu (this)
+	vector<int> possibleNuEdges;			// set of feasible edges on cell nu (onTheRight)
+	double vertexCenterDotProduct;			// dot product between vertex location and center-to-center vector
+	double dpTol = 0.1;						// cutoff for dot product between vertex location and center-to-center vector
+
+	// initialize force vectors here
+	vector< vector<double> > muForce;
+	vector< vector<double> > nuForce;
+	vector<double> tmpForceVec(NDIM,0.0);
+
+
+	// loop over vertices i on mu (this) and check dot products with deltaMuNu to determine feasibility
+	for (i=0; i<NV; i++){
+		// initialize dot product between r_mu,i and deltaMuNu to be 0
+		vertexCenterDotProduct = 0.0;
+
+		// calculate dot product 
+		for (d=0; d<NDIM; d++)
+			vertexCenterDotProduct += vrel(i,d)*deltaMuNu.at(d);
+
+		// check sign (+ means feasible contact)
+		if (vertexCenterDotProduct > dpTol)
+			possibleMuEdges.push_back(i);
+
+		// push back entries to vector for force calculation
+		muForce.push_back(tmpForceVec);
+	}
+
+	// loop over vertices j on nu (onTheRight) and check dot products with deltaMuNu to determine feasibility
+	for (j=0; j<onTheRight.getNV(); j++){
+		// initialize dot product between r_nu,j and deltaMuNu to be 0
+		vertexCenterDotProduct = 0.0;
+
+		// calculate dot product 
+		for (d=0; d<NDIM; d++)
+			vertexCenterDotProduct += onTheRight.vrel(j,d)*deltaMuNu.at(d);
+
+		// check sign (- means feasible contact)
+		if (vertexCenterDotProduct < -dpTol)
+			possibleNuEdges.push_back(j);
+
+		// push back entries to vector for force calculation
+		nuForce.push_back(tmpForceVec);
+	}
+
+	// -------------------------
+	// 
+	// 	Vertex force calculation
+	//
+	// -------------------------
+}
+*/
+
+
+
+
+
 
 // harmonic spring force between centers of overlapping particles
 int deformableParticles2D::radialForce(deformableParticles2D &onTheRight){
