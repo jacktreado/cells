@@ -25,7 +25,7 @@ int main(){
 	// input params
 	int NCELLS 	= 10;
 	int NT 		= 1e7;
-	int NPRINT 	= 5e2;
+	int NPRINT 	= 1e2;
 	double L 	= 10.0*NCELLS;
 
 	// instantiate object
@@ -50,7 +50,7 @@ int main(){
 	l 			= 0.0;
 
 	// asphericity
-	asphericity = 1.1;
+	asphericity = 1.08;
 
 	// temperature
 	T0 = 1e-4;
@@ -85,8 +85,8 @@ int main(){
 	*****************/
 
 	// simulation params
-	double timeStepMag 			= 0.025;
-	double initialPhi 			= 0.7;
+	double timeStepMag 			= 0.03;
+	double initialPhi 			= 0.6;
 	double deltaPhi 			= 0.002;
 	double kineticTol 			= 1e-16;
 	double potentialTol 		= 1e-16;

@@ -465,7 +465,7 @@ void cellPacking2D::squareLattice(){
 		cell(ci).regularPolygon();
 
 		// perturb vertices a lil bit
-		cell(ci).vertexPerturbation(0.1);
+		cell(ci).vertexPerturbation(0.5);
 
 		// output cell asphericities
 		cout << "initializing cell " << ci << " on square lattice, initial asphericity = " << cell(ci).asphericity();
@@ -662,6 +662,19 @@ double cellPacking2D::shapePotentialEnergy(){
 	// loop over cells, add potential energy
 	for (ci=0; ci<NCELLS; ci++)
 		val += (cell(ci).perimeterEnergy() + cell(ci).areaEnergy());
+
+	// return value
+	return val;
+}
+
+double cellPacking2D::relaxPotentialEnergy(){
+	// local variables
+	int ci;
+	double val = 0.0;
+
+	// loop over cells, add potential energy
+	for (ci=0; ci<NCELLS; ci++)
+		val += (cell(ci).perimeterEnergy() + cell(ci).areaEnergy() + cell(ci).interactionEnergy());
 
 	// return value
 	return val;
@@ -1147,7 +1160,7 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 
 		// relax shapes (energies calculated in relax function)
 		potentialRelaxFire(Ktol,Utol,plotIt,k);
-		Unew = totalPotentialEnergy();
+		Unew = relaxPotentialEnergy();
 		Knew = T;
 
 		// remove rattlers
@@ -1211,16 +1224,18 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 int cellPacking2D::potentialRelaxFire(double kineticTol, double potentialTol, int plotIt, int& frameCount){
 	// local variables
 	int t,np,nv,nt,nucheck,Uconst,NPLATEAU;
-	double Fmax,Knew,Unew,Uold,dUtol,dUcheck,alpha,constTol;
+	double Fmax,Knew,Unew,Fnetmax,Uold,dUtol,dUcheck,alpha,constTol;
 	double totalTime = 0.0;
 
 	// check for constant U
+	Fnetmax = 0.0;
 	Unew = 0.0;
 	Knew = 0.0;
 	Uold = 0.0;
 	nucheck = 0;
 	Uconst = 0;
-	constTol = 1e-6;
+	constTol = potentialTol;
+	dUcheck = 10*constTol;
 	NPLATEAU = 200;
 
 	// initial values of FIRE variables
@@ -1255,7 +1270,7 @@ int cellPacking2D::potentialRelaxFire(double kineticTol, double potentialTol, in
 			cout << "	* U 		= " << Unew << endl;
 			cout << "	* K 		= " << Knew << endl;
 			cout << "	* Fmax 		= " << maxForceMagnitude() << endl;
-			cout << "	* Fnet		= " << maxNetForceMagnitude() << endl;
+			cout << "	* Fnetmax	= " << Fnetmax << endl;
 			cout << "	* phi 		= " << phi << endl;
 			cout << "	* dt 		= " << dt << endl;
 			cout << "	* alpha 	= " << alpha << endl;
@@ -1275,11 +1290,12 @@ int cellPacking2D::potentialRelaxFire(double kineticTol, double potentialTol, in
 
 		// update kinetic and potential energy (T updated in fverlet)
 		Uold = Unew;
-		Unew = totalPotentialEnergy();
+		Unew = relaxPotentialEnergy();
+		Fnetmax = maxNetForceMagnitude();
 		Knew = T;
 
 		// check for constant U
-		dUcheck = abs(Unew - Uold);
+		dUcheck = abs(Unew - Uold)/(cell(0).getNV()*NCELLS*constTol);
 		if (dUcheck < cell(0).getNV()*NCELLS*constTol){
 			nucheck++;
 			if (nucheck > NPLATEAU)
@@ -1291,8 +1307,13 @@ int cellPacking2D::potentialRelaxFire(double kineticTol, double potentialTol, in
 		}
 
 		// if minimized, return 1
-		// if (Uconst == 1 || (Unew < potentialTol && Knew < kineticTol) || (Unew > 2*potentialTol && Knew < kineticTol)){
-		if (Knew < cell(0).getNV()*NCELLS*kineticTol && (Uconst == 1 || Unew < cell(0).getNV()*NCELLS*potentialTol)){
+		if ( Fnetmax < potentialTol || ( Knew < cell(0).getNV()*NCELLS*kineticTol && (Uconst == 1 || Unew < cell(0).getNV()*NCELLS*potentialTol) ) ) {
+		// if (Knew < cell(0).getNV()*NCELLS*kineticTol && (Uconst == 1 || Fnetmax < cell(0).getNV()*NCELLS*potentialTol)){
+			if (Uconst == 1)
+				cout << "*** Uconst = 1" << endl;
+			else
+				cout << "*** U < Utol" << endl;
+
 			cout << "Energy sufficiently minimized/relaxed at t = " << t << endl;
 			cout << "Fmax = " << maxForceMagnitude() << endl;
 			cout << "U = " << Unew << endl;
@@ -1865,7 +1886,7 @@ void cellPacking2D::fireStep(int& np, double& alpha){
 	// HARD CODE IN FIRE PARAMETERS
 	const double alpha0 	= 0.1;
 	const double finc 		= 1.1;
-	const double fdec 		= 0.5;
+	const double fdec 		= 0.3;
 	const double falpha 	= 0.99;
 	const double dtmax 		= 20*dt0;
 	const int NMIN 			= 50;

@@ -131,6 +131,7 @@ public:
 	double timeScale();						// MD characteristic time scale
 	double packingFraction();				// calculate system packing fraction
 	double shapePotentialEnergy();			// calculate potential energy due to shape
+	double relaxPotentialEnergy();			// potential energy - bending energy
 	double totalPotentialEnergy();			// calculate total potential energy
 	double interactionPotentialEnergy();	// calculate only interaction potential energy
 	double totalKineticEnergy();			// calculate total kinetic energy
