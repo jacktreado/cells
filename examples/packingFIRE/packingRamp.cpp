@@ -23,9 +23,9 @@ int main(){
 	string energyStr = "examples/packingFIRE/packingRampEnergy.test";
 
 	// input params
-	int NCELLS 	= 10;
+	int NCELLS 	= 12;
 	int NT 		= 1e7;
-	int NPRINT 	= 1e2;
+	int NPRINT 	= 5e2;
 	double L 	= 10.0*NCELLS;
 
 	// instantiate object
@@ -45,7 +45,7 @@ int main(){
 	gam 		= 0.0;
 	kb 			= 0.0;
 	kint 		= 1.0;
-	del 		= 0.1;
+	del 		= 1.0;		// NOTE: NEEDS TO BE = 1.0 IF DOING VERTEX-VERTEX FORCE ONLY
 	C 			= 0.0;
 	l 			= 0.0;
 
@@ -69,7 +69,7 @@ int main(){
 	packingObject.squareLattice();
 
 	cout << "	** Initializing particle velocities with temperature T0 = " << T0 << endl;
-	packingObject.initializeVelocities(1e-4);
+	packingObject.initializeVelocities(T0);
 
 	// open print objects
 	packingObject.openPackingObject(positionsStr);
@@ -85,10 +85,10 @@ int main(){
 	*****************/
 
 	// simulation params
-	double timeStepMag 			= 0.03;
+	double timeStepMag 			= 0.01;
 	double initialPhi 			= 0.6;
 	double deltaPhi 			= 0.002;
-	double kineticTol 			= 1e-16;
+	double kineticTol 			= 1e-24;
 	double potentialTol 		= 1e-16;
 	double fixedTemperature		= 1e-2;	
 	double dCalA				= 0.001;
@@ -114,8 +114,7 @@ int main(){
 
 	// perform initial overlap relief
 	packingObject.overlapRelief();
-
-	packingObject.setT(fixedTemperature);
+	packingObject.initializeVelocities(T0);
 
 	// run simulation 
 	// packingObject.msFire(deltaPhi0,deltaPhiJ,phiJGuess,kineticTol,forceTol);

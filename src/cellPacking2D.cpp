@@ -111,6 +111,104 @@ cellPacking2D::cellPacking2D(int ncells, int nt, int nprint, double l, double s)
 		contactMatrix[i] = 0;
 }
 
+// overloaded constructor for tumorous tissue simulation
+cellPacking2D::cellPacking2D(int ncells, int ntumor, int tumorNV, int adiposeNV, double tumorCalA, double adiposeCalA, int s){
+	// local variables
+	int i, ci, NC;
+
+	// set initial seed
+	seed = s;
+
+	// first use starting variabls
+	defaultvars();
+
+	// set member variables based on inputs
+	NCELLS 		= ncells;
+	L 			= 10.0*NCELLS;
+
+	// test for error in inputs
+	if (NCELLS <= 0){
+		cout << "	ERROR: in adipose tissue constructor, NCELLS <= 0 so cannot initialize arrays, ending code here." << endl;
+		exit(1);
+	}
+	else if (ntumor <= 0){
+		cout << "	ERROR: in adipose tissue constructor, ntumor <= 0 so cannot initialize arrays, ending code here." << endl;
+		exit(1);
+	}
+	else if (tumorNV <= 2){
+		cout << "	ERROR: in adipose tissue constructor, tumorNV = " << tumorNV << " which is too small for cells, ending." << endl;
+	}
+	else if (adiposeNV <= 2){
+		cout << "	ERROR: in adipose tissue constructor, adiposeNV = " << adiposeNV << " which is too small for cells, ending." << endl;
+	}
+
+	// test that memory has not yet been initialized
+	if (contactMatrix){
+		cout << "	ERROR: in overloaded operator, contactMatrix ptr already initialized, ending code here." << endl;
+		exit(1);
+	}
+
+	// initialize cell array
+	cellArray = new deformableParticles2D[NCELLS];
+
+	// initialize contact matrix
+	NC = NCELLS*(NCELLS-1)/2;
+	contactMatrix = new int[NC];
+
+	// intialize contact matrix to 0
+	for (i=0; i<NC; i++)
+		contactMatrix[i] = 0;
+
+	// initialize cells as ntumor tumor cells, rest adipose
+	for (ci=0; ci<NCELLS; ci++){
+
+		// set box length for each cell
+		cell(ci).setL(L);
+
+		// tumor cells
+		if (ci < ntumor){
+			// initialize arrays in tumor cells
+			cell(ci).setNV(tumorNV);
+			cell(ci).initializeVertices();
+			cell(ci).initializeCell();
+
+			// set tumor asphericity
+			cell(ci).setAsphericity(tumorCalA);
+		}
+
+		// adipose cells
+		else{
+			// initialize arrays in adipose cells
+			cell(ci).setNV(adiposeNV);
+			cell(ci).initializeVertices();
+			cell(ci).initializeCell();
+
+			// set adipose asphericity
+			cell(ci).setAsphericity(adiposeCalA);
+		}
+	}
+
+	// force constants for adipose simulation
+	double kl,ka,gam,kb,kint,del,C,l;
+
+	// set force constant values
+	kl 		= 1.0;
+	ka 		= 1.0;
+	gam 	= 0.0;
+	kb 		= 2.0;
+	kint 	= 1.0;
+	del 	= 1.0;		// USING VERTEX FORCES, SO DEL MUST BE SET TO L0!
+	C 		= 0.0;
+	l 		= 0.0;
+
+	// set values
+	initializeForceConstants(kl,ka,gam,kb,kint);
+	initializeInteractionParams(del,C,l);
+
+	// initialize cell positions on a square lattice
+	squareLattice();
+}
+
 // overloaded constryctor with file stream object as argument
 cellPacking2D::cellPacking2D(ifstream& inputFileObject, double asphericity, double s){
 	// set initial seed
@@ -529,6 +627,28 @@ void cellPacking2D::initializeVelocities(double tmp0){
 }
 
 
+void cellPacking2D::initializeVelocities(int ci, double tmp0){
+	// local variables
+	int d;
+	double rv, vscale, ek;
+
+	// create random velocities
+	for (d=0; d<NDIM; d++){
+		rv = drand48();
+		cell(ci).setCVel(d,rv);
+	}
+
+	// calc kinetic energy
+	ek = 0.0;
+	for (d=0; d<NDIM; d++)
+		ek += 0.5*pow(cell(ci).cvel(d),2);
+
+	// get vscale
+	vscale = sqrt(tmp0/(cell(ci).area()*ek));
+	for (d=0; d<NDIM; d++)
+    	cell(ci).setCVel(d,cell(ci).cvel(d)*vscale);
+}
+
 
 
 
@@ -624,7 +744,8 @@ double cellPacking2D::timeScale(){
 	double charMass, charLength, charEnergy, val;
 
 	// characteristic mass
-	charMass = cell(0).getdel()*(cell(0).getl0() + PI*0.5*cell(0).getdel());
+	// charMass = cell(0).getdel()*(cell(0).getl0() + PI*0.5*cell(0).getdel());
+	charMass = 0.25*PI*cell(0).getdel(); 		// needs to be this for mass if vertex forces only
 	charLength = cell(0).getdel();
 	charEnergy = cell(0).getkint();
 
@@ -642,8 +763,10 @@ double cellPacking2D::packingFraction(){
 	double val = 0.0;
 
 	// loop over cells, packing fraction is : triangular area + 0.5*delta*perimeter area + area of circular corners
-	for (ci=0; ci<NCELLS; ci++)
+	for (ci=0; ci<NCELLS; ci++){
 		val += cell(ci).area() + (0.5*cell(ci).getdel())*cell(ci).perimeter() + PI*0.25*cell(ci).getdel()*cell(ci).getdel();
+		// val += cell(ci).area();		// needs to be this if vertex forces only
+	}
 
 	// divide by box area
 	val /= pow(L,NDIM);
@@ -984,9 +1107,6 @@ int cellPacking2D::removeRattlers(int krcrs){
 
 
 // print positions to file
-// NOTE: COMMENT-OUT FRAME INFORMATION, READ IN DATA ON THE FLY IN MATLAB
-// 	* in future, maybe have trajectory-specific file that includes # of frames? but this seems restrictive, so for now
-// 	* don't give frame information
 void cellPacking2D::printSystemPositions(int frame){
 	// local variables
 	int w1 = 12;
@@ -1072,6 +1192,34 @@ void cellPacking2D::printSystemStats(){
 
 
 
+
+/************************
+
+	Calculate forces
+
+*************************/
+
+// calculate all forces, both shape and pairwise
+void cellPacking2D::calculateForces(){
+	// local variables
+	int ci,cj,inContact;
+
+	// loop over cells and cell pairs, calculate shape and interaction forces
+	for (ci=0; ci<NCELLS; ci++){
+		// loop over pairs, add info to contact matrix
+		for (cj=ci+1; cj<NCELLS; cj++){
+			inContact = cell(ci).vertexForce(cell(cj));
+			if (inContact == 1)
+				addContact(ci,cj);
+		}
+
+		// forces on vertices due to shape
+		cell(ci).shapeForces();
+	}
+}
+
+
+
 /**************************
 
 	Simulation Functions
@@ -1094,6 +1242,7 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 
 	// initialize structure to unjammed
 	isjammed = 0;
+	nr = NCELLS;
 
 	// initialize current calA
 	asphericityLow = 1;
@@ -1223,20 +1372,14 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 
 int cellPacking2D::potentialRelaxFire(double kineticTol, double potentialTol, int plotIt, int& frameCount){
 	// local variables
-	int t,np,nv,nt,nucheck,Uconst,NPLATEAU;
-	double Fmax,Knew,Unew,Fnetmax,Uold,dUtol,dUcheck,alpha,constTol;
+	int t,np,nv,nt,nc;
+	double Fmax,Knew,Unew,Fnetmax,alpha;
 	double totalTime = 0.0;
 
 	// check for constant U
 	Fnetmax = 0.0;
 	Unew = 0.0;
 	Knew = 0.0;
-	Uold = 0.0;
-	nucheck = 0;
-	Uconst = 0;
-	constTol = potentialTol;
-	dUcheck = 10*constTol;
-	NPLATEAU = 200;
 
 	// initial values of FIRE variables
 	np = 0;
@@ -1244,6 +1387,9 @@ int cellPacking2D::potentialRelaxFire(double kineticTol, double potentialTol, in
 
 	// get typical number of vertices
 	nv = cell(0).getNV();
+
+	// get number of contacts
+	nc = totalNumberOfContacts();
 
 	// loop over time, compress until mechanically stable and quiescent (i.e. K < Ktol & F < Ftol)
 	for (t=0; t<NT; t++){
@@ -1274,10 +1420,7 @@ int cellPacking2D::potentialRelaxFire(double kineticTol, double potentialTol, in
 			cout << "	* phi 		= " << phi << endl;
 			cout << "	* dt 		= " << dt << endl;
 			cout << "	* alpha 	= " << alpha << endl;
-			cout << "	* nc 		= " << totalNumberOfContacts() << endl;
-			cout << "	* dUcheck	= " << dUcheck << endl;
-			cout << "	* Uconst	= " << Uconst << endl;
-			cout << "	* nucheck	= " << nucheck << endl;
+			cout << "	* nc 		= " << nc << endl;
 			cout << endl << endl;
 			
 		}
@@ -1288,33 +1431,28 @@ int cellPacking2D::potentialRelaxFire(double kineticTol, double potentialTol, in
 		// make verlet update
 		fverlet(np,alpha,0.0);
 
+		// get number of contacts
+		nc = totalNumberOfContacts();
+
 		// update kinetic and potential energy (T updated in fverlet)
-		Uold = Unew;
 		Unew = relaxPotentialEnergy();
 		Fnetmax = maxNetForceMagnitude();
 		Knew = T;
 
-		// check for constant U
-		dUcheck = abs(Unew - Uold)/(cell(0).getNV()*NCELLS*constTol);
-		if (dUcheck < cell(0).getNV()*NCELLS*constTol){
-			nucheck++;
-			if (nucheck > NPLATEAU)
-				Uconst = 1;	
-		}
-		else{
-			nucheck = 0;
-			Uconst = 0;
-		}
-
 		// if minimized, return 1
-		if ( Fnetmax < potentialTol || ( Knew < cell(0).getNV()*NCELLS*kineticTol && (Uconst == 1 || Unew < cell(0).getNV()*NCELLS*potentialTol) ) ) {
-		// if (Knew < cell(0).getNV()*NCELLS*kineticTol && (Uconst == 1 || Fnetmax < cell(0).getNV()*NCELLS*potentialTol)){
-			if (Uconst == 1)
-				cout << "*** Uconst = 1" << endl;
-			else
-				cout << "*** U < Utol" << endl;
-
+		if ( Fnetmax < potentialTol || Unew < cell(0).getNV()*NCELLS*potentialTol || ( Knew < cell(0).getNV()*NCELLS*kineticTol && Unew > 2*cell(0).getNV()*NCELLS*potentialTol && nc > 0 ) ) {
+			// print to console
 			cout << "Energy sufficiently minimized/relaxed at t = " << t << endl;
+
+			// describe which condition is met
+			if (Fnetmax < potentialTol)
+				cout << "*** Fnetmax < tol" << endl;
+			else if (Unew < cell(0).getNV()*NCELLS*potentialTol)
+				cout << "*** U < Utol" << endl;
+			else
+				cout << "*** mechanically stable!" << endl;
+
+			// print extra info
 			cout << "Fmax = " << maxForceMagnitude() << endl;
 			cout << "U = " << Unew << endl;
 			cout << "K = " << totalKineticEnergy() << endl;
@@ -1343,8 +1481,199 @@ int cellPacking2D::potentialRelaxFire(double kineticTol, double potentialTol, in
 	return 0;
 }
 
+// perform single step of a verlet integration with FIRE minimization
+void cellPacking2D::fverlet(int& np, double& alpha, double dampingParameter){
+	// local variables
+	int i;
 
-// // NON-EQUILIBRIUM MD FUNCTIONS
+	// update positions
+	for (i=0; i<NCELLS; i++){
+		cell(i).verletPositionUpdate(dt);
+		cell(i).updateCPos();
+	}
+
+	// reset contacts before force calculation
+	resetContacts();
+
+	// calculate forces
+	calculateForces();
+
+	// update velocities
+	for (i=0; i<NCELLS; i++)
+		cell(i).verletVelocityUpdate(dt,dampingParameter);
+
+	// perform FIRE step
+	fireStep(np,alpha);
+}
+
+// relieve overlap between particles
+void cellPacking2D::overlapRelief(){
+	// local variables
+	int ci,cj,k,kmax,fcheck,fconst,inContact;
+	int frameCount = 0;
+	double Fnew,Fold,dF,Ftol,dampingParameter;
+
+	// interaction variables
+	double dist2, cdist2;
+
+	// initial variables for checking for constant U
+	fcheck = 0;
+	fconst = 0;
+	Fold = 0.0;
+	Ftol = 1e-8;
+
+	// damping
+	dampingParameter = 0.3;
+
+	// max number of iterations
+	kmax = 1e5;
+
+	// loop over system and push cells aways from one another 
+	// as damped frictionless disks until force has plateau'd constant
+	while (fconst == 0 && k < kmax){
+		// update particle positions
+		for (ci=0; ci<NCELLS; ci++){
+			cell(ci).verletPositionUpdate(20*dt);
+			cell(ci).updateCPos();
+		}
+
+		// update forces based on center-to-center distances only
+		for (ci=0; ci<NCELLS; ci++){
+			// loop over pairs, add info to contact matrix
+			for (cj=ci+1; cj<NCELLS; cj++){
+				inContact = cell(ci).radialForce(cell(cj));
+				if (inContact == 1)
+					addContact(ci,cj);
+			}
+		}
+
+		// update damped velocities
+		for (ci=0; ci<NCELLS; ci++)
+			cell(ci).verletVelocityUpdate(20*dt,dampingParameter);
+
+		// check that F is below threshold and constant
+		Fnew = maxForceMagnitude();
+		dF = Fnew - Fold;
+		Fold = Fnew;
+		if (abs(dF) < Ftol){
+			fcheck++;
+			if (fcheck > 50){
+				fconst = 1;
+				fcheck = 0;
+			}
+			
+		}
+		else{
+			fcheck = 0;
+			fconst = 0;
+		}
+
+		// increment k
+		k++;
+	}
+
+	if (k == kmax){
+		cout << "	ERROR: overlapRelief() function failed, could not reduce potential energy, ending." << endl;
+		exit(1);
+	}
+}
+
+// fire energy minimization
+void cellPacking2D::fireStep(int& np, double& alpha){
+	// HARD CODE IN FIRE PARAMETERS
+	const double alpha0 	= 0.1;
+	const double finc 		= 1.1;
+	const double fdec 		= 0.1;
+	const double falpha 	= 0.99;
+	const double dtmax 		= 20*dt0;
+	const int NMIN 			= 50;
+
+	// local variables
+	int ci,vi,d;
+	double P,vstarnrm,fstarnrm,vtmp,ftmp;
+
+	// calculate P and norms
+	P = 0.0;
+	vstarnrm = 0.0;
+	fstarnrm = 0.0;
+	for (ci=0; ci<NCELLS; ci++){
+		for (vi=0; vi<cell(ci).getNV(); vi++){
+			for (d=0; d<NDIM; d++){
+				// get tmp variables
+				ftmp = cell(ci).vforce(vi,d);
+				vtmp = cell(ci).vvel(vi,d);
+
+				// calculate based on all vertices on all cells
+				P += ftmp*vtmp;
+				vstarnrm += vtmp*vtmp;
+				fstarnrm += ftmp*ftmp;
+			}
+		}
+	}
+
+	// get norms
+	vstarnrm = sqrt(vstarnrm);
+	fstarnrm = sqrt(fstarnrm);
+
+	// update velocities if forces are acting
+	if (fstarnrm > 0){
+		for (ci=0; ci<NCELLS; ci++){
+			for (vi=0; vi<cell(ci).getNV(); vi++){
+				for (d=0; d<NDIM; d++){
+					vtmp = (1 - alpha)*cell(ci).vvel(vi,d) + alpha*(cell(ci).vforce(vi,d)/fstarnrm)*vstarnrm;
+					cell(ci).setVVel(vi,d,vtmp);
+				}
+			}
+		}
+	}
+
+	// save current kinetic energy to temperature variable
+	T = totalKineticEnergy();
+
+	// update P and alpha
+	if (P > 0 && np > NMIN){
+
+		// increase dt
+		if (dt * finc < dtmax)
+			dt *= finc;
+		else
+			dt = dtmax;
+
+		// decrease alpha
+		alpha *= falpha;
+
+		np++;
+	}
+	else if (P <= 0) {
+		// decrease time step, but only to limit
+		if (dt * fdec > dt0)
+			dt *= fdec;
+		else
+			dt = dt0;
+
+		// set global velocity vector to zero
+		for (ci=0; ci<NCELLS; ci++){
+			for (vi=0; vi<cell(ci).getNV(); vi++){
+				for (d=0; d<NDIM; d++){
+					cell(ci).setVVel(vi,d,0.0);
+				}
+			}
+		}
+
+		// set alpha -> alpha0
+		alpha = alpha0;
+
+		// set np -> 0
+		np = 0;
+	}
+	else if (P > 0 && np <= NMIN) 
+		np++;
+}
+
+
+// NON-EQUILIBRIUM MD FUNCTIONS
+
+// quasistaic gel forming function
 void cellPacking2D::isoExtensionQS(double phiTarget, double dphi, double dampingParameter){
 	// local variables
 	int t, frameCount = 0;
@@ -1399,6 +1728,197 @@ void cellPacking2D::isoExtensionQS(double phiTarget, double dphi, double damping
 
 }
 
+// TUMOR TISSUE FUNCTIONS
+
+// NVE dynamics
+void cellPacking2D::tumorNVE(){
+	// local variables
+	int t, ci, frameCount;
+	double U,K;
+
+	// check that NT, NPRINT have been assigned values
+	if (NT <= 0){
+		cout << "	* ERROR: tried to run tumorNVE() function without proper NT, ending." << endl;
+		exit(1);
+	}
+	else if (NPRINT <= 0){
+		cout << "	* ERROR: tried to run tumorNVE() function without proper NPRINT, ending." << endl;
+		exit(1);
+	}
+
+	// reinitialize frame counter
+	frameCount = 0;
+
+	// run NVE for allotted time
+	for (t=0; t<NT; t++){
+		// calculate energies
+		U = totalPotentialEnergy();
+		K = totalKineticEnergy();
+
+		// print data first to get the initial condition
+		if (t % NPRINT == 0){
+			cout << "===================================================" << endl << endl;
+			cout << " 	TUMOR NVE, t = " << t << ", frame = " << frameCount << endl << endl;
+			cout << "===================================================" << endl;
+
+			if (packingPrintObject.is_open()){
+				cout << "	* Printing vetex positions to file" << endl;
+				printSystemPositions(frameCount);
+			}
+			
+			if (energyPrintObject.is_open()){
+				cout << "	* Printing cell energy to file" << endl;
+				printSystemEnergy(frameCount,U,K);
+			}
+			frameCount++;
+			
+			cout << "	* Run data:" << endl;
+			cout << "	* U 		= " << U << endl;
+			cout << "	* K 		= " << K << endl;
+			cout << "	* dt 		= " << dt << endl;
+			cout << "	* nc 		= " << totalNumberOfContacts() << endl;
+			cout << endl << endl;
+		}
+
+		// use velocity verlet to advance time
+
+		// update positions
+		for (ci=0; ci<NCELLS; ci++){
+			cell(ci).verletPositionUpdate(dt);
+			cell(ci).updateCPos();
+		}
+
+		// reset contacts before force calculation
+		resetContacts();
+
+		// calculate forces
+		calculateForces();
+
+		// update velocities
+		for (ci=0; ci<NCELLS; ci++)
+			cell(ci).verletVelocityUpdate(dt,0.0);
+	}
+
+	// print something to conclude
+	cout << "t = NT, which = " << t << ", so ending NVE run!" << endl;
+}
+
+
+void cellPacking2D::tumorForce(int NTUMORCELLS, double forceScale, double adiposeDamping){
+	// local variables
+	int t, ci, frameCount, forceUnit;
+	double U,K;
+
+	// check that NT, NPRINT have been assigned values
+	if (NT <= 0){
+		cout << "	* ERROR: tried to run tumorNVE() function without proper NT, ending." << endl;
+		exit(1);
+	}
+	else if (NPRINT <= 0){
+		cout << "	* ERROR: tried to run tumorNVE() function without proper NPRINT, ending." << endl;
+		exit(1);
+	}
+
+	// reinitialize frame counter
+	frameCount = 0;
+
+	// run NVE for allotted time
+	for (t=0; t<NT; t++){
+		// calculate energies
+		U = totalPotentialEnergy();
+		K = totalKineticEnergy();
+
+		// print data first to get the initial condition
+		if (t % NPRINT == 0){
+			cout << "===================================================" << endl << endl;
+			cout << " 	TUMOR NVE, t = " << t << ", frame = " << frameCount << endl << endl;
+			cout << "===================================================" << endl;
+
+			if (packingPrintObject.is_open()){
+				cout << "	* Printing vetex positions to file" << endl;
+				printSystemPositions(frameCount);
+			}
+			
+			if (energyPrintObject.is_open()){
+				cout << "	* Printing cell energy to file" << endl;
+				printSystemEnergy(frameCount,U,K);
+			}
+			frameCount++;
+			
+			cout << "	* Run data:" << endl;
+			cout << "	* U 		= " << U << endl;
+			cout << "	* K 		= " << K << endl;
+			cout << "	* dt 		= " << dt << endl;
+			cout << "	* nc 		= " << totalNumberOfContacts() << endl;
+			cout << endl << endl;
+		}
+
+		// use velocity verlet to advance time
+
+		// update positions
+		for (ci=0; ci<NCELLS; ci++){
+			cell(ci).verletPositionUpdate(dt);
+			cell(ci).updateCPos();
+		}
+
+		// reset contacts before force calculation
+		resetContacts();
+
+		// calculate forces
+		calculateForces();
+
+		// add dragging force to tumor cell
+		for (ci=0; ci<NTUMORCELLS; ci++){
+			// calculate force unit
+			forceUnit = cell(ci).getkint()/cell(ci).getdel();
+
+			// add to x-direction of center-of-mass force
+			cell(ci).setCForce(0, cell(ci).cforce(0) + forceScale*forceUnit );
+		}
+
+		// update velocities, with damping on adipose tissue
+		for (ci=0; ci<NCELLS; ci++){
+			if (ci < NTUMORCELLS)
+				cell(ci).verletVelocityUpdate(dt,0.0);
+			else
+				cell(ci).verletVelocityUpdate(dt,adiposeDamping);
+		}
+	}
+
+	// print something to conclude
+	cout << "t = NT, which = " << t << ", so ending NVE run!" << endl;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/**************************
+
+	Extra Sim Functions, on their way out
+
+***************************/
 
 
 // compress to a mechanically stable state using FIRE minimization and velocity verlet
@@ -1598,26 +2118,6 @@ void cellPacking2D::msDamping(double dphi, double Ktol, double Ftol, double damp
 
 // WRAPPER FUNCTIONS
 
-// calculate all forces, both shape and pairwise
-// NOTE: MAKE BETTER THAN JUST USING ARRAY, ANYWAY TO USE FUNCTION CALL OR STAND-IN OBEJCT?
-void cellPacking2D::calculateForces(){
-	// local variables
-	int ci,cj,inContact;
-
-	// loop over cells and cell pairs, calculate shape and interaction forces
-	for (ci=0; ci<NCELLS; ci++){
-		// loop over pairs, add info to contact matrix
-		for (cj=ci+1; cj<NCELLS; cj++){
-			inContact = cell(ci).segmentForce(cell(cj));
-			if (inContact == 1)
-				addContact(ci,cj);
-		}
-
-		// forces on vertices due to shape
-		cell(ci).shapeForces();
-	}
-}
-
 // perform single step of a verlet integration with damping
 void cellPacking2D::dverlet(double dampingParameter){
 	// local variables
@@ -1641,30 +2141,7 @@ void cellPacking2D::dverlet(double dampingParameter){
 }
 
 
-// perform single step of a verlet integration with FIRE minimization
-void cellPacking2D::fverlet(int& np, double& alpha, double dampingParameter){
-	// local variables
-	int i;
 
-	// update positions
-	for (i=0; i<NCELLS; i++){
-		cell(i).verletPositionUpdate(dt);
-		cell(i).updateCPos();
-	}
-
-	// reset contacts before force calculation
-	resetContacts();
-
-	// calculate forces
-	calculateForces();
-
-	// update velocities
-	for (i=0; i<NCELLS; i++)
-		cell(i).verletVelocityUpdate(dt,dampingParameter);
-
-	// perform FIRE step
-	fireStep(np,alpha);
-}
 
 
 // shape relaxation using FIRE
@@ -1805,172 +2282,6 @@ void cellPacking2D::shapeRelaxRamp(double finalCalA, double initialDCalA, double
 	else
 		cout << " Shape minimization a success! End asphericity is = " << meanAsphericity() << endl;
 
-}
-
-
-// relieve overlap between particles
-void cellPacking2D::overlapRelief(){
-	// local variables
-	int ci,cj,k,kmax,fcheck,fconst,inContact;
-	int frameCount = 0;
-	double Fnew,Fold,dF,Ftol,dampingParameter;
-
-	// interaction variables
-	double dist2, cdist2;
-
-	// initial variables for checking for constant U
-	fcheck = 0;
-	fconst = 0;
-	Fold = 0.0;
-	Ftol = 1e-8;
-
-	// damping
-	dampingParameter = 1.5;
-
-	// max number of iterations
-	kmax = 1e5;
-
-	// loop over system and push cells aways from one another 
-	// as damped frictionless disks until force has plateau'd constant
-	while (fconst == 0 && k < kmax){
-		// update particle positions
-		for (ci=0; ci<NCELLS; ci++){
-			cell(ci).verletPositionUpdate(20*dt);
-			cell(ci).updateCPos();
-		}
-
-		// update forces based on center-to-center distances only
-		for (ci=0; ci<NCELLS; ci++){
-			// loop over pairs, add info to contact matrix
-			for (cj=ci+1; cj<NCELLS; cj++){
-				inContact = cell(ci).radialForce(cell(cj));
-				if (inContact == 1)
-					addContact(ci,cj);
-			}
-		}
-
-		// update damped velocities
-		for (ci=0; ci<NCELLS; ci++)
-			cell(ci).verletVelocityUpdate(20*dt,dampingParameter);
-
-		// check that F is below threshold and constant
-		Fnew = maxForceMagnitude();
-		dF = Fnew - Fold;
-		Fold = Fnew;
-		if (abs(dF) < Ftol){
-			fcheck++;
-			if (fcheck > 50){
-				fconst = 1;
-				fcheck = 0;
-			}
-			
-		}
-		else{
-			fcheck = 0;
-			fconst = 0;
-		}
-
-		// increment k
-		k++;
-	}
-
-	if (k == kmax){
-		cout << "	ERROR: overlapRelief() function failed, could not reduce potential energy, ending." << endl;
-		exit(1);
-	}
-}
-
-
-// fire energy minimization
-void cellPacking2D::fireStep(int& np, double& alpha){
-	// HARD CODE IN FIRE PARAMETERS
-	const double alpha0 	= 0.1;
-	const double finc 		= 1.1;
-	const double fdec 		= 0.3;
-	const double falpha 	= 0.99;
-	const double dtmax 		= 20*dt0;
-	const int NMIN 			= 50;
-
-	// local variables
-	int ci,vi,d;
-	double P,vstarnrm,fstarnrm,vtmp,ftmp;
-
-	// calculate P and norms
-	P = 0.0;
-	vstarnrm = 0.0;
-	fstarnrm = 0.0;
-	for (ci=0; ci<NCELLS; ci++){
-		for (vi=0; vi<cell(ci).getNV(); vi++){
-			for (d=0; d<NDIM; d++){
-				// get tmp variables
-				ftmp = cell(ci).vforce(vi,d);
-				vtmp = cell(ci).vvel(vi,d);
-
-				// calculate based on all vertices on all cells
-				P += ftmp*vtmp;
-				vstarnrm += vtmp*vtmp;
-				fstarnrm += ftmp*ftmp;
-			}
-		}
-	}
-
-	// get norms
-	vstarnrm = sqrt(vstarnrm);
-	fstarnrm = sqrt(fstarnrm);
-
-	// update velocities if forces are acting
-	if (fstarnrm > 0){
-		for (ci=0; ci<NCELLS; ci++){
-			for (vi=0; vi<cell(ci).getNV(); vi++){
-				for (d=0; d<NDIM; d++){
-					vtmp = (1 - alpha)*cell(ci).vvel(vi,d) + alpha*(cell(ci).vforce(vi,d)/fstarnrm)*vstarnrm;
-					cell(ci).setVVel(vi,d,vtmp);
-				}
-			}
-		}
-	}
-
-	// save current kinetic energy to temperature variable
-	T = totalKineticEnergy();
-
-	// update P and alpha
-	if (P > 0 && np > NMIN){
-
-		// increase dt
-		if (dt * finc < dtmax)
-			dt *= finc;
-		else
-			dt = dtmax;
-
-		// decrease alpha
-		alpha *= falpha;
-
-		np++;
-	}
-	else if (P <= 0) {
-		// decrease time step, but only to limit
-		if (dt * fdec > dt0)
-			dt *= fdec;
-		else
-			dt = dt0;
-
-		// set global velocity vector to zero
-		for (ci=0; ci<NCELLS; ci++){
-			for (vi=0; vi<cell(ci).getNV(); vi++){
-				for (d=0; d<NDIM; d++){
-					cell(ci).setVVel(vi,d,0.0);
-				}
-			}
-		}
-
-		// set alpha -> alpha0
-		alpha = alpha0;
-
-		// set np -> 0
-		np = 0;
-	}
-	else if (P > 0 && np <= NMIN) 
-		np++;
 }
 
 

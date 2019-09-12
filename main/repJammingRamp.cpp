@@ -34,14 +34,14 @@ using namespace std;
 const double PI = 4.0*atan(1);
 
 // simulation constants
-const int NT 				= 1e7; 			// number of time steps
-const double T0 			= 1e-8;			// temperature scale
+const int NT 				= 5e7; 			// number of time steps
+const double T0 			= 1e-4;			// temperature scale
 const double sizeRatio 		= 1.4;			// size ratio between large and small particles
-const double timeStepMag 	= 0.025;			// time step in MD units
+const double timeStepMag 	= 0.01;			// time step in MD units
 const double initialPhi		= 0.5;			// initial packing fraction
 const double deltaPhi 		= 0.002;		// packing fraction step
 const double deltaCalA		= 0.001;		// asphericity increase step
-const double kineticTol 	= 1e-20;		// kinetic energy tolerance
+const double kineticTol 	= 1e-24;		// kinetic energy tolerance
 const double potentialTol 	= 1e-16;		// potential energy tolerance
 
 // force parameters
@@ -50,7 +50,7 @@ const double ka 			= 1.0;			// area force constant
 const double gam 			= 0.0;			// surface tension force constant
 const double kb 			= 0.0;			// bending energy constant
 const double kint 			= 2.0;			// interaction energy constant
-const double del 			= 0.1;			// width of circulo lines
+const double del 			= 1.0;			// width of vertices (WHEN = 1, ITS A VERTEX FORCE!)
 const double C 				= 0.0;			// attraction parameter (strength)
 const double l 				= 0.0;			// attraction parameter (distance)
 

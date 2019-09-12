@@ -60,6 +60,7 @@ public:
 	void defaultvars();
 	cellPacking2D();
 	cellPacking2D(int ncells, int nt, int nprint, double l, double s);
+	cellPacking2D(int ncells, int ntumor, int tumorNV, int adiposeNV, double tumorCalA, double adiposeCalA, int s);
 	cellPacking2D(std::ifstream& inputFileObject, double asphericity, double s);
 	~cellPacking2D();
 
@@ -82,6 +83,7 @@ public:
 
 	// initialize velocities
 	void initializeVelocities(double tmp0);
+	void initializeVelocities(int ci, double tmp0);
 
 	// file openers
 	void openPackingObject(std::string& str){
@@ -183,6 +185,10 @@ public:
 
 	// non-equilibrium MD functions
 	void isoExtensionQS(double phiTarget, double dphi, double dampingParameter);
+
+	// tumor MD functions
+	void tumorNVE();
+	void tumorForce(int NTUMORCELLS, double forceScale, double adiposeDamping);
 
 
 	// wrapper functions for simulation protocols

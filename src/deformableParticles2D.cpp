@@ -1571,7 +1571,7 @@ int deformableParticles2D::segmentForce(deformableParticles2D &onTheRight){
 					}
 
 					// add to interaction potential energies to segments (mu,i) and (nu,j)
-					uTmp = 0.5 * forceScale * pow(1 - distScale,2);
+					uTmp = 0.5 * kint * pow(1 - distScale,2);
 
 					// distribute to vertex and line
 					/*
@@ -1801,8 +1801,138 @@ int deformableParticles2D::segmentForce(deformableParticles2D &onTheRight){
 }
 
 
+// force between vertices
+// 		* interacting parts are disks of diameter delta = l_0
+// 		* also updates interaction potential
+
+int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight){
+	// return variable
+	int inContact = 0;
+
+	// local variables
+	int i,j,d;
+
+	// -------------------------
+	// 
+	// 	   Distance cutoff
+	//
+	// -------------------------
+
+	// section variables
+	double centerDistance = 0.0; 			// center-to-center distance
+	vector<double> deltaMuNu(NDIM,0.0);		// vector to store center-to-center distance vector
+	double muREff,nuREff,buffer;			// variables to determine effect cell contact distance
+	double distTmp = 0.0;					// temporary distance, for mimimum image convention (MIC)
+
+	// calculate connecting vector deltaMuNu
+	for (d=0; d<NDIM; d++){
+		// get distance
+		distTmp = onTheRight.cpos(d)-cpos(d);
+		distTmp = distTmp - L*round(distTmp/L);
+
+		// save distance in vector
+		deltaMuNu.at(d) = distTmp;
+
+		// calculate vector norm
+		centerDistance += pow(distTmp,2);
+	}
+	centerDistance = sqrt(centerDistance);
+
+	// get effect radii
+	muREff = sqrt(area()/PI);
+	nuREff = sqrt(onTheRight.area()/PI);
+	buffer = 0.1*perimeter();
+
+	// if not close enough, return 0
+	if ((muREff + nuREff + del + buffer) < centerDistance)
+		return 0;
 
 
+	// -------------------------
+	// 
+	// 	   Vertex forces
+	//
+	// -------------------------
+
+	double forceScale = kint/del;			// force scale
+	double distScale = 0.0;					// distance scale
+	double p1 = 1.0 + C;					// interaction zone 1 for generalized spring potential (rep + att)
+	double p2 = p1 + l;						// interaction zone 2 for generalized spring potential (attraction only)
+	double ftmp = 0.0;						// temporary force variable
+	double uTmp = 0.0;						// temporary energy variable
+	double vertexDist = 0.0;				// distance variable
+	vector<double> vertexVec(NDIM,0.0);		// vector to hold vectorial distance quantity
+	double contactDistance = 0.0;			// contact distance variable
+
+	// loop over vertex pairs, check for contact
+	for (i=0; i<NV; i++){
+		for (j=0; j<onTheRight.NV; j++){
+
+			// get distance between vertices i and j
+			vertexDist = 0.0;
+			for (d=0; d<NDIM; d++){
+				// get distance to nearest image
+				distTmp = onTheRight.vpos(j,d) - vpos(i,d);
+				distTmp -= L*round(distTmp/L);
+
+				// add to vertex distance
+				vertexVec.at(d) = distTmp;
+
+				// add to scalar distance
+				vertexDist += distTmp*distTmp;
+			}
+
+			// get contact distance
+			contactDistance = 0.5*(del + onTheRight.del);
+
+			// get vertex distance
+			vertexDist = sqrt(vertexDist);
+
+			// check overlap distances
+			if (vertexDist < contactDistance*p2){
+				// set inContact to 1 for return
+				inContact = 1;
+
+				// define scaled distance (x = distance/contact distance)
+				distScale = vertexDist/contactDistance;
+
+				// update force scale
+				forceScale = kint/contactDistance;
+
+				// IF in zone to use repulsive force (and, if a > 0, bottom of attractive well)
+				if (vertexDist < contactDistance*p1){
+
+					// add to interaction potential energies to segments (mu,i) and (nu,j)
+					uTmp = 0.5 * kint * pow(1 - distScale,2);
+		
+					setUInt(i,uInt(i) + uTmp);
+					onTheRight.setUInt(j,onTheRight.uInt(j) + uTmp);
+
+					// add to vectorial forces
+					for (d=0; d<NDIM; d++){
+						// get force value
+						ftmp = -forceScale * (1 - distScale) * vertexVec.at(d) / vertexDist;
+
+						// add to force on i
+						setVForce(i,d,vforce(i,d) + ftmp);
+
+						// subtract off complement from force on j
+						onTheRight.setVForce(j,d,onTheRight.vforce(j,d) - ftmp);
+					}
+				}
+
+				// IF C,l > 0, top of attractive well
+				else if (vertexDist > contactDistance*p1 && vertexDist < contactDistance*p2 && C > 0.0 && l > 0.0){
+					cout << "	** ERROR: Attractive area under construction, need to incorporate new interaction, so ending for now..." << endl;
+					exit(1);
+				}
+			}
+		}
+	}
+
+	// return if in contact or not
+	return inContact;
+}
 
 
 // harmonic spring force between centers of overlapping particles
@@ -1821,7 +1951,7 @@ int deformableParticles2D::radialForce(deformableParticles2D &onTheRight){
 	double contactDistance = 0.0;			// distance based on vertices closest to pair
 
 	// buffer
-	buffer = 0.05*perimeter();
+	buffer = 0.15*perimeter();
 
 	// calculate connecting vector deltaMuNu
 	for (d=0; d<NDIM; d++){
@@ -2009,10 +2139,10 @@ void deformableParticles2D::verletPositionUpdate(double dt){
 		for (d=0; d<2; d++){
 			// update positions using velocity-Verlet with PBCs
 			postmp = vpos(i,d) + dt*vvel(i,d) + 0.5*vacc(i,d)*dt*dt;
-			if (postmp < 0)
-				postmp += L;
-			else if (postmp > L)
-				postmp -= L;
+			// if (postmp < 0)
+			// 	postmp += L;
+			// else if (postmp > L)
+			// 	postmp -= L;
 
 			setVPos(i,d,postmp);
 

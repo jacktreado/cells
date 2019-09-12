@@ -38,7 +38,7 @@ int main(){
 	}
 
 	// box variables
-	double L = 35.0;
+	double L = 30.0;
 
 	// Basic cell variables (cells will be identical)
 	int NV = 30;
@@ -50,7 +50,7 @@ int main(){
 	l0 = 1.0;
 
 	// set interaction distance to a fraction of l0
-	del = 0.1*l0;
+	del = 1.0*l0;
 
 	// set attraction parameter to be 0, which is in units of delta
 	C = 0.0;
@@ -66,7 +66,7 @@ int main(){
 	// using perimeter and area force
 	kl = 1.0;
 	ka = 1.0;
-	kb = 2.0;
+	kb = 1.0;
 
 	// set a strong interaction parameter
 	kint = 1.0;
@@ -139,7 +139,7 @@ int main(){
 	int printCount = 0;
 	int inContact = 0;
 	double timeScale = sqrt((segmentMass*l0*l0)/kint);
-	double dt = 0.02*timeScale;
+	double dt = 0.05*timeScale;
 
 	// use damping 
 	double dampingParam = 0.0*sqrt(segmentMass*kint);
@@ -205,7 +205,7 @@ int main(){
 		cell2.shapeForces();
 
 		// calculate interaction
-		inContact = cell1.segmentForce(cell2);
+		inContact = cell1.vertexForce(cell2);
 		
 		// update vertex velocities
 		cell1.verletVelocityUpdate(dt,dampingParam);
