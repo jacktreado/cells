@@ -205,6 +205,10 @@ cellPacking2D::cellPacking2D(int ncells, int ntumor, int tumorNV, int adiposeNV,
 	initializeForceConstants(kl,ka,gam,kb,kint);
 	initializeInteractionParams(del,C,l);
 
+	// turn off bending energy for tumor cells
+	for (ci=0; ci<ntumor; ci++)
+		cell(ci).setkb(0.0);
+
 	// initialize cell positions on a square lattice
 	squareLattice();
 }
