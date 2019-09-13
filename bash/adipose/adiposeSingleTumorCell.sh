@@ -35,7 +35,7 @@ let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=tumor_force_N"$NCELLS"_NV"$adiposeNV"_calA"$tumorCalA"_fs"%forceScale"
+basestr=tumor_force_N"$NCELLS"_NV"$adiposeNV"_calA"$tumorCalA"_fs"$forceScale"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation
@@ -45,7 +45,7 @@ mkdir -p $simdatadir
 # compile into binary using packing.h
 binf=bin/"$runstr".o
 mainf=$maindir/adiposeSingleTumorCell.cpp
-echo Running $numSeeds sims of $NCELLS with $NV vertices, cal A = $asphericity, will force a small tumor cell through dense adipose tissue
+echo Running $numSeeds sims of $NCELLS with $NV vertices, cal A = $tumorCalA, will force a small tumor cell through dense adipose tissue
 
 # run compiler
 rm -f $binf
@@ -94,7 +94,6 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         # create output files
         posf=$specificdir/$filestr.pos
         enf=$specificdir/$filestr.energy
-        statf=$specificdir/$filestr.stats
 
         # append to runString
         runString="$runString ; ./$binf $NCELLS $adiposeNV $tumorCalA $forceScale $runseed $posf $enf"
