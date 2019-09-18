@@ -2064,6 +2064,14 @@ void cellPacking2D::attractionRamp(double attractionTarget, double dAttraction){
 	k=0;
 	frameCount=0;
 	while (attractionCheck < tol && k < NT){
+		// output to console
+		cout << "===================================================" << endl << endl << endl;
+		cout << " 	Ramping attraction to aTarget = " << attractionTarget << endl << endl;
+		cout << "===================================================" << endl;
+		cout << "	* k 			= " << k << endl;
+		cout << "	* current a 	= " << currAttraction << endl;
+		cout << endl << endl;
+
 		// decide whether attraction is too large or too small
 		if (delSgn*currAttraction < delSgn*attractionTarget)
 			da = delSgn*dAttraction;
