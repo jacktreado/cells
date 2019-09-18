@@ -189,21 +189,20 @@ cellPacking2D::cellPacking2D(int ncells, int ntumor, int tumorNV, int adiposeNV,
 	}
 
 	// force constants for adipose simulation
-	double kl,ka,gam,kb,kint,del,C,l;
+	double kl,ka,gam,kb,kint,del,a;
 
 	// set force constant values
-	kl 		= 1.0;
-	ka 		= 1.0;
+	kl 		= 2.0;
+	ka 		= 2.0;
 	gam 	= 0.0;
-	kb 		= 2.0;
+	kb 		= 0.0;
 	kint 	= 1.0;
 	del 	= 1.0;		// USING VERTEX FORCES, SO DEL MUST BE SET TO L0!
-	C 		= 0.0;
-	l 		= 0.0;
+	a 		= 0.0;
 
 	// set values
 	initializeForceConstants(kl,ka,gam,kb,kint);
-	initializeInteractionParams(del,C,l);
+	initializeInteractionParams(del,a);
 
 	// turn off bending energy for tumor cells
 	for (ci=0; ci<ntumor; ci++)
@@ -520,7 +519,7 @@ void cellPacking2D::initializeForceConstants(double kl, double ka, double gam, d
 
 
 // set interaction parameters
-void cellPacking2D::initializeInteractionParams(double del, double C, double l){
+void cellPacking2D::initializeInteractionParams(double del, double a){
 	// local variables
 	int i;
 
@@ -533,8 +532,7 @@ void cellPacking2D::initializeInteractionParams(double del, double C, double l){
 	// loop over cells
 	for (i=0; i<NCELLS; i++){
 		cell(i).setdel(del);
-		cell(i).setC(C);
-		cell(i).setl(l);
+		cell(i).seta(a);
 	}
 }
 
@@ -1365,7 +1363,7 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 	}
 
 	if (k == kmax){
-		cout << "	ERROR: particle shapes could not relax to desired cal A in allotted time, ending." << endl;
+		cout << "	ERROR: particles could not jam in allotted time, ending." << endl;
 		exit(1);
 	}
 	else{
@@ -1457,10 +1455,10 @@ int cellPacking2D::potentialRelaxFire(double kineticTol, double potentialTol, in
 				cout << "*** mechanically stable!" << endl;
 
 			// print extra info
-			cout << "Fmax = " << maxForceMagnitude() << endl;
+			cout << "Fmax = " << Fnetmax << endl;
 			cout << "U = " << Unew << endl;
-			cout << "K = " << totalKineticEnergy() << endl;
-			cout << "nc = " << totalNumberOfContacts() << endl;
+			cout << "K = " << Knew << endl;
+			cout << "nc = " << nc << endl;
 			cout << "Ending relaxation protocol" << endl;
 
 			if (plotIt == 1){
@@ -1677,6 +1675,144 @@ void cellPacking2D::fireStep(int& np, double& alpha){
 
 // NON-EQUILIBRIUM MD FUNCTIONS
 
+// quasistatic compression function
+void cellPacking2D::qsCompression(double phiTarget, double dphi){
+	// local variables
+	int k = 0;
+	int kmax = 1e5;
+	int plotIt = 1;
+	double Ktol = 1e-24;
+	double Utol = 1e-16;
+	double U = 0;
+	double K = 0;
+
+	// get initial packing fraction
+	phi = packingFraction();
+
+	// loop until packing fraction > target
+	while (phi < phiTarget && k < kmax){
+
+		// print statement
+		cout << "===================================================" << endl << endl;
+		cout << " 	CHANGING PACKING FRACTION FROM " << phi << " to " << phi + dphi << ": k = " << k << endl << endl;
+		cout << "===================================================" << endl;
+
+		// print to file
+		if (packingPrintObject.is_open()){
+			cout << "	* Printing vetex positions to file" << endl;
+			printSystemPositions(k);
+		}
+		
+		if (energyPrintObject.is_open()){
+			cout << "	* Printing cell energy to file" << endl;
+			U = totalPotentialEnergy();
+			K = totalPotentialEnergy();
+			printSystemEnergy(k,U,K);
+		}
+
+		// finish info print
+		cout << "	* Run data:" << endl;
+		cout << "	* old phi 	= " << phi << endl;
+		cout << "	* new phi 	= " << phi + dphi << endl;
+		cout << "	* nc 		= " << totalNumberOfContacts() << endl;
+		cout << endl << endl;
+
+		// increase iterator count
+		k++;
+
+		// increase packing fraction
+		phi = packingFraction();
+		setPackingFraction(phi+dphi);
+
+		// relax potential energy
+		potentialRelaxFire(Ktol, Utol, plotIt, k);
+	}
+
+	if (k == kmax){
+		cout << "	** Error: compression protocol did not finish, ending" << endl;
+		exit(1);
+	}
+}
+
+// rate compression function
+void cellPacking2D::rateCompression(double phiTarget, double dphi, double dampingParameter){
+	// local variables
+	int ci, frameCount=0;
+	int k = 0;
+	int kmax = 1e7;
+	int plotIt = 1;
+	double Ktol = 1e-24;
+	double Utol = 1e-16;
+	double U = 0;
+	double K = 0;
+
+	// get initial packing fraction
+	phi = packingFraction();
+
+	// loop until packing fraction > target
+	while (phi < phiTarget && k < kmax){
+
+		if (k % NPRINT == 0){
+			// print statement
+			cout << "===================================================" << endl << endl;
+			cout << " 	CHANGING PACKING FRACTION FROM " << phi << " to " << phi + dphi << ": frameCount = " << frameCount << endl << endl;
+			cout << "===================================================" << endl;
+
+			// print to file
+			if (packingPrintObject.is_open()){
+				cout << "	* Printing vetex positions to file" << endl;
+				printSystemPositions(frameCount);
+			}
+			
+			if (energyPrintObject.is_open()){
+				cout << "	* Printing cell energy to file" << endl;
+				U = totalPotentialEnergy();
+				K = totalPotentialEnergy();
+				printSystemEnergy(frameCount,U,K);
+			}
+
+			// finish info print
+			cout << "	* Run data:" << endl;
+			cout << "	* old phi 	= " << phi << endl;
+			cout << "	* new phi 	= " << phi + dphi << endl;
+			cout << "	* nc 		= " << totalNumberOfContacts() << endl;
+			cout << endl << endl;
+			frameCount++;
+		}
+		
+		// increase iterator count
+		k++;
+
+		// increase packing fraction
+		phi = packingFraction();
+		setPackingFraction(phi+dphi);
+
+		// run dynamics
+
+		// update positions
+		for (ci=0; ci<NCELLS; ci++){
+			cell(ci).verletPositionUpdate(dt);
+			cell(ci).updateCPos();
+		}
+
+		// reset contacts before force calculation
+		resetContacts();
+
+		// calculate forces
+		calculateForces();
+
+		// update velocities
+		for (ci=0; ci<NCELLS; ci++)
+			cell(ci).verletVelocityUpdate(dt,dampingParameter);
+	}
+
+	if (k == kmax){
+		cout << "	** Error: compression protocol did not finish, ending" << endl;
+		exit(1);
+	}
+}
+
+
 // quasistaic gel forming function
 void cellPacking2D::isoExtensionQS(double phiTarget, double dphi, double dampingParameter){
 	// local variables
@@ -1729,7 +1865,6 @@ void cellPacking2D::isoExtensionQS(double phiTarget, double dphi, double damping
 
 	if (phi < phiTarget)
 		cout << "	Target phi = " << phiTarget << "reached! Ending isoExtensionQS protocol" << endl;
-
 }
 
 // TUMOR TISSUE FUNCTIONS
@@ -1895,7 +2030,71 @@ void cellPacking2D::tumorForce(int NTUMORCELLS, double forceScale, double adipos
 
 
 
+// RELAXATION FUNCTIONS
 
+
+// increase attraction quasi-statically, relax after each add
+void cellPacking2D::attractionRamp(double attractionTarget, double dAttraction){
+	// local variables
+	int k, ci, delSgn, frameCount;
+	double da, currAttraction, decScale, Ktol, Utol;
+	double attractionCheck, tol;
+
+	// set check and tolerance
+	tol = 1e-8;
+	attractionCheck = 10*tol;
+
+	// set tolerance for relaxation
+	Utol = 1e-16;
+	Ktol = 1e-24;
+
+	// get current attraction (assuming all attraction the same)
+	currAttraction = cell(0).geta();
+
+	// set decrease scale to be 1
+	decScale = 1.0;
+
+	// check whether to increase or decrease
+	if (currAttraction < attractionTarget)
+		delSgn = 1;
+	else
+		delSgn = -1;
+
+	// loop until attraction is the correct value
+	k=0;
+	frameCount=0;
+	while (attractionCheck < tol && k < NT){
+		// decide whether attraction is too large or too small
+		if (delSgn*currAttraction < delSgn*attractionTarget)
+			da = delSgn*dAttraction;
+		else{
+			decScale *= 0.9;
+			da = -delSgn*decScale*dAttraction;
+		}
+
+		// update current attraction parameter
+		currAttraction += da;
+
+		// update attraction in all of the cells
+		for (ci=0; ci<NCELLS; ci++)
+			cell(ci).seta(currAttraction);
+
+		// relax potential energy
+		potentialRelaxFire(Ktol, Utol, 1, frameCount);
+
+		// update check
+		attractionCheck = abs(currAttraction - attractionTarget);
+
+		// update iterator
+		k++;
+	}
+
+	if (k == NT){
+		cout << "	ERROR: particle shapes could not relax to desired attraction in allotted time, ending." << endl;
+		exit(1);
+	}
+
+}
 
 
 

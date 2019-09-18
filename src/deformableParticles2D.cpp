@@ -46,8 +46,7 @@ deformableParticles2D::deformableParticles2D(){
 	l0 		= 1.0;
 	a0 		= 0.0;
 	del 	= 0.0;
-	C 		= 0.0;
-	l 		= 0.0;
+	a 		= 0.0;
 
 	// pointer variables point to nullptr
 	vertexPositions 		= nullptr;
@@ -74,8 +73,7 @@ deformableParticles2D::deformableParticles2D(int n){
 	l0 		= 1.0;
 	a0 		= 0.0;
 	del 	= 0.0;
-	C 		= 0.0;
-	l 		= 0.0;
+	a 		= 0.0;
 
 	// pointer variables point to nullptr
 	vertexPositions 		= nullptr;
@@ -156,8 +154,7 @@ void deformableParticles2D::operator=(deformableParticles2D& onTheRight){
 	l0 		= 1.0;
 	a0 		= 0.0;
 	del 	= 0.0;
-	C 		= 0.0;
-	l 		= 0.0;
+	a 		= 0.0;
 
 	// pointer variables point to nullptr
 	vertexPositions 		= nullptr;
@@ -178,8 +175,7 @@ void deformableParticles2D::operator=(deformableParticles2D& onTheRight){
 	l0 		= onTheRight.l0;
 	a0 		= onTheRight.a0;
 	del 	= onTheRight.del;
-	C 		= onTheRight.C;
-	l 		= onTheRight.l;
+	a 		= onTheRight.a;
 
 	// initialize everything else
 	initializeVertices();
@@ -1265,522 +1261,9 @@ int deformableParticles2D::segmentForce(deformableParticles2D &onTheRight){
 	//
 	// ----------------------------------------
 
-	// section variables
-	int ii,jj,ip1,jp1;						// dummy indices to loop over vector
-	vector<double> Pi_j(NDIM,0);			// vector from vertex i to vertex j
-	vector<double> Pip1_j(NDIM,0);			// vector from vertex ip1 to vertex j
-	vector<double> Pj_i(NDIM,0);			// vector from vertex j to vertex i
-	vector<double> Pjp1_i(NDIM,0);			// vector from vertex jp1 to vertex i
-	double ti_j,tip1_j,tj_i,tjp1_i; 		// candidate t values between four pairs of vertices and lines
-	double li,lj;							// variables to store segment lengths
-	double dminScalar;						// minimum distance given feasible t values
-	double dminTest;						// variable to test minimum distance
-	double dminCompTmp;						// temporary component of dmin vector
-	vector<double> dminVec(NDIM,0);			// minimum distance vector
-	vector<double> dminVecTest(NDIM,0);		// minimum distance vector (during test)
-	double distScale = 0.0;					// distance scale, will be dmin/delta
-	double forceScale = kint/del;			// force scale
-	double p1 = 1.0 + C;					// interaction zone 1 for generalized spring potential (rep + att)
-	double p2 = p1 + l;						// interaction zone 2 for generalized spring potential (attraction only)
-	double ftmp = 0.0;						// temporary force variable
-	double uTmp = 0.0;						// temporary energy variable
-	int forceSgn;							// whether or not dmin points from i to j or j to i
-	double overlapDist, vertexDist;			// distances to check cell overlap
-	int pointIsI, pointIsIp1;
-	int pointIsJ, pointIsJp1;
-
-	// loop over feasible edge pairs i,j on mu,nu to check contact feasibility
-	for (ii=0; ii<possibleMuEdges.size(); ii++){
-		// get true vertex index
-		i = possibleMuEdges.at(ii);
-
-		// enforce periodic vertex checking
-		ip1 = (i+1) % NV;
-
-		// get segment length of vertex i on cell mu
-		li = segmentLength(i);
-
-		// loop over feasible edges on cell nu (onTheRight)
-		for (jj=0; jj<possibleNuEdges.size(); jj++){
-			// get true vertex index
-			j = possibleNuEdges.at(jj);
-
-			// enforce periodic vertex checking
-			jp1 = (j+1) % onTheRight.getNV();
-
-			// get segment length of vertex j on cell nu
-			lj = onTheRight.segmentLength(j);
-
-			// get possible distance vectors here, and implement MIC
-			for (d=0; d<NDIM; d++){
-				// get initial displacements
-				Pi_j.at(d) = vpos(i,d) - onTheRight.vpos(j,d);
-				Pip1_j.at(d) = vpos(ip1,d) - onTheRight.vpos(j,d);
-				Pj_i.at(d) = -Pi_j.at(d);
-				Pjp1_i.at(d) = onTheRight.vpos(jp1,d) - vpos(i,d);
-
-				// check images
-				Pi_j.at(d) -= L*round(Pi_j.at(d)/L);
-				Pip1_j.at(d) -= L*round(Pip1_j.at(d)/L);
-				Pj_i.at(d) -= L*round(Pj_i.at(d)/L);
-				Pjp1_i.at(d) -= L*round(Pjp1_i.at(d)/L);
-			}
-
-			// calculate t between (i,j), and check that ti_j is on the line segment j
-			ti_j = 0.0;
-			for (d=0; d<NDIM; d++)
-				ti_j += Pi_j.at(d)*onTheRight.segment(j,d)/lj;
-
-			if (ti_j > lj)
-				ti_j = lj;
-			else if (ti_j < 0)
-				ti_j = 0.0;
-
-
-			// calculate t between (i+1,j), and check that tip1_j is on the line segment j
-			tip1_j = 0.0;
-			for (d=0; d<NDIM; d++)
-				tip1_j += Pip1_j.at(d)*onTheRight.segment(j,d)/lj;
-
-			if (tip1_j > lj)
-				tip1_j = lj;
-			else if (tip1_j < 0)
-				tip1_j = 0.0;
-
-
-			// calculate t between (j,i), and check that tj_i is on the line segment i
-			tj_i = 0.0;
-			for (d=0; d<NDIM; d++)
-				tj_i += Pj_i.at(d)*segment(i,d)/li;
-
-			if (tj_i > li)
-				tj_i = li;
-			else if (tj_i < 0)
-				tj_i = 0.0;
-
-
-			// calculate t between (j+1,i), and check that tjp1_i is on the line segment i
-			tjp1_i = 0.0;
-			for (d=0; d<NDIM; d++)
-				tjp1_i += Pjp1_i.at(d)*segment(i,d)/li;
-
-			if (tjp1_i > li)
-				tjp1_i = li;
-			else if (tjp1_i < 0)
-				tjp1_i = 0.0;
-
-			// get minimum distance squared
-			dminScalar = 1e20;
-
-			// label which point on the line segment gets the force
-			pointIsI 	= 0;
-			pointIsIp1 	= 0;
-			pointIsJ 	= 0;
-			pointIsJp1 	= 0;
-			
-			// test min between vertex i and line segment j
-			dminTest = 0.0;
-			for (d=0; d<NDIM; d++){
-				// get component of dmin
-				dminCompTmp = Pi_j.at(d)-ti_j*(onTheRight.segment(j,d)/lj);
-
-				// dmin scalar
-				dminTest += pow(dminCompTmp,2);
-
-				// dmin vector
-				dminVecTest.at(d) = dminCompTmp;
-			}
-
-			if (dminTest < dminScalar){
-				// set direction of dmin in force
-				forceSgn = 1;
-
-				// calc dmin
-				dminScalar = dminTest;
-				for (d=0; d<NDIM; d++)
-					dminVec.at(d) = dminVecTest.at(d);
-
-				// force acts on i
-				pointIsI = 1;
-			}
-			
-			// test min between vertex ip1 and line segment j
-			dminTest = 0.0;
-			for (d=0; d<NDIM; d++){
-				// get component of dmin
-				dminCompTmp = Pip1_j.at(d)-tip1_j*(onTheRight.segment(j,d)/lj);
-
-				// dmin scalar
-				dminTest += pow(dminCompTmp,2);
-
-				// dmin vector
-				dminVecTest.at(d) = dminCompTmp;
-			}
-
-			if (dminTest < dminScalar){
-				// set direction of dmin in force
-				forceSgn = 1;
-
-				// calc dmin
-				dminScalar = dminTest;
-				for (d=0; d<NDIM; d++)
-					dminVec.at(d) = dminVecTest.at(d);
-
-				// force acts on ip1
-				pointIsI 	= 0;
-				pointIsIp1	= 1;
-			}
-
-			// test min between vertex j and line segment i
-			dminTest = 0.0;
-			for (d=0; d<NDIM; d++){
-				// get component of dmin
-				dminCompTmp = Pj_i.at(d)-tj_i*(segment(i,d)/li);
-
-				// dmin scalar
-				dminTest += pow(dminCompTmp,2);
-
-				// dmin vector
-				dminVecTest.at(d) = dminCompTmp;
-			}
-
-			if (dminTest < dminScalar){
-				// set direction of dmin in force
-				forceSgn = -1;
-
-				// calc dmin
-				dminScalar = dminTest;
-				for (d=0; d<NDIM; d++)
-					dminVec.at(d) = dminVecTest.at(d);
-
-				// force acts on j
-				pointIsI 	= 0;
-				pointIsIp1	= 0;
-				pointIsJ 	= 1;
-			}
-
-			// test min between vertex jp1 and line segment i
-			dminTest = 0.0;
-			for (d=0; d<NDIM; d++){
-				// get component of dmin
-				dminCompTmp = Pjp1_i.at(d)-tjp1_i*(segment(i,d)/li);
-
-				// dmin scalar
-				dminTest += pow(dminCompTmp,2);
-
-				// dmin vector
-				dminVecTest.at(d) = dminCompTmp;
-			}
-
-			if (dminTest < dminScalar){
-				// set direction of dmin in force
-				forceSgn = -1;
-
-				// calc dmin
-				dminScalar = dminTest;
-				for (d=0; d<NDIM; d++)
-					dminVec.at(d) = dminVecTest.at(d);
-
-				// force acts on jp1
-				pointIsI 	= 0;
-				pointIsIp1	= 0;
-				pointIsJ 	= 0;
-				pointIsJp1 	= 1;
-			}
-
-			// take square root of minimum to get correct dmin
-			dminScalar = sqrt(dminScalar);
-
-			// compute force based on dmin (IF edges are in range)
-			if (dminScalar < del*p2){
-				// set inContact to 1 for return
-				inContact = 1;
-
-				// define scaled distance (x = dmin/delta)
-				distScale = dminScalar/del;
-
-				// // test that vertices do not intrude into other cells
-				// overlapDist = 0.0;
-				// for (d=0; d<NDIM; d++){
-				// 	// get distance component
-				// 	dminCompTmp = onTheRight.vpos(j,d) - cpos(d);
-				// 	dminCompTmp -= L*round(dminCompTmp/L);
-
-				// 	// add to overlap distance
-				// 	overlapDist += dminCompTmp*dminCompTmp;
-				// }
-
-				// // get distance to own vertex
-				// vertexDist = 0.0;
-				// for (d=0; d<NDIM; d++)
-				// 	vertexDist += vrel(i,d)*vrel(i,d);
-
-				// // compare distances, decide on overlap
-				// if (overlapDist < vertexDist){
-				// 	// overlapping vertices found, push cells away, end force calculation between two cells
-				// 	inContact = radialForce(onTheRight);
-
-				// 	// end function
-				// 	return inContact;
-				// }
-
-				// Note that we had to determine force sign. If dmin points from i to j, then use normal negative
-				// sign from calculation in notes. If dmin points from j to i, then really
-				// we are calculating w.r.t. the force on j, so need to flip sign
-
-				// IF in zone to use repulsive force (and, if a > 0, bottom of attractive well)
-				if (dminScalar < del*p1){
-					// add to forces
-					for (d=0; d<NDIM; d++){
-						// get initial force value
-						ftmp = forceSgn * forceScale * (1 - distScale) * dminVec.at(d) / dminScalar;
-
-						// distribute to vertex and line
-						if (pointIsI){
-							// force is applied to vertex
-							muForce.at(i).at(d) += ftmp;
-
-							// force is distributed to line
-							nuForce.at(j).at(d) -= (ti_j/lj)*ftmp;
-							nuForce.at(jp1).at(d) -= (1 - (ti_j/lj))*ftmp;
-						}
-						else if (pointIsIp1){
-							// force is applied to vertex
-							muForce.at(ip1).at(d) += ftmp;
-
-							// force is distributed to line
-							nuForce.at(j).at(d) -= (tip1_j/lj)*ftmp;
-							nuForce.at(jp1).at(d) -= (1 - (tip1_j/lj))*ftmp;
-						}
-						else if (pointIsJ){
-							// force is applied to vertex
-							muForce.at(i).at(d) += (tj_i/li)*ftmp;
-							muForce.at(ip1).at(d) += (1 - (tj_i/li))*ftmp;
-
-							// force is distributed to line
-							nuForce.at(j).at(d) -= ftmp;
-						}
-						else if (pointIsJp1){
-							// force is applied to vertex
-							muForce.at(i).at(d) += (tjp1_i/li)*ftmp;
-							muForce.at(ip1).at(d) += (1 - (tjp1_i/li))*ftmp;
-
-							// force is distributed to line
-							nuForce.at(jp1).at(d) -= ftmp;
-						}
-					}
-
-					// add to interaction potential energies to segments (mu,i) and (nu,j)
-					uTmp = 0.5 * kint * pow(1 - distScale,2);
-
-					// distribute to vertex and line
-					/*
-					if (pointIsI){
-						// add to vertex
-						setUInt(i,uInt(i) + uTmp);
-
-						// distribute to line
-						onTheRight.setUInt(j,onTheRight.uInt(j) + (ti_j/lj)*uTmp);
-						onTheRight.setUInt(jp1,onTheRight.uInt(jp1) + (1.0 - (ti_j/lj))*uTmp);
-					}
-					else if (pointIsIp1){
-						// add to vertex
-						setUInt(ip1,uInt(ip1) + uTmp);
-
-						// distribute to line
-						onTheRight.setUInt(j,onTheRight.uInt(j) + (tip1_j/lj)*uTmp);
-						onTheRight.setUInt(jp1,onTheRight.uInt(jp1) + (1.0 - (tip1_j/lj))*uTmp);
-					}
-					else if (pointIsJ){
-						// distribute to line
-						setUInt(i,uInt(i) + (tj_i/li)*uTmp);
-						setUInt(ip1,uInt(ip1) + (1.0 - (tj_i/li))*uTmp);
-
-						// add to vertex
-						onTheRight.setUInt(j,onTheRight.uInt(j) + uTmp);
-					}
-					else if (pointIsJp1){
-						// distribute to line
-						setUInt(i,uInt(i) + (tjp1_i/li)*uTmp);
-						setUInt(ip1,uInt(ip1) + (1.0 - (tjp1_i/li))*uTmp);
-
-						// add to vertex
-						onTheRight.setUInt(jp1,onTheRight.uInt(jp1) + uTmp);
-					}
-					*/
-					setUInt(i,uInt(i) + uTmp);
-					onTheRight.setUInt(j,onTheRight.uInt(j) + uTmp);
-
-				}
-				// IF C,l > 0, top of attractive well
-				else if (dminScalar > del*p1 && dminScalar < del*p2 && C > 0.0 && l > 0.0){
-					// add to forces
-					for (d=0; d<NDIM; d++){
-						ftmp = forceSgn * (C/l) * forceScale * (distScale - p2) * dminVec.at(d) / dminScalar;
-
-						// distribute to vertex and line
-						if (pointIsI){
-							// force is applied to vertex
-							muForce.at(i).at(d) += ftmp;
-
-							// force is distributed to line
-							nuForce.at(j).at(d) -= (ti_j/lj)*ftmp;
-							nuForce.at(jp1).at(d) -= (1 - (ti_j/lj))*ftmp;
-						}
-						else if (pointIsIp1){
-							// force is applied to vertex
-							muForce.at(ip1).at(d) += ftmp;
-
-							// force is distributed to line
-							nuForce.at(j).at(d) -= (tip1_j/lj)*ftmp;
-							nuForce.at(jp1).at(d) -= (1 - (tip1_j/lj))*ftmp;
-						}
-						else if (pointIsJ){
-							// force is applied to vertex
-							muForce.at(i).at(d) += (tj_i/li)*ftmp;
-							muForce.at(ip1).at(d) += (1 - (tj_i/li))*ftmp;
-
-							// force is distributed to line
-							nuForce.at(j).at(d) -= ftmp;
-						}
-						else if (pointIsJp1){
-							// force is applied to vertex
-							muForce.at(i).at(d) += (tjp1_i/li)*ftmp;
-							muForce.at(ip1).at(d) += (1 - (tjp1_i/li))*ftmp;
-
-							// force is distributed to line
-							nuForce.at(jp1).at(d) -= ftmp;
-						}
-					}
-
-					// add to interaction potential energies to segments (mu,i) and (nu,j)
-					uTmp = (C/l) * forceScale * (distScale*(1 - 0.5*distScale) + p1*(0.5*p1 - p2));
-					
-					// distribute to vertex and line
-					if (pointIsI){
-						// add to vertex
-						setUInt(i,uInt(i) + uTmp);
-
-						// distribute to line
-						onTheRight.setUInt(j,onTheRight.uInt(j) + (ti_j/lj)*uTmp);
-						onTheRight.setUInt(jp1,onTheRight.uInt(jp1) + (1 - (ti_j/lj))*uTmp);
-					}
-					else if (pointIsIp1){
-						// add to vertex
-						setUInt(ip1,uInt(ip1) + uTmp);
-
-						// distribute to line
-						onTheRight.setUInt(j,onTheRight.uInt(j) + (tip1_j/lj)*uTmp);
-						onTheRight.setUInt(jp1,onTheRight.uInt(jp1) + (1 - (tip1_j/lj))*uTmp);
-					}
-					else if (pointIsJ){
-						// distribute to line
-						setUInt(i,uInt(i) + (tj_i/li)*uTmp);
-						setUInt(ip1,uInt(ip1) + (1 - (tj_i/li))*uTmp);
-
-						// add to vertex
-						onTheRight.setUInt(j,onTheRight.uInt(j) + uTmp);
-					}
-					else if (pointIsJp1){
-						// distribute to line
-						setUInt(i,uInt(i) + (tjp1_i/li)*uTmp);
-						setUInt(ip1,uInt(ip1) + (1 - (tjp1_i/li))*uTmp);
-
-						// add to vertex
-						onTheRight.setUInt(jp1,onTheRight.uInt(jp1) + uTmp);
-					}
-				}
-			}
-		}
-	}
-
-
-
-	/*
-	// also loop over vertex - vertex interactions
-	for (ii=0; ii<possibleMuEdges.size(); ii++){
-		// get true vertex index
-		i = possibleMuEdges.at(ii);
-
-		// enforce periodic vertex checking
-		ip1 = (i+1) % NV;
-
-		// loop over feasible edges on cell nu (onTheRight)
-		for (jj=0; jj<possibleNuEdges.size(); jj++){
-
-			// get true vertex index
-			j = possibleNuEdges.at(jj);
-
-			// enforce periodic vertex checking
-			jp1 = (j+1) % onTheRight.getNV();
-
-			// get distance between vertices
-			dminTest = 0.0;
-			for (d=0; d<NDIM; d++){
-				// distance component (use minimum image)
-				dminCompTmp = onTheRight.vpos(j,d) - vpos(i,d);
-				dminCompTmp -= L*round(dminCompTmp/L);
-
-				// scalar distance
-				dminTest += pow(dminCompTmp,2);
-
-				// vector distance
-				dminVecTest.at(d) = dminCompTmp;
-			}
-
-			// if distance is < overlap distance, there is a force
-			if (dminTest < del*del*p2*p2){
-				// get scalar distance
-				dminScalar = sqrt(dminTest);
-
-				// set inContact to 1 for return
-				inContact = 1;
-
-				// define scaled distance (x = dmin/delta)
-				distScale = dminScalar/del;
-
-				// IF in zone to use repulsive force (and, if a > 0, bottom of attractive well)
-				if (dminScalar < del*p1){
-					// add to forces
-					for (d=0; d<NDIM; d++){
-						// get initial force value
-						ftmp = forceSgn * forceScale * (1 - distScale) * dminVecTest.at(d) / dminScalar;
-
-						// force is applied to vertices pairwise
-						muForce.at(i).at(d) += ftmp;
-						nuForce.at(j).at(d) -= ftmp;
-					}
-
-					// add to interaction potential energies to segments (mu,i) and (nu,j)
-					uTmp = 0.5 * forceScale * pow(1 - distScale,2);
-
-					// distribute potential energy to vertices
-					setUInt(i,uInt(i) + uTmp);
-					onTheRight.setUInt(j,onTheRight.uInt(j) + uTmp);
-				}
-
-				// IF C,l > 0, top of attractive well
-				else if (dminScalar > del*p1 && dminScalar < del*p2 && C > 0.0 && l > 0.0){
-					// add to forces pairwise
-					for (d=0; d<NDIM; d++){
-						ftmp = forceSgn * (C/l) * forceScale * (distScale - p2) * dminVecTest.at(d) / dminScalar;
-
-						// force is applied to vertex
-						muForce.at(i).at(d) += ftmp;
-						nuForce.at(j).at(d) -= ftmp;
-					}
-
-					// add to potential energy
-					uTmp = (C/l) * forceScale * (distScale*(1 - 0.5*distScale) + p1*(0.5*p1 - p2));
-
-					// distribute potential energy to vertices
-					setUInt(i,uInt(i) + uTmp);
-					onTheRight.setUInt(j,onTheRight.uInt(j) + uTmp);
-				}
-			}
-		}
-	}
-	*/
+	cout << "	*** ERROR: segment force under construction at this time, need to incorporate better contact";
+	cout << "				checking. Ending program." << endl;
+	exit(1);
 
 	// add forces to mu vertices
 	for (i=0; i<NV; i++){
@@ -1856,8 +1339,7 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight){
 
 	double forceScale = kint/del;			// force scale
 	double distScale = 0.0;					// distance scale
-	double p1 = 1.0 + C;					// interaction zone 1 for generalized spring potential (rep + att)
-	double p2 = p1 + l;						// interaction zone 2 for generalized spring potential (attraction only)
+	double p1 = 1.0 + a;					// edge of interaction zone, units of delta
 	double ftmp = 0.0;						// temporary force variable
 	double uTmp = 0.0;						// temporary energy variable
 	double vertexDist = 0.0;				// distance variable
@@ -1889,7 +1371,7 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight){
 			vertexDist = sqrt(vertexDist);
 
 			// check overlap distances
-			if (vertexDist < contactDistance*p2){
+			if (vertexDist < contactDistance*p1){
 				// set inContact to 1 for return
 				inContact = 1;
 
@@ -1900,9 +1382,9 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight){
 				forceScale = kint/contactDistance;
 
 				// IF in zone to use repulsive force (and, if a > 0, bottom of attractive well)
-				if (vertexDist < contactDistance*p1){
+				if (vertexDist < contactDistance){
 
-					// add to interaction potential energies to segments (mu,i) and (nu,j)
+					// add to interaction potential
 					uTmp = 0.5 * kint * pow(1 - distScale,2);
 		
 					setUInt(i,uInt(i) + uTmp);
@@ -1921,10 +1403,26 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight){
 					}
 				}
 
-				// IF C,l > 0, top of attractive well
-				else if (vertexDist > contactDistance*p1 && vertexDist < contactDistance*p2 && C > 0.0 && l > 0.0){
-					cout << "	** ERROR: Attractive area under construction, need to incorporate new interaction, so ending for now..." << endl;
-					exit(1);
+				// IF a > 0, in attractive well
+				else if (vertexDist >= contactDistance && vertexDist < contactDistance*p1 && a > 0.0){
+
+					// add to interaction potential
+					uTmp =  (-kint/(6.0*a)) * pow(distScale - 1.0,2) * (2*(distScale - 1.0) - 3*a);
+		
+					setUInt(i,uInt(i) + uTmp);
+					onTheRight.setUInt(j,onTheRight.uInt(j) + uTmp);
+
+					// add to vectorial forces
+					for (d=0; d<NDIM; d++){
+						// get force value
+						ftmp = -(forceScale/a) * (distScale - 1.0) * (distScale - p1) * vertexVec.at(d) / vertexDist;
+
+						// add to force on i
+						setVForce(i,d,vforce(i,d) + ftmp);
+
+						// subtract off complement from force on j
+						onTheRight.setVForce(j,d,onTheRight.vforce(j,d) - ftmp);
+					}
 				}
 			}
 		}

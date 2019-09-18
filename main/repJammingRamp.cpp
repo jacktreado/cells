@@ -51,8 +51,7 @@ const double gam 			= 0.0;			// surface tension force constant
 const double kb 			= 0.0;			// bending energy constant
 const double kint 			= 2.0;			// interaction energy constant
 const double del 			= 1.0;			// width of vertices (WHEN = 1, ITS A VERTEX FORCE!)
-const double C 				= 0.0;			// attraction parameter (strength)
-const double l 				= 0.0;			// attraction parameter (distance)
+const double a 				= 0.0;			// attraction parameter
 
 
 // int main
@@ -100,7 +99,7 @@ int main(int argc, char const *argv[])
 	cout << "	** Initializing particle quantities, particles are initially regular polygons" << endl;
 	packingObject.initializeBidisperse(NV,sizeRatio);
 	packingObject.initializeForceConstants(kl,ka,gam,kb,kint);
-	packingObject.initializeInteractionParams(del,C,l);
+	packingObject.initializeInteractionParams(del,a);
 
 	// initialize particle positions
 	cout << "	** Initializing particle positions on a square lattice" << endl;

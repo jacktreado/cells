@@ -34,9 +34,11 @@ const int NTUMORCELLS 			= 1;			// only 1 tumor cell
 const int NT 					= 1e6; 			// number of time steps
 const int NPRINT 				= 5e2;			// number of steps between printing
 const double T0 				= 1.0;			// temperature of background
-const double adiposeCalA		= 1.05;			// adipose deformability
+const double adiposeCalA		= 1.01;			// adipose deformability
 const double timeStepMag 		= 0.01;			// time step in MD units
-const double initialPhi			= 0.7;			// initial packing fraction
+const double initialPhi			= 0.2;			// initial packing fraction
+const double targetPhi			= 0.95;			// target packing fraction
+const double dphi 				= 1e-5;			// packing fraction step
 const double adiposeDamping		= 0.025;		// damping on adipose tissue
 
 // int main
@@ -73,7 +75,7 @@ int main(int argc, char const *argv[])
 	double L = 10.0*NCELLS;
 
 	// tumor NV
-	tumorNV = round(0.5*adiposeNV);
+	tumorNV = round(0.75*adiposeNV);
 
 	// instantiate object
 	cout << "	** Instantiating object" << endl;
@@ -118,8 +120,13 @@ int main(int argc, char const *argv[])
 	cout << endl << endl;
 
 	// run simulation 
-	cout << "	** Compressing to a jammed state" << endl;
-	tissueObject.tumorForce(NTUMORCELLS, forceScale, adiposeDamping);
+	cout << "	** Quasi-static compression to target packing fraction" << endl;
+	tissueObject.setNPRINT(5e1);
+	tissueObject.rateCompression(targetPhi, dphi, adiposeDamping);
+
+	// cout << "	** Forcing tumor cell through tissue to a jammed state" << endl;
+	tissueObject.setNPRINT(NPRINT);
+	// tissueObject.tumorForce(NTUMORCELLS, forceScale, adiposeDamping);
 
 	return 0;
 }

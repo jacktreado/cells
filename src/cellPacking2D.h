@@ -75,7 +75,7 @@ public:
 
 	// initialize parameters
 	void initializeForceConstants(double kl, double ka, double gam, double kb, double kint);
-	void initializeInteractionParams(double del, double C, double l);
+	void initializeInteractionParams(double del, double a);
 
 	// initialize positions
 	void squareLattice();
@@ -184,7 +184,12 @@ public:
 	void jammingFireRamp(double dphi, double dCalA, double asphericityTarget, double kbTarget, double Ktol, double Utol);
 
 	// non-equilibrium MD functions
+	void qsCompression(double phiTarget, double dphi);
+	void rateCompression(double phiTarget, double dphi, double dampingParameter);
 	void isoExtensionQS(double phiTarget, double dphi, double dampingParameter);
+
+	// relaxation/ramp functions
+	void attractionRamp(double attractionTarget, double dAttraction);
 
 	// tumor MD functions
 	void tumorNVE();

@@ -46,8 +46,7 @@ int main(){
 	kb 			= 0.0;
 	kint 		= 1.0;
 	del 		= 1.0;		// NOTE: NEEDS TO BE = 1.0 IF DOING VERTEX-VERTEX FORCE ONLY
-	C 			= 0.0;
-	l 			= 0.0;
+	a 			= 0.0;
 
 	// asphericity
 	asphericity = 1.08;
@@ -62,7 +61,7 @@ int main(){
 	cout << "	** Initializing particle quantities" << endl;
 	packingObject.initializeBidisperse(NV,sizeRatio);
 	packingObject.initializeForceConstants(kl,ka,gam,kb,kint);
-	packingObject.initializeInteractionParams(del,C,l);
+	packingObject.initializeInteractionParams(del,a);
 
 	// initialize particle positions
 	cout << "	** Initializing particle positions on a square lattice" << endl;

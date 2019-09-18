@@ -63,8 +63,7 @@ private:
 	double l0;			// rest length for edges
 	double a0;			// rest area for particles
 	double del;			// contact distance for two edge segments
-	double C;			// 1st attraction parameter (strength)
-	double l;			// 2nd attraction parameter (distance)
+	double a;			// only attraction parameter (distance and strength, good for DM)
 
 public:
 	// constructors
@@ -93,8 +92,7 @@ public:
 	double getl0() { return l0; };
 	double geta0() { return a0; };
 	double getdel() { return del; };
-	double getC() { return C; };
-	double getl() {return l; }
+	double geta() { return a; };
 
 	double vpos(int vertex, int dim);
 	double vrel(int vertex, int dim);
@@ -117,8 +115,7 @@ public:
 	void setl0(double val) { l0 = val; };
 	void seta0(double val) { a0 = val; };
 	void setdel(double val) { del = val; };
-	void setC(double val) { C = val; };
-	void setl(double val) { l = val; };
+	void seta(double val) { a = val; };
 
 	void setVPos(int vertex, int dim, double val);
 	void setVRel(int vertex, int dim, double val);
