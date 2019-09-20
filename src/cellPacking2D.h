@@ -190,10 +190,10 @@ public:
 	// non-equilibrium MD functions
 	void qsCompression(double phiTarget, double dphi);
 	void rateCompression(double phiTarget, double dphi, double dampingParameter);
-	void isoExtensionQS(double phiTarget, double dphi, double dampingParameter);
+	void isoExtensionQS(int plotIt, int& frameCount, double phiTarget, double dphi);
 
 	// relaxation/ramp functions
-	void attractionRamp(double attractionTarget, double dAttraction);
+	void attractionRamp(double attractionTarget, double dAttraction, int plotIt, int initialFrame);
 	void shapeRamp(double fixedPhi, double calATarget, double dCalA, double kbTarget, double dkb);
 
 	// tumor MD functions

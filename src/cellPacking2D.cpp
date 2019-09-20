@@ -232,6 +232,9 @@ cellPacking2D::cellPacking2D(ifstream& inputFileObject, double asphericity, doub
 	cout << "NCELLS = " << NCELLS << endl;
 	cout << "L = " << L << endl;
 
+	// reset length scales to be in units of l0
+	L /= l0tmp;
+
 	// test for error in inputs
 	if (NCELLS <= 0){
 		cout << "	ERROR: in overloaded operator, NCELLS <= 0 so cannot initialize arrays, ending code here." << endl;
@@ -265,14 +268,14 @@ cellPacking2D::cellPacking2D(ifstream& inputFileObject, double asphericity, doub
 		// set cell com position
 		for (d=0; d<NDIM; d++){
 			inputFileObject >> posTmp;
-			cell(ci).setCPos(d,posTmp);
+			cell(ci).setCPos(d,posTmp/l0tmp);
 		}
 
 		// set vertex positions
 		for (vi=0; vi<nv; vi++){
 			for (d=0; d<NDIM; d++){
 				inputFileObject >> posTmp;
-				cell(ci).setVPos(vi,d,posTmp);
+				cell(ci).setVPos(vi,d,posTmp/l0tmp);
 			}
 		}
 
@@ -562,7 +565,7 @@ void cellPacking2D::squareLattice(){
 		cell(ci).regularPolygon();
 
 		// perturb vertices a lil bit
-		cell(ci).vertexPerturbation(0.5);
+		cell(ci).vertexPerturbation(0.1);
 
 		// output cell asphericities
 		cout << "initializing cell " << ci << " on square lattice, initial asphericity = " << cell(ci).asphericity();
@@ -1279,7 +1282,7 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 	Unew = totalPotentialEnergy();
 	Knew = totalKineticEnergy();
 	Fnorm = forceRMS();
-	Ftol = 1e-6;
+	Ftol = 1e-8;
 
 	// loop over by alternating compression steps and 
 	// shape change steps
@@ -1345,7 +1348,7 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 		nr = removeRattlers(kr);
 
 		// check if jammed
-		if (nr < NCELLS-2 && Unew > 2*cell(0).getNV()*NCELLS*Utol*cell(0).getkint() && Knew < cell(0).getNV()*NCELLS*Ktol*cell(0).getkint())
+		if (nr < NCELLS-2 && Unew > 2*cell(0).getNV()*NCELLS*Utol*cell(0).getkint())
 			isjammed = 1;
 
 		if (isjammed){
@@ -1642,7 +1645,7 @@ void cellPacking2D::fireMinimize(double Ftol, double Utol, double Ktol, int plot
 	// initialize energies
 	Unew = relaxPotentialEnergy();
 	Knew = totalKineticEnergy();
-	// Fnorm = forceRMS();
+	Fnorm = forceRMS();
 
 	// reset velocities to 0
 	for (ci=0; ci<NCELLS; ci++){
@@ -1653,7 +1656,7 @@ void cellPacking2D::fireMinimize(double Ftol, double Utol, double Ktol, int plot
 	}
 
 	// iterate through MD time until system converged
-	kmax = 1e7;
+	kmax = 1e5;
 	for (k=0; k<kmax; k++){
 
 		// output some information to console
@@ -1676,9 +1679,9 @@ void cellPacking2D::fireMinimize(double Ftol, double Utol, double Ktol, int plot
 			}
 			
 			cout << "	* Run data:" << endl;
-			cout << "	* U 		= " << Unew << endl;
+			cout << "	* U 		= " << Unew/(cell(0).getNV()*NCELLS*Utol*energyScale) << endl;
 			cout << "	* K 		= " << Knew << endl;
-			cout << "	* Fmax 		= " << Fnorm << endl;
+			cout << "	* Fmax 		= " << Fnorm/(Ftol*forceScale) << endl;
 			cout << "	* phi 		= " << phi << endl;
 			cout << "	* dt 		= " << dt << endl;
 			cout << "	* alpha 	= " << alpha << endl;
@@ -1809,9 +1812,10 @@ void cellPacking2D::fireMinimize(double Ftol, double Utol, double Ktol, int plot
 		Unew = relaxPotentialEnergy();
 		Knew = totalKineticEnergy();
 		Fnorm = forceRMS();
-		// converged = (Fnorm < Ftol*forceScale);
-		converged = (converged || Unew < cell(0).getNV()*NCELLS*Utol*energyScale);
-		converged = (converged || (Knew < cell(0).getNV()*NCELLS*Ktol*energyScale && Unew > 2*cell(0).getNV()*NCELLS*Utol*energyScale) );
+
+		converged = (Fnorm < Ftol*forceScale);
+		// converged = (converged || Unew < cell(0).getNV()*NCELLS*Utol*energyScale);
+		// converged = (converged || (Knew < cell(0).getNV()*NCELLS*Ktol*energyScale && Unew > 2*cell(0).getNV()*NCELLS*Utol*energyScale) );
 		converged = (converged && k > NMIN);
 
 		if (converged){
@@ -1832,11 +1836,9 @@ void cellPacking2D::fireMinimize(double Ftol, double Utol, double Ktol, int plot
 	// reset dt to be original value before ending function
 	dt = dt0;
 
-	// if no convergence, throw an error
-	if (k == kmax){
-		cout << "	** ERROR: FIRE 2.0 with backstepping not able to find stable minimum, so ending." << endl;
-		exit(1);
-	}
+	// if no convergence, just stop
+	if (k == kmax)
+		cout << "	** FIRE not converged in kmax = " << kmax << " force evaluations" << endl;
 }
 
 
@@ -2172,11 +2174,13 @@ void cellPacking2D::rateCompression(double phiTarget, double dphi, double dampin
 
 
 // quasistaic gel forming function
-void cellPacking2D::isoExtensionQS(double phiTarget, double dphi, double dampingParameter){
+void cellPacking2D::isoExtensionQS(int plotIt, int& frameCount, double phiTarget, double dphi){
 	// local variables
-	int t, frameCount = 0;
+	int t = 0;
 	int isRelaxed = 1;
 	double Ftol = 1e-8;
+	double Utol = 1e-16;
+	double Ktol = 1e-24;
 
 	// calculate initial packing fraction
 	phi = packingFraction();
@@ -2189,6 +2193,7 @@ void cellPacking2D::isoExtensionQS(double phiTarget, double dphi, double damping
 			isRelaxed = 0;
 
 			// decrement packing fraction
+			phi = packingFraction();
 			setPackingFraction(phi-dphi);
 
 			// print statement
@@ -2211,14 +2216,12 @@ void cellPacking2D::isoExtensionQS(double phiTarget, double dphi, double damping
 		}
 		// run relaxation until code relaxed
 		else{
-			// isRelaxed = fireRelax(Ftol,dampingParameter,1,frameCount);
-			isRelaxed = potentialRelaxFire(Ftol*Ftol, Ftol, 1, frameCount);
-
-			if (isRelaxed == 0){
-				cout << "	** ERROR: system did not relax in isoExtensionQS at phi = " << phi << " in allowed time, ending." << endl;
-				exit(1);
-			}
+			fireMinimize(Ftol, Utol, Ktol, plotIt, frameCount);
+			isRelaxed = 1;
 		}
+
+		// increment t
+		t++;
 	}
 
 	if (phi < phiTarget)
@@ -2392,7 +2395,7 @@ void cellPacking2D::tumorForce(int NTUMORCELLS, double forceScale, double adipos
 
 
 // increase attraction quasi-statically, relax after each add
-void cellPacking2D::attractionRamp(double attractionTarget, double dAttraction){
+void cellPacking2D::attractionRamp(double attractionTarget, double dAttraction, int plotIt, int initalFrame){
 	// local variables
 	int k, ci, delSgn, frameCount;
 	double da, currAttraction, decScale, Ftol, Utol, Ktol;
@@ -2421,7 +2424,7 @@ void cellPacking2D::attractionRamp(double attractionTarget, double dAttraction){
 
 	// loop until attraction is the correct value
 	k=0;
-	frameCount=0;
+	frameCount=initalFrame;
 	while (attractionCheck > tol && k < NT){
 		// output to console
 		cout << "===================================================" << endl << endl << endl;
@@ -2448,7 +2451,7 @@ void cellPacking2D::attractionRamp(double attractionTarget, double dAttraction){
 
 		// relax potential energy
 		// potentialRelaxFire(Ktol, Utol, 1, frameCount);
-		fireMinimize(Ftol, Utol, Ktol, 1, frameCount);
+		fireMinimize(Ftol, Utol, Ktol, plotIt, frameCount);
 
 		// update check
 		attractionCheck = abs(currAttraction - attractionTarget);

@@ -25,7 +25,7 @@ const double deltaPhi 		= 0.002;		// packing fraction step
 const double deltaCalA		= 0.0005;		// asphericity increase step
 const double kineticTol 	= 1e-24;		// kinetic energy tolerance
 const double potentialTol 	= 1e-16;		// potential energy tolerance
-const double initialPhi 	= 0.86;			// initial packing fraction
+const double initialPhi 	= 0.975;			// initial packing fraction
 
 // force parameters
 const double kl 			= 1.0;			// perimeter force constant
@@ -122,26 +122,33 @@ int main(int argc, char const *argv[])
 	cout << endl << endl;
 
 	// run simulation 
-	// cout << "	** Compressing to a jammed state" << endl;
+	cout << "	** Relaxing initial state" << endl;
+	int frameCount = 0;
+	packingObject.fireMinimize(1e-8, potentialTol, kineticTol, 0, frameCount);
 	// packingObject.jammingFireRamp(deltaPhi,deltaCalA,asphericity,kb,kineticTol,potentialTol);
 
 	// initialize velocities
-	cout << "	** Initializing velocities to temp scale " << T0 << endl;
-	packingObject.initializeVelocities(T0);
+	// cout << "	** Initializing velocities to temp scale " << T0 << endl;
+	// packingObject.initializeVelocities(T0);
 
 	// ramp to target shape parameter
-	double calATarget = 1.5;
-	double kbTarget = 0.01;
-	double dCalA = 0.001;
-	double dkb = 0.001;
-	cout << "	** QS ramp to cal A, target cal A= " << calATarget << endl;
-	packingObject.shapeRamp(initialPhi,calATarget,dCalA,kbTarget,dkb);
+	// double calATarget = 1.5;
+	// double kbTarget = 0.01;
+	// double dCalA = 0.001;
+	// double dkb = 0.001;
+	// cout << "	** QS ramp to cal A, target cal A= " << calATarget << endl;
+	// packingObject.shapeRamp(initialPhi,calATarget,dCalA,kbTarget,dkb);
 
 	// ramp to fixed attraction and bending energy
-	// double aTarget = 0.5;
-	// double da = 0.001;
-	// cout << "	** QS ramp to attraction, target a = " << aTarget << endl;
-	// packingObject.attractionRamp(aTarget, da);
+	double aTarget = 0.1;
+	double da = 0.0005;
+	cout << "	** QS ramp to attraction, target a = " << aTarget << endl;
+	packingObject.attractionRamp(aTarget, da, 0, frameCount);
+
+	// run isotropic extension
+	double phiTarget = 0.2;
+	double dphi = 0.001;
+	packingObject.isoExtensionQS(1, frameCount, phiTarget, dphi);
 
 
 
