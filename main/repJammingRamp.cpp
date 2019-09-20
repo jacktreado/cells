@@ -48,7 +48,7 @@ const double potentialTol 	= 1e-16;		// potential energy tolerance
 const double kl 			= 1.0;			// perimeter force constant
 const double ka 			= 1.0;			// area force constant
 const double gam 			= 0.0;			// surface tension force constant
-const double kb 			= 0.0;			// bending energy constant
+const double kb 			= 0.1;			// bending energy constant
 const double kint 			= 2.0;			// interaction energy constant
 const double del 			= 1.0;			// width of vertices (WHEN = 1, ITS A VERTEX FORCE!)
 const double a 				= 0.0;			// attraction parameter
