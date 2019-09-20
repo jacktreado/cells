@@ -1042,12 +1042,12 @@ void cellPacking2D::setAsphericity(double val){
 
 	// set all cells to specified asphericity values
 	for (ci=0; ci<NCELLS; ci++)
-		cell(ci).setAsphericity(val);
+		cell(ci).setAsphericityConstA(val);
 }
 
 // change asphericity on cell ci
 void cellPacking2D::setAsphericity(int ci, double val){
-	cell(ci).setAsphericity(val);
+	cell(ci).setAsphericityConstA(val);
 }
 
 
@@ -1252,13 +1252,10 @@ void cellPacking2D::calculateForces(){
 // LOOPING FUNCTIONS
 
 // prepare jammed packing by ramping asphericity
-void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericityTarget, double kbTarget, double Ktol, double Utol){
+void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericityTarget, double kbTarget, double phiTarget, double Ktol, double Utol, int plotIt){
 	// local variables
-	int i, ci, nr, kr, isjammed, k, kmax, plotIt, asphericityLow, kbLow;
+	int i, ci, nr, kr, isjammed, k, kmax, asphericityLow, kbLow;
 	double Unew, Knew, dkb, Ftol, Fnorm;
-
-	// plotting
-	plotIt = 1;
 
 	// update packing fraction
 	phi = packingFraction();
@@ -1279,7 +1276,7 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 	dkb = 1e-3;
 
 	// initialize energies
-	Unew = totalPotentialEnergy();
+	Unew = relaxPotentialEnergy();
 	Knew = totalKineticEnergy();
 	Fnorm = forceRMS();
 	Ftol = 1e-8;
@@ -1312,6 +1309,9 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 				if (cell(ci).calA0() < asphericityTarget){
 					asphericityLow = 1;
 					setAsphericity(ci,cell(ci).calA0()+dCalA);
+
+					// randomize vertices
+					cell(ci).vertexPerturbation(0.1);
 				}
 			}
 		}
@@ -1331,15 +1331,10 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 				}
 			}
 		}
-		
-
-		// update packing fraction
-		phi = packingFraction();
-		setPackingFraction(phi + dphi);
 
 		// relax shapes (energies calculated in relax function)
 		// potentialRelaxFire(Ktol,Utol,plotIt,k);
-		fireMinimize(Ftol, Utol, Ktol, 1, k);
+		fireMinimize(Ftol, Utol, Ktol, plotIt, k);
 		Unew = relaxPotentialEnergy();
 		Knew = totalKineticEnergy();
 
@@ -1347,8 +1342,18 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 		kr = 0;
 		nr = removeRattlers(kr);
 
-		// check if jammed
-		if (nr < NCELLS-2 && Unew > 2*cell(0).getNV()*NCELLS*Utol*cell(0).getkint())
+		// check for target packing fraction
+		phi = packingFraction();
+		if (phi > phiTarget){
+			cout << "	** phi > phiTarget, so ending!" << endl;
+			cout << "	** Final phi = " << phi << endl;
+			break;;
+		}
+
+		// check whether or not to grow
+		if (Unew < cell(0).getNV()*NCELLS*Utol*cell(0).getkint() )
+			setPackingFraction(phi + dphi);
+		else if (nr < NCELLS-2 && Unew > 2*cell(0).getNV()*NCELLS*Utol*cell(0).getkint() && Knew < cell(0).getNV()*NCELLS*Ktol*cell(0).getkint() )
 			isjammed = 1;
 
 		if (isjammed){
@@ -1625,6 +1630,7 @@ void cellPacking2D::fireMinimize(double Ftol, double Utol, double Ktol, int plot
 	const int NDELAY 		= 1000;
 	int npPos				= 0;
 	int npNeg 				= 0;
+	int npFMIN				= 0;
 	double alpha 			= alpha0;
 	double alphat 			= alpha;
 	double t 				= 0.0;
@@ -1641,6 +1647,10 @@ void cellPacking2D::fireMinimize(double Ftol, double Utol, double Ktol, int plot
 
 	// reset time step
 	dt = dt0;
+
+	// initialize forces
+	resetContacts();
+	calculateForces();
 
 	// initialize energies
 	Unew = relaxPotentialEnergy();
@@ -1660,7 +1670,7 @@ void cellPacking2D::fireMinimize(double Ftol, double Utol, double Ktol, int plot
 	for (k=0; k<kmax; k++){
 
 		// output some information to console
-		if (k % NPRINT == 0 && plotIt){
+		if (k % NPRINT == 0){
 			cout << "===================================================" << endl << endl;
 			cout << " 	FIRE MINIMIZATION, k = " << k << ", frame = " << frameCount << endl << endl;
 			cout << "===================================================" << endl;
@@ -1813,10 +1823,15 @@ void cellPacking2D::fireMinimize(double Ftol, double Utol, double Ktol, int plot
 		Knew = totalKineticEnergy();
 		Fnorm = forceRMS();
 
+		if (Fnorm < Ftol*forceScale)
+			npFMIN++;
+		else
+			npFMIN = 0;
+
 		converged = (Fnorm < Ftol*forceScale);
 		// converged = (converged || Unew < cell(0).getNV()*NCELLS*Utol*energyScale);
 		// converged = (converged || (Knew < cell(0).getNV()*NCELLS*Ktol*energyScale && Unew > 2*cell(0).getNV()*NCELLS*Utol*energyScale) );
-		converged = (converged && k > NMIN);
+		converged = (converged && npFMIN > 5*NMIN);
 
 		if (converged){
 			cout << "FIRE has converged!" << endl;
@@ -2177,7 +2192,7 @@ void cellPacking2D::rateCompression(double phiTarget, double dphi, double dampin
 void cellPacking2D::isoExtensionQS(int plotIt, int& frameCount, double phiTarget, double dphi){
 	// local variables
 	int t = 0;
-	int isRelaxed = 1;
+	int isRelaxed = 0;
 	double Ftol = 1e-8;
 	double Utol = 1e-16;
 	double Ktol = 1e-24;
@@ -2200,9 +2215,6 @@ void cellPacking2D::isoExtensionQS(int plotIt, int& frameCount, double phiTarget
 			cout << "===================================================" << endl << endl;
 			cout << " 	CHANGING PACKING FRACTION FROM " << phi + dphi << " to " << phi << ": t = " << t << ", frame = " << frameCount << endl << endl;
 			cout << "===================================================" << endl;
-
-			cout << "	* Printing vetex positions to file" << endl;
-			printSystemPositions(frameCount);
 			
 			cout << "	* Run data:" << endl;
 			cout << "	* old phi 	= " << phi + dphi << endl;

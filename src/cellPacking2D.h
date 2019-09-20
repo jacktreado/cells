@@ -182,7 +182,7 @@ public:
 	int potentialRelaxFire(double kineticTol, double potentialTol, int plotIt, int& frameCount);
 	void jammingDamping(double dphi, double Ktol, double Utol, double dampingParameter);	// NEEDS WORKS
 	void jammingFire(double dphi, double Ktol, double Utol);	// NEEDS WORKS
-	void jammingFireRamp(double dphi, double dCalA, double asphericityTarget, double kbTarget, double Ktol, double Utol);
+	void jammingFireRamp(double dphi, double dCalA, double asphericityTarget, double kbTarget, double phiTarget, double Ktol, double Utol, int plotIt);
 
 	// FIRE 2.0 relaxation function
 	void fireMinimize(double Ftol, double Utol, double Ktol, int plotIt, int& frameCount);

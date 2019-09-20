@@ -37,9 +37,9 @@ const double PI = 4.0*atan(1);
 const int NT 				= 5e7; 			// number of time steps
 const double T0 			= 1e-4;			// temperature scale
 const double sizeRatio 		= 1.0;			// size ratio between large and small particles
-const double timeStepMag 	= 0.001;		// time step in MD units
-const double initialPhi		= 0.5;			// initial packing fraction
-const double deltaPhi 		= 0.002;		// packing fraction step
+const double timeStepMag 	= 0.02;		// time step in MD units
+const double initialPhi		= 0.7;			// initial packing fraction
+const double deltaPhi 		= 0.001;		// packing fraction step
 const double deltaCalA		= 0.001;		// asphericity increase step
 const double kineticTol 	= 1e-24;		// kinetic energy tolerance
 const double potentialTol 	= 1e-16;		// potential energy tolerance
@@ -147,8 +147,9 @@ int main(int argc, char const *argv[])
 	packingObject.overlapRelief();
 
 	// run simulation 
+	double phiTarget = 1.1;
 	cout << "	** Compressing to a jammed state" << endl;
-	packingObject.jammingFireRamp(deltaPhi,deltaCalA,asphericity,kb,kineticTol,potentialTol);
+	packingObject.jammingFireRamp(deltaPhi,deltaCalA,asphericity,kb,phiTarget,kineticTol,potentialTol,1);
 
 	// once completed, print stats
 	cout << "	** Compression protocol completed, printing stats to file." << endl;

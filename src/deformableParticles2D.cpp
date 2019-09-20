@@ -349,8 +349,8 @@ void deformableParticles2D::vertexPerturbation(double dscale){
 	// loop over vertices, perturb
 	for (i=0; i<NV; i++){
 		// get random perturbations
-		dx = drand48();
-		dy = drand48();
+		dx = 1.0 - 2.0*drand48();
+		dy = 1.0 - 2.0*drand48();
 
 		// normalize perturbations
 		dnorm = sqrt(dx*dx + dy*dy);

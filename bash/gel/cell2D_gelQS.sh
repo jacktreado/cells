@@ -22,20 +22,18 @@ mkdir -p out
 # inputs
 NCELLS=$1
 asphericity=$2
-C=$3
-l=$4
-kb=$5
-partition=$6
-time=$7
-numSeedsPerRun=$8
-numRuns=$9
-startSeed="${10}"
+a=$3
+partition=$4
+time=$5
+numSeedsPerRun=$6
+numRuns=$7
+startSeed=$8
 
 let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=cell2D_gelQS_N"$NCELLS"_calA"$asphericity"_C"$C"_l"$l"_kb"$kb"
+basestr=gelQS_N"$NCELLS"_calA"$asphericity"_a"$a"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation
@@ -45,7 +43,7 @@ mkdir -p $simdatadir
 # compile into binary using packing.h
 binf=bin/"$runstr".o
 mainf=$maindir/gelQS.cpp
-echo Running $numSeeds sims of $NCELLS from input.dat, cal A = $asphericity, C = $C, l = $l, kb = $kb, will decompress to target phi
+echo Running $numSeeds sims of $NCELLS from input.dat, cal A = $asphericity, a = $a, will decompress to target phi
 
 # run compiler
 rm -f $binf
@@ -93,9 +91,10 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
 
         # create output files
         posf=$specificdir/$filestr.pos
+        enf=$specificdir/$filestr.en
 
         # append to runString
-        runString="$runString ; ./$binf $NCELLS $asphericity $C $l $kb $runseed $posf"
+        runString="$runString ; ./$binf $NCELLS $asphericity $a $runseed $posf $enf"
     done
 
     # finish off run string
@@ -146,14 +145,12 @@ sbatch -t $time $slurmf
 # ====================
 # 1. NCELLS
 # 2. asphericity
-# 3. C (attraction strength, units of epsilon/d)
-# 4. l (attraction distance, units of l)
-# 5. kb (bending energy, units of epsilon)
-# 6. partition
-# 7. time
-# 8. num seeds per run (for each entry in array)
-# 9. number of runs (number of array entries, i.e. arraynum)
-# 10. start seed (end seed determined by number of runs)
+# 3. a (attraction parameter)
+# 4. partition
+# 5. time
+# 6. num seeds per run (for each entry in array)
+# 7. number of runs (number of array entries, i.e. arraynum)
+# 8. start seed (end seed determined by number of runs)
 
 
 

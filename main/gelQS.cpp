@@ -36,82 +36,87 @@ using namespace std;
 const double PI = 4.0*atan(1);
 
 // simulation constants
-const int NT 					= 1e6;			// number of time steps
+const int NT 					= 5e7; 			// number of time steps
+const double T0 				= 1e-4;			// temperature scale
+const double sizeRatio 			= 1.0;			// size ratio between large and small particles
 const int NPRINT 				= 500;			// number of time steps between prints
-const double T0 				= 0.0;			// temperature scale
-const double timeStepMag 		= 0.0075;		// time step in MD units
-const double dampingParameter 	= 1.9;			// damping parameter
-const double phiTarget 			= 0.6;			// target packing fraction
-const double dphi				= 0.001;		// decrease in packing fraction increment
+const double timeStepMag 		= 0.02;			// time step in MD unit
+const double deltaPhi 			= 0.001;		// packing fraction step
+const double deltaCalA			= 0.003;		// asphericity increase step
+const double kineticTol 		= 1e-24;		// kinetic energy tolerance
+const double potentialTol 		= 1e-16;		// potential energy tolerance
+const double initialPhi 		= 0.7;			// initial packing fraction
 
 // force parameters
 const double kl 			= 1.0;			// perimeter force constant
 const double ka 			= 1.0;			// area force constant
 const double gam 			= 0.0;			// surface tension force constant
-const double kint 			= 5.0;			// interaction energy constant
-const double del 			= 0.1;			// width of circulo lines
+const double kb 			= 0.0;			// bending energy constant
+const double kint 			= 2.0;			// interaction energy constant
+const double del 			= 1.0;			// width of vertices (WHEN = 1, ITS A VERTEX FORCE!)
+const double aInitial 		= 0.0;			// attraction parameter to start
 
 // int main
 int main(int argc, char const *argv[])
 {
 	// local variables
-	int NCELLS;
-	double asphericity, C, l, kb, seed;
+	int NCELLS, NV, seed, plotIt;
+	double asphericity, a;
 
 	// inputs from command line
 	string NCELLS_str 			= argv[1];
-	string asphericity_str 		= argv[2];
-	string C_str 				= argv[3];
-	string l_str 				= argv[4];
-	string kb_str 				= argv[5];
-	string seed_str				= argv[6];
-	string positionFile			= argv[7];
+	string NV_str 				= argv[2];
+	string asphericity_str 		= argv[3];
+	string a_str 				= argv[4];
+	string seed_str				= argv[5];
+	string positionFile			= argv[6];
+	string energyFile 			= argv[7];
 
 	// load strings into sstream
 	stringstream NCELLSss(NCELLS_str);
+	stringstream NVss(NV_str);
 	stringstream asphericityss(asphericity_str);
-	stringstream Css(C_str);
-	stringstream lss(l_str);
-	stringstream kbss(kb_str);
+	stringstream ass(a_str);
 	stringstream seedss(seed_str);
 
 	// parse values from strings
 	NCELLSss 		>> NCELLS;
+	NVss 			>> NV;
 	asphericityss 	>> asphericity;
-	Css	 			>> C;
-	lss 			>> l;
-	kbss 			>> kb;
+	ass	 			>> a;
 	seedss 			>> seed;
 
 	// box size
 	double L = 10.0*NCELLS;
 
-	// open input object
-	string inputStr = "input.dat";
-	cout << "	** Opening file object from string " << inputStr << endl;
-	ifstream fileInputObject(inputStr.c_str());
-	if (!fileInputObject.is_open()){
-		cout << "	** ERROR: could not open file " << inputStr << ", ending." << endl;
-		return 1;
-	}
-
 	// instantiate object
-	cout << "	** Instantiating object for gel simulation" << endl;
-	cellPacking2D gelObject(fileInputObject, asphericity, 1);
+	cout << "	** Instantiating object" << endl;
+	cellPacking2D packingObject(NCELLS,NT,NPRINT,L,seed);
 
 	// print initial greeting
 	cout << "	** BEGINNING main code for gel simulation, initial asphericity = " << asphericity << endl;
 
 	// set values in setting up packing
-	cout << "	** Initializing particle quantities *WITHOUT BENDING ENERGY*" << endl;
-	gelObject.initializeForceConstants(kl,ka,gam,0.0,kint);
-	gelObject.initializeInteractionParams(del,C,l);
+	cout << "	** Initializing particle quantities, particles are initially regular polygons" << endl;
+	packingObject.initializeBidisperse(NV,sizeRatio);
+	packingObject.initializeForceConstants(kl,ka,gam,kb,kint);
+	packingObject.initializeInteractionParams(del,aInitial);
 
+	// initialize particle positions
+	cout << "	** Initializing particle positions on a square lattice" << endl;
+	packingObject.squareLattice();
+
+	// initialize particle velocities
 	cout << "	** Initializing particle velocities with temperature T0 = " << T0 << endl;
-	gelObject.initializeVelocities(0.0);
+	packingObject.initializeVelocities(T0);
 
 	// open print objects
-	gelObject.openPackingObject(positionFile);
+	cout << "	** Opening print objects" << endl;
+	packingObject.openPackingObject(positionFile);
+	packingObject.openEnergyObject(energyFile);
+
+
+
 
 	/****************
 
@@ -119,57 +124,51 @@ int main(int argc, char const *argv[])
 
 	*****************/
 
-	// get initial phi from input.dat
-	double phi = gelObject.packingFraction();
-	gelObject.setPackingFraction(phi);
-
 	// set time step
-	gelObject.setdt(0.5*timeStepMag);
+	packingObject.setdt(timeStepMag);
 
-	// print simulation header
+	// set initial packing fraction
+	packingObject.setPackingFraction(initialPhi);
+
+	// print simulation header for initial compression
 	cout << endl << endl;
 	cout << "================================================" << endl << endl;
-	cout << "	Beginning gelation algorithm using velocity-Verlet and damping" << endl;
-	cout << " 		* NCELLS = " << NCELLS << endl;
-	cout << "		* NPRINT = " << NPRINT << endl;
-	cout << "		* asphericity = " << asphericity << endl;
-	cout << " 		* timeScale = " << gelObject.timeScale() << endl;
-	cout << "		* timeStepMag = " << timeStepMag << endl;
-	cout << " 		* initial phi = " << phi << endl;
-	cout << "		* target phi = " << phiTarget << endl;
-	cout << "		* dphi = " << dphi << endl;
-	cout << "		* initial potential energy = " << gelObject.totalPotentialEnergy() << endl;
+	cout << "	Beginning compression algorithm using velocity-Verlet and FIRE" << endl;
+	cout << " 		* NCELLS 				= " 	<< NCELLS << " and smaller cells have NV = " << NV << " vertices" << endl;
+	cout << "		* NT total 				= " 	<< NT << endl;
+	cout << "		* NPRINT 				= " 	<< NPRINT << endl;
+	cout << "		* target asphericity 	= " 	<< asphericity << endl;
+	cout << " 		* timeScale 			= " 	<< packingObject.timeScale() << endl;
+	cout << "		* timeStepMag 			= " 	<< timeStepMag << endl;
+	cout << "		* delta phi 			= "	 	<< deltaPhi << endl;
+	cout << "		* delta calA 			= " 	<< deltaCalA << endl;
 	cout << "================================================" << endl;
 	cout << endl << endl;
 
-	// relax IC shapes
-	gelObject.setNPRINT(50*NPRINT);
-	gelObject.setNT(NT);
+	// perform initial overlap relief
+	cout << "	** Peforming a wee relief of any initial overlaps" << endl;
+	packingObject.overlapRelief();
+
+	// run simulation 
+	double phiTarget = 0.75;
+	plotIt = 0;
+	cout << "	** Compressing to a jammed state, do not plot yet" << endl;
+	packingObject.jammingFireRamp(deltaPhi,deltaCalA,asphericity,kb,phiTarget,kineticTol,potentialTol,plotIt);
+
+	// ramp to fixed attraction and bending energy
 	int frameCount = 0;
-	int plotRelax = 0;
-	double Ftol = 1e-8;
-	int isRelaxed = gelObject.fireRelax(Ftol,dampingParameter,plotRelax,frameCount);
+	double aTarget = a;
+	double da = 0.001;
+	cout << "	** QS ramp to attraction, target a = " << aTarget << endl;
+	packingObject.attractionRamp(aTarget, da, plotIt, frameCount);
 
-	// run simulation if initial conditions can relax
-	if (isRelaxed == 1){
-		cout << "	** Initial condition sufficiently relaxed!" << endl;
-		cout << "	** Initializing particle velocities with temperature T0 = " << T0 << endl;
-		gelObject.initializeVelocities(T0);
-
-		cout << "	** Running quasistatic isotropic extension simulation, now kb = " << kb << endl;
-		gelObject.setNPRINT(NPRINT);
-		gelObject.setdt(timeStepMag);
-		gelObject.initializeForceConstants(kl,ka,gam,kb,kint);
-		gelObject.initializeInteractionParams(del,C,l);
-		gelObject.isoExtensionQS(phiTarget, dphi, dampingParameter);
-
-		// close file input object
-		fileInputObject.close();
-	}
-	else{
-		cout << "	** ERROR: initial conditions could not relax in alloted time NT = " << NT << ", ending." << endl;
-		return 1;
-	}
+	// run isotropic extension
+	frameCount = 0;
+	phiTarget = 0.2;
+	plotIt = 1;
+	double dphi = 0.001;
+	cout << "	** QS isotropic extension to form cell gel, starting to plot! aTarget = " << aTarget << endl;
+	packingObject.isoExtensionQS(plotIt, frameCount, phiTarget, dphi);
 
 	// end main successfully
 	return 0;
