@@ -127,6 +127,7 @@ public:
 	void setCForce(int dim, double val);
 	void setUInt(int vertex, double val);
 	void setAsphericity(double val);
+	void setAsphericityConstA(double val);
 
 	// update cpos
 	void updateCPos();

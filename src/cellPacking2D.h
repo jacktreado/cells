@@ -139,6 +139,7 @@ public:
 	double totalKineticEnergy();			// calculate total kinetic energy
 	double maxForceMagnitude();				// calculate magnitude of largest force
 	double maxNetForceMagnitude();			// calculate magnitude of largest net force on any cell
+	double forceRMS(); 						// RMS net force
 	double meanAsphericity();				// calculate system-average asphericity
 
 	// setters
@@ -183,6 +184,9 @@ public:
 	void jammingFire(double dphi, double Ktol, double Utol);	// NEEDS WORKS
 	void jammingFireRamp(double dphi, double dCalA, double asphericityTarget, double kbTarget, double Ktol, double Utol);
 
+	// FIRE 2.0 relaxation function
+	void fireMinimize(double Ftol, double Utol, double Ktol, int plotIt, int& frameCount);
+
 	// non-equilibrium MD functions
 	void qsCompression(double phiTarget, double dphi);
 	void rateCompression(double phiTarget, double dphi, double dampingParameter);
@@ -190,6 +194,7 @@ public:
 
 	// relaxation/ramp functions
 	void attractionRamp(double attractionTarget, double dAttraction);
+	void shapeRamp(double fixedPhi, double calATarget, double dCalA, double kbTarget, double dkb);
 
 	// tumor MD functions
 	void tumorNVE();
@@ -209,6 +214,7 @@ public:
 
 	// fire energy minimization
 	void fireStep(int& np, double& alpha);
+	void fireStep(std::vector<int>& np, std::vector<double>& alphaVec);
 };
 
 #endif

@@ -18,14 +18,14 @@ const double PI = 4.0*atan(1);
 
 // simulation constants
 const int NT 				= 5e7; 			// number of time steps
-const double T0 			= 1e-4;			// temperature scale
+const double T0 			= 1e-2;			// temperature scale
 const double sizeRatio 		= 1.4;			// size ratio between large and small particles
-const double timeStepMag 	= 0.01;			// time step in MD units
-const double initialPhi		= 0.7;			// initial packing fraction
+const double timeStepMag 	= 0.001;		// time step in MD units
 const double deltaPhi 		= 0.002;		// packing fraction step
 const double deltaCalA		= 0.0005;		// asphericity increase step
 const double kineticTol 	= 1e-24;		// kinetic energy tolerance
 const double potentialTol 	= 1e-16;		// potential energy tolerance
+const double initialPhi 	= 0.86;			// initial packing fraction
 
 // force parameters
 const double kl 			= 1.0;			// perimeter force constant
@@ -44,58 +44,54 @@ int main(int argc, char const *argv[])
 	double asphericity, seed, NPRINTtmp;
 
 	// inputs from command line
-	string NCELLS_str 			= argv[1];
-	string NPRINT_str 			= argv[2];
-	string NV_str 				= argv[3];
-	string asphericity_str 		= argv[4];
-	string seed_str				= argv[5];
-	string positionFile			= argv[6];
-	string energyFile 			= argv[7];
-	string statFile 			= argv[8];
+	string NPRINT_str 			= argv[1];
+	string asphericity_str 		= argv[2];
+	string positionFile			= argv[3];
+	string energyFile 			= argv[4];
+
+	// input file
+	string inputFile = "gelRamp.input";
+	ifstream inputFileObj(inputFile.c_str());
+	if (!inputFileObj.is_open()){
+		cout << "	** ERROR: input file cannot be opened" << endl;
+		return 1;
+	}
 
 	// load strings into sstream
-	stringstream NCELLSss(NCELLS_str);
 	stringstream NPRINTss(NPRINT_str);
-	stringstream NVss(NV_str);
 	stringstream asphericityss(asphericity_str);
-	stringstream seedss(seed_str);
 
 	// parse values from strings
-	NCELLSss 		>> NCELLS;
 	NPRINTss 		>> NPRINTtmp;
-	NVss 			>> NV;
 	asphericityss 	>> asphericity;
-	seedss 			>> seed;
 
 	// set NPRINT to int
 	NPRINT = (int)NPRINTtmp;
 
-	// box size
-	double L = 10.0*NCELLS;
+	// set seed
+	seed = 1;
 
 	// instantiate object
 	cout << "	** Instantiating object" << endl;
-	cellPacking2D packingObject(NCELLS,NT,NPRINT,L,seed);
+	cellPacking2D packingObject(inputFileObj,asphericity,seed);
+
+	// get values from reading in packing fraction
+	NCELLS = packingObject.getNCELLS();
+	NV = packingObject.cell(0).getNV();
+
+	// set packing print info
+	packingObject.setNT(NT);
+	packingObject.setNPRINT(NPRINT);
 
 	// set values in setting up packing
-	cout << "	** Initializing particle quantities, particles are initially regular polygons" << endl;
-	packingObject.initializeBidisperse(NV,sizeRatio);
+	cout << "	** Initializing particle quantities" << endl;
 	packingObject.initializeForceConstants(kl,ka,gam,kb,kint);
 	packingObject.initializeInteractionParams(del,a);
-
-	// initialize particle positions
-	cout << "	** Initializing particle positions on a square lattice" << endl;
-	packingObject.squareLattice();
-
-	// initialize particle velocities
-	cout << "	** Initializing particle velocities with temperature T0 = " << T0 << endl;
-	packingObject.initializeVelocities(T0);
 
 	// open print objects
 	cout << "	** Opening print objects" << endl;
 	packingObject.openPackingObject(positionFile);
 	packingObject.openEnergyObject(energyFile);
-	packingObject.openStatObject(statFile);
 
 	/****************
 
@@ -106,7 +102,7 @@ int main(int argc, char const *argv[])
 	// set time step
 	packingObject.setdt(timeStepMag);
 
-	// set initial packing fraction
+	// set initial packing fraction to be starter - dphi
 	packingObject.setPackingFraction(initialPhi);
 
 	// print simulation header
@@ -116,6 +112,7 @@ int main(int argc, char const *argv[])
 	cout << " 		* NCELLS 				= " 	<< NCELLS << " and smaller cells have NV = " << NV << " vertices" << endl;
 	cout << "		* NT total 				= " 	<< NT << endl;
 	cout << "		* NPRINT 				= " 	<< NPRINT << endl;
+	cout << "		* starting phi 			= " 	<< initialPhi << endl;
 	cout << "		* target asphericity 	= " 	<< asphericity << endl;
 	cout << " 		* timeScale 			= " 	<< packingObject.timeScale() << endl;
 	cout << "		* timeStepMag 			= " 	<< timeStepMag << endl;
@@ -124,19 +121,28 @@ int main(int argc, char const *argv[])
 	cout << "================================================" << endl;
 	cout << endl << endl;
 
-	// perform initial overlap relief
-	cout << "	** Peforming a wee relief of any initial overlaps" << endl;
-	packingObject.overlapRelief();
-
 	// run simulation 
-	cout << "	** Compressing to a jammed state" << endl;
-	packingObject.jammingFireRamp(deltaPhi,deltaCalA,asphericity,kb,kineticTol,potentialTol);
+	// cout << "	** Compressing to a jammed state" << endl;
+	// packingObject.jammingFireRamp(deltaPhi,deltaCalA,asphericity,kb,kineticTol,potentialTol);
+
+	// initialize velocities
+	cout << "	** Initializing velocities to temp scale " << T0 << endl;
+	packingObject.initializeVelocities(T0);
+
+	// ramp to target shape parameter
+	double calATarget = 1.5;
+	double kbTarget = 0.01;
+	double dCalA = 0.001;
+	double dkb = 0.001;
+	cout << "	** QS ramp to cal A, target cal A= " << calATarget << endl;
+	packingObject.shapeRamp(initialPhi,calATarget,dCalA,kbTarget,dkb);
 
 	// ramp to fixed attraction and bending energy
-	double aTarget = 1.0;
-	double da = 0.001;
-	cout << "	** QS ramp to attraction, target a = " << aTarget << endl;
-	packingObject.attractionRamp(aTarget, da);
+	// double aTarget = 0.5;
+	// double da = 0.001;
+	// cout << "	** QS ramp to attraction, target a = " << aTarget << endl;
+	// packingObject.attractionRamp(aTarget, da);
+
 
 
 	// end main successfully

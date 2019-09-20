@@ -276,9 +276,6 @@ cellPacking2D::cellPacking2D(ifstream& inputFileObject, double asphericity, doub
 			}
 		}
 
-		// calculate a0 based on NV and asphericity
-		// a0 = (l0*l0*nv*nv)/(4.0*PI*asphericity);
-
 		// determine new l0 for given area
 		l0 = (1.0/nv)*sqrt(4*PI*cell(ci).area()*asphericity);
 		a0 = (nv*nv*l0*l0)/(4*PI*asphericity);
@@ -531,7 +528,7 @@ void cellPacking2D::initializeInteractionParams(double del, double a){
 
 	// loop over cells
 	for (i=0; i<NCELLS; i++){
-		cell(i).setdel(del);
+		cell(i).setdel(del*cell(i).getl0());
 		cell(i).seta(a);
 	}
 }
@@ -747,7 +744,7 @@ double cellPacking2D::timeScale(){
 
 	// characteristic mass
 	// charMass = cell(0).getdel()*(cell(0).getl0() + PI*0.5*cell(0).getdel());
-	charMass = 0.25*PI*cell(0).getdel(); 		// needs to be this for mass if vertex forces only
+	charMass = 0.25*PI*cell(0).getdel()*cell(0).getdel(); 		// needs to be this for mass if vertex forces only
 	charLength = cell(0).getdel();
 	charEnergy = cell(0).getkint();
 
@@ -920,6 +917,27 @@ double cellPacking2D::maxNetForceMagnitude(){
 
 	// return max force
 	return sqrt(maxForce);
+}
+
+double cellPacking2D::forceRMS(){
+	int ci, vi, d;
+	int NVTOTAL = 0;
+	double frms = 0.0;
+
+	// loop over forces, calc total force norm
+	for (ci=0; ci<NCELLS; ci++){
+		NVTOTAL += cell(ci).getNV();
+		for (vi=0; vi<cell(ci).getNV(); vi++){
+			for (d=0; d<NDIM; d++)
+				frms += pow(cell(ci).vforce(vi,d),2);
+		}
+	}
+
+	// get force scale
+	frms = sqrt(frms/(NDIM*NVTOTAL));
+
+	// return
+	return frms;
 }
 
 // calculate mean asphericity of all particles
@@ -1234,7 +1252,7 @@ void cellPacking2D::calculateForces(){
 void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericityTarget, double kbTarget, double Ktol, double Utol){
 	// local variables
 	int i, ci, nr, kr, isjammed, k, kmax, plotIt, asphericityLow, kbLow;
-	double Unew, Knew, dkb;
+	double Unew, Knew, dkb, Ftol, Fnorm;
 
 	// plotting
 	plotIt = 1;
@@ -1257,6 +1275,12 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 	// bending energy increment
 	dkb = 1e-3;
 
+	// initialize energies
+	Unew = totalPotentialEnergy();
+	Knew = totalKineticEnergy();
+	Fnorm = forceRMS();
+	Ftol = 1e-6;
+
 	// loop over by alternating compression steps and 
 	// shape change steps
 	while (isjammed == 0 && k < kmax){
@@ -1272,6 +1296,7 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 		cout << "	* low calA 		= " << asphericityLow << endl;
 		cout << "	* target calA0 		= " << asphericityTarget << endl;
 		cout << "	* # of rattlers = " << nr << endl;
+		cout << "	* isjammed = " << isjammed << endl;
 		cout << endl << endl;
 
 		// update calA and bending energies if below target
@@ -1310,16 +1335,17 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 		setPackingFraction(phi + dphi);
 
 		// relax shapes (energies calculated in relax function)
-		potentialRelaxFire(Ktol,Utol,plotIt,k);
+		// potentialRelaxFire(Ktol,Utol,plotIt,k);
+		fireMinimize(Ftol, Utol, Ktol, 1, k);
 		Unew = relaxPotentialEnergy();
-		Knew = T;
+		Knew = totalKineticEnergy();
 
 		// remove rattlers
 		kr = 0;
 		nr = removeRattlers(kr);
 
 		// check if jammed
-		if (nr < NCELLS-2 && Unew > 2*cell(0).getNV()*NCELLS*Utol && Knew < cell(0).getNV()*NCELLS*Ktol)
+		if (nr < NCELLS-2 && Unew > 2*cell(0).getNV()*NCELLS*Utol*cell(0).getkint() && Knew < cell(0).getNV()*NCELLS*Ktol*cell(0).getkint())
 			isjammed = 1;
 
 		if (isjammed){
@@ -1438,19 +1464,20 @@ int cellPacking2D::potentialRelaxFire(double kineticTol, double potentialTol, in
 
 		// update kinetic and potential energy (T updated in fverlet)
 		Unew = relaxPotentialEnergy();
-		Fnetmax = maxNetForceMagnitude();
+		Fnetmax = forceRMS();
 		Knew = T;
+		// Knew = totalKineticEnergy();
 
 		// if minimized, return 1
-		if ( Fnetmax < potentialTol || Unew < cell(0).getNV()*NCELLS*potentialTol || ( Knew < cell(0).getNV()*NCELLS*kineticTol && Unew > 2*cell(0).getNV()*NCELLS*potentialTol && nc > 0 ) ) {
+		if ( Fnetmax < kineticTol || Unew < cell(0).getNV()*NCELLS*potentialTol || ( Knew < cell(0).getNV()*NCELLS*kineticTol && Unew > 2*cell(0).getNV()*NCELLS*potentialTol ) ) {
 			// print to console
 			cout << "Energy sufficiently minimized/relaxed at t = " << t << endl;
 
 			// describe which condition is met
-			if (Fnetmax < potentialTol)
-				cout << "*** Fnetmax < tol" << endl;
-			else if (Unew < cell(0).getNV()*NCELLS*potentialTol)
+			if (Unew < cell(0).getNV()*NCELLS*potentialTol)
 				cout << "*** U < Utol" << endl;
+			else if (Fnetmax < kineticTol)
+				cout << "*** Fnetmax < " << kineticTol << endl;
 			else
 				cout << "*** mechanically stable!" << endl;
 
@@ -1488,6 +1515,9 @@ void cellPacking2D::fverlet(int& np, double& alpha, double dampingParameter){
 	// local variables
 	int i;
 
+	// perform FIRE step
+	fireStep(np,alpha);
+
 	// update positions
 	for (i=0; i<NCELLS; i++){
 		cell(i).verletPositionUpdate(dt);
@@ -1503,9 +1533,6 @@ void cellPacking2D::fverlet(int& np, double& alpha, double dampingParameter){
 	// update velocities
 	for (i=0; i<NCELLS; i++)
 		cell(i).verletVelocityUpdate(dt,dampingParameter);
-
-	// perform FIRE step
-	fireStep(np,alpha);
 }
 
 // relieve overlap between particles
@@ -1580,15 +1607,248 @@ void cellPacking2D::overlapRelief(){
 	}
 }
 
+
+// fire energy minimzation with backstepping if P < 0
+void cellPacking2D::fireMinimize(double Ftol, double Utol, double Ktol, int plotIt, int& frameCount){
+	// HARD CODE IN FIRE PARAMETERS
+	const double alpha0 	= 0.25;
+	const double finc 		= 1.1;
+	const double fdec 		= 0.5;
+	const double falpha 	= 0.99;
+	const double dtmax 		= 10*dt0;
+	const double dtmin 		= 0.02*dt0;
+	const int NMIN 			= 20;
+	const int NNEGMAX 		= 2000;
+	const int NDELAY 		= 1000;
+	int npPos				= 0;
+	int npNeg 				= 0;
+	double alpha 			= alpha0;
+	double alphat 			= alpha;
+	double t 				= 0.0;
+	double energyScale 		= cell(0).getkint();
+	double forceScale		= energyScale/cell(0).getl0();
+
+	// local variables
+	int ci,vi,d,k,kmax;
+	double P,vstarnrm,fstarnrm,vtmp,ftmp;
+	double Unew, Knew, Fnorm;
+
+	// variable to test for potential energy minimization
+	bool converged = false;
+
+	// reset time step
+	dt = dt0;
+
+	// initialize energies
+	Unew = relaxPotentialEnergy();
+	Knew = totalKineticEnergy();
+	// Fnorm = forceRMS();
+
+	// reset velocities to 0
+	for (ci=0; ci<NCELLS; ci++){
+		for (vi=0; vi<cell(ci).getNV(); vi++){
+			for (d=0; d<NDIM; d++)
+				cell(ci).setVVel(vi,d,0.0);
+		}
+	}
+
+	// iterate through MD time until system converged
+	kmax = 1e7;
+	for (k=0; k<kmax; k++){
+
+		// output some information to console
+		if (k % NPRINT == 0 && plotIt){
+			cout << "===================================================" << endl << endl;
+			cout << " 	FIRE MINIMIZATION, k = " << k << ", frame = " << frameCount << endl << endl;
+			cout << "===================================================" << endl;
+
+			if (plotIt == 1){
+				if (packingPrintObject.is_open()){
+					cout << "	* Printing vetex positions to file" << endl;
+					printSystemPositions(frameCount);
+				}
+				
+				if (energyPrintObject.is_open()){
+					cout << "	* Printing cell energy to file" << endl;
+					printSystemEnergy(frameCount,Unew,Knew);
+				}
+				frameCount++;
+			}
+			
+			cout << "	* Run data:" << endl;
+			cout << "	* U 		= " << Unew << endl;
+			cout << "	* K 		= " << Knew << endl;
+			cout << "	* Fmax 		= " << Fnorm << endl;
+			cout << "	* phi 		= " << phi << endl;
+			cout << "	* dt 		= " << dt << endl;
+			cout << "	* alpha 	= " << alpha << endl;
+			cout << "	* P 		= " << P << endl;
+			cout << endl << endl;
+		}
+
+		// Step 1. calculate P and norms
+		P = 0.0;
+		vstarnrm = 0.0;
+		fstarnrm = 0.0;
+		for (ci=0; ci<NCELLS; ci++){
+			for (vi=0; vi<cell(ci).getNV(); vi++){
+				for (d=0; d<NDIM; d++){
+					// get tmp variables
+					ftmp = cell(ci).vforce(vi,d);
+					vtmp = cell(ci).vvel(vi,d);
+
+					// calculate based on all vertices on all cells
+					P += ftmp*vtmp;
+					vstarnrm += vtmp*vtmp;
+					fstarnrm += ftmp*ftmp;
+				}
+			}
+		}
+
+		// get norms
+		vstarnrm = sqrt(vstarnrm);
+		fstarnrm = sqrt(fstarnrm);
+
+
+		// Step 2. Adjust simulation based on net motion of system
+		if (P > 0){
+			// increment pos counter
+			npPos++;
+
+			// reset neg counter
+			npNeg = 0;
+
+			// update alpha_t for next time
+			alphat = alpha;
+
+			// alter sim if enough positive steps taken
+			if (npPos > NMIN){
+				// change time step
+				if (dt*finc < dtmax)
+					dt *= finc;
+				else
+					dt = dtmax;
+
+				// decrease alpha
+				alpha *= falpha;
+			}
+		}
+		else{
+			// reset pos counter
+			npPos = 0;
+
+			// rest neg counter
+			npNeg++;
+
+			// check for stuck sim
+			if (npNeg > NNEGMAX)
+				break;
+
+			// decrease time step if past initial delay
+			if (k > NMIN){
+				// decrease time step 
+				if (dt*fdec > dtmin)
+					dt *= fdec;
+				else
+					dt = dtmin;
+
+				// change alpha
+				alpha = alpha0;
+				alphat = alpha;
+			}
+
+			// take half step backwards
+			for (ci=0; ci<NCELLS; ci++){
+				for (vi=0; vi<cell(ci).getNV(); vi++){
+					for (d=0; d<NDIM; d++)
+						cell(ci).setVPos(vi,d,cell(ci).vpos(vi,d) - 0.5*dt*cell(ci).vvel(vi,d));
+				}
+			}
+
+			// reset velocities to 0
+			for (ci=0; ci<NCELLS; ci++){
+				for (vi=0; vi<cell(ci).getNV(); vi++){
+					for (d=0; d<NDIM; d++)
+						cell(ci).setVVel(vi,d,0.0);
+				}
+			}
+		}
+
+		// update velocities if forces are acting
+		if (fstarnrm > 0){
+			for (ci=0; ci<NCELLS; ci++){
+				for (vi=0; vi<cell(ci).getNV(); vi++){
+					for (d=0; d<NDIM; d++){
+						vtmp = (1 - alphat)*cell(ci).vvel(vi,d) + alphat*(cell(ci).vforce(vi,d)/fstarnrm)*vstarnrm;
+						cell(ci).setVVel(vi,d,vtmp);
+					}
+				}
+			}
+		}
+
+		// do verlet update
+		for (ci=0; ci<NCELLS; ci++){
+			cell(ci).verletPositionUpdate(dt);
+			cell(ci).updateCPos();
+		}
+
+		// reset contacts before force calculation
+		resetContacts();
+
+		// calculate forces
+		calculateForces();
+
+		// update velocities
+		for (ci=0; ci<NCELLS; ci++)
+			cell(ci).verletVelocityUpdate(dt,0.0);
+
+		// update t
+		t += dt;
+
+		// check for convergence
+		Unew = relaxPotentialEnergy();
+		Knew = totalKineticEnergy();
+		Fnorm = forceRMS();
+		// converged = (Fnorm < Ftol*forceScale);
+		converged = (converged || Unew < cell(0).getNV()*NCELLS*Utol*energyScale);
+		converged = (converged || (Knew < cell(0).getNV()*NCELLS*Ktol*energyScale && Unew > 2*cell(0).getNV()*NCELLS*Utol*energyScale) );
+		converged = (converged && k > NMIN);
+
+		if (converged){
+			cout << "FIRE has converged!" << endl;
+			cout << "k = " << k << ", t = " << t << endl;
+			if (Fnorm < Ftol*forceScale)
+				cout << "	** Fnorm = " << Fnorm << ";  which is < Ftol" << endl;
+			else if (Unew < cell(0).getNV()*NCELLS*Utol)
+				cout << "	** U = " << Unew << ";  which is < Utol" << endl;
+			else
+				cout << "	** K = " << Knew << ";  and U = " << Unew << " which is< Ktol && U > 2*Utol" << endl;
+
+			cout << "Breaking out of FIRE protocol." << endl;
+			break;
+		}
+	}
+
+	// reset dt to be original value before ending function
+	dt = dt0;
+
+	// if no convergence, throw an error
+	if (k == kmax){
+		cout << "	** ERROR: FIRE 2.0 with backstepping not able to find stable minimum, so ending." << endl;
+		exit(1);
+	}
+}
+
+
 // fire energy minimization
 void cellPacking2D::fireStep(int& np, double& alpha){
 	// HARD CODE IN FIRE PARAMETERS
 	const double alpha0 	= 0.1;
 	const double finc 		= 1.1;
-	const double fdec 		= 0.1;
-	const double falpha 	= 0.99;
-	const double dtmax 		= 20*dt0;
-	const int NMIN 			= 50;
+	const double fdec 		= 0.5;
+	const double falpha 	= 0.999;
+	const double dtmax 		= 10*dt0;
+	const int NMIN 			= 5;
 
 	// local variables
 	int ci,vi,d;
@@ -1648,10 +1908,7 @@ void cellPacking2D::fireStep(int& np, double& alpha){
 	}
 	else if (P <= 0) {
 		// decrease time step, but only to limit
-		if (dt * fdec > dt0)
-			dt *= fdec;
-		else
-			dt = dt0;
+		dt *= fdec;
 
 		// set global velocity vector to zero
 		for (ci=0; ci<NCELLS; ci++){
@@ -1670,6 +1927,107 @@ void cellPacking2D::fireStep(int& np, double& alpha){
 	}
 	else if (P > 0 && np <= NMIN) 
 		np++;
+}
+
+// fire energy minimization with vector of alpha values, individual P values for each cell
+void cellPacking2D::fireStep(vector<int>& np, vector<double>& alpha){
+	// HARD CODE IN FIRE PARAMETERS
+	const double alpha0 	= 0.1;
+	const double finc 		= 1.1;
+	const double fdec 		= 0.1;
+	const double falpha 	= 0.99;
+	const double dtmax 		= 10*dt0;
+	const int NMIN 			= 5;
+
+	// local variables
+	int ci,vi,d;
+	double vstarnrm,fstarnrm,vtmp,ftmp;
+
+	// updated temperature
+	T = 0;
+
+	// P values
+	vector<double> P(NCELLS,0.0);
+
+	// loop over cells
+	for (ci=0; ci<NCELLS; ci++){
+
+		// reset norms
+		vstarnrm = 0.0;
+		fstarnrm = 0.0;
+
+		// loop over vertices
+		for (vi=0; vi<cell(ci).getNV(); vi++){
+			for (d=0; d<NDIM; d++){
+				// get tmp variables
+				ftmp = cell(ci).vforce(vi,d);
+				vtmp = cell(ci).vvel(vi,d);
+
+				// calculate based on all vertices on all cells
+				P.at(ci) += ftmp*vtmp;
+				vstarnrm += vtmp*vtmp;
+				fstarnrm += ftmp*ftmp;
+			}
+		}
+
+		// get norms
+		vstarnrm = sqrt(vstarnrm);
+		fstarnrm = sqrt(fstarnrm);
+
+		// update velocities if forces are acting
+		if (fstarnrm > 0){
+			for (vi=0; vi<cell(ci).getNV(); vi++){
+				for (d=0; d<NDIM; d++){
+					vtmp = (1 - alpha.at(ci))*cell(ci).vvel(vi,d) + alpha.at(ci)*(cell(ci).vforce(vi,d)/fstarnrm)*vstarnrm;
+					cell(ci).setVVel(vi,d,vtmp);
+				}
+			}
+		}
+
+		// update temperature, cannot use function because we are looping over cells
+		for (vi=0; vi<cell(ci).getNV(); vi++){
+			for (d=0; d<NDIM; d++){
+				T += 0.5*cell(ci).vvel(vi,d)*cell(ci).vvel(vi,d)*0.25*PI*cell(ci).getdel()*cell(ci).getdel();
+			}
+		}
+
+		// update P and alpha values
+		if (P.at(ci) > 0){
+
+			if (np.at(ci) > NMIN){
+				// increase dt
+				if (dt * finc < dtmax)
+					dt *= finc;
+				else
+					dt = dtmax;
+
+				// decrease alpha
+				alpha.at(ci) *= falpha;
+
+				// increase np counter
+				np.at(ci)++;
+			}
+			else
+				np.at(ci)++;
+
+		}
+		else {
+			// decrease time step
+			dt *= fdec;
+
+			// set global velocity vector to zero
+			for (vi=0; vi<cell(ci).getNV(); vi++){
+				for (d=0; d<NDIM; d++)
+					cell(ci).setVVel(vi,d,0.0);
+			}
+
+			// set alpha -> alpha0
+			alpha.at(ci) = alpha0;
+
+			// set np -> 0
+			np.at(ci) = 0;
+		}
+	}
 }
 
 
@@ -2037,7 +2395,7 @@ void cellPacking2D::tumorForce(int NTUMORCELLS, double forceScale, double adipos
 void cellPacking2D::attractionRamp(double attractionTarget, double dAttraction){
 	// local variables
 	int k, ci, delSgn, frameCount;
-	double da, currAttraction, decScale, Ktol, Utol;
+	double da, currAttraction, decScale, Ftol, Utol, Ktol;
 	double attractionCheck, tol;
 
 	// set check and tolerance
@@ -2047,6 +2405,7 @@ void cellPacking2D::attractionRamp(double attractionTarget, double dAttraction){
 	// set tolerance for relaxation
 	Utol = 1e-16;
 	Ktol = 1e-24;
+	Ftol = 1e-6;
 
 	// get current attraction (assuming all attraction the same)
 	currAttraction = cell(0).geta();
@@ -2063,7 +2422,7 @@ void cellPacking2D::attractionRamp(double attractionTarget, double dAttraction){
 	// loop until attraction is the correct value
 	k=0;
 	frameCount=0;
-	while (attractionCheck < tol && k < NT){
+	while (attractionCheck > tol && k < NT){
 		// output to console
 		cout << "===================================================" << endl << endl << endl;
 		cout << " 	Ramping attraction to aTarget = " << attractionTarget << endl << endl;
@@ -2088,7 +2447,8 @@ void cellPacking2D::attractionRamp(double attractionTarget, double dAttraction){
 			cell(ci).seta(currAttraction);
 
 		// relax potential energy
-		potentialRelaxFire(Ktol, Utol, 1, frameCount);
+		// potentialRelaxFire(Ktol, Utol, 1, frameCount);
+		fireMinimize(Ftol, Utol, Ktol, 1, frameCount);
 
 		// update check
 		attractionCheck = abs(currAttraction - attractionTarget);
@@ -2101,11 +2461,93 @@ void cellPacking2D::attractionRamp(double attractionTarget, double dAttraction){
 		cout << "	ERROR: particle shapes could not relax to desired attraction in allotted time, ending." << endl;
 		exit(1);
 	}
-
 }
 
 
+void cellPacking2D::shapeRamp(double fixedPhi, double calATarget, double dCalA, double kbTarget, double dkb){
+	// local variables
+	int k, ci, delSgn, frameCount;
+	double da, currCalA, decScale, Ftol, Utol, Ktol;
+	double calACheck, tol;
+	double kb = cell(0).getkb();
 
+	// set check and tolerance
+	tol = 1e-8;
+	calACheck = 10*tol;
+
+	// set tolerance for relaxation
+	Ftol = 1e-6;
+	Utol = 1e-16;
+	Ktol = 1e-24;
+
+	// get current attraction (assuming all attraction the same)
+	currCalA = cell(0).calA0();
+
+	// set decrease scale to be 1
+	decScale = 1.0;
+
+	// check whether to increase or decrease
+	if (currCalA < calATarget)
+		delSgn = 1;
+	else
+		delSgn = -1;
+
+	// loop until attraction is the correct value
+	k=0;
+	frameCount=0;
+	while (calACheck > tol && k < NT){
+		// output to console
+		cout << "===================================================" << endl << endl << endl;
+		cout << " 	Ramping cal A to calATarget = " << calATarget << endl << endl;
+		cout << "===================================================" << endl;
+		cout << "	* k 			= " << k << endl;
+		cout << "	* current CalA 	= " << currCalA << endl;
+		cout << "	* current kb 	= " << kb << endl;
+		cout << endl << endl;
+
+		// decide whether attraction is too large or too small
+		if (delSgn*currCalA < delSgn*calATarget)
+			da = delSgn*dCalA;
+		else{
+			decScale *= 0.9;
+			da = -delSgn*decScale*dCalA;
+		}
+
+		// update current attraction parameter
+		currCalA += da;
+
+		// update attraction in all of the cells
+		for (ci=0; ci<NCELLS; ci++)
+			cell(ci).setAsphericityConstA(currCalA);
+
+		// relax potential energy
+		// potentialRelaxFire(Ktol, Utol, 1, frameCount);
+		fireMinimize(Ftol, Utol, Ktol, 1, frameCount);
+
+		// update check
+		calACheck = abs(currCalA - calATarget);
+
+		// update packing fraction (keep fixed)
+		phi = packingFraction();
+		setPackingFraction(fixedPhi);
+
+		// increase bending energy (ASSUME DISTANCE TO kbTarget IS NOT PART OF WHILE LOOP)
+		if (kb < kbTarget){
+			kb += dkb;
+
+			for (ci=0; ci<NCELLS; ci++)
+				cell(ci).setkb(kb);
+		}
+
+		// update iterator
+		k++;
+	}
+
+	if (k == NT){
+		cout << "	ERROR: particle shapes could not relax to desired calA in allotted time, ending." << endl;
+		exit(1);
+	}
+}
 
 
 

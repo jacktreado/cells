@@ -718,6 +718,15 @@ void deformableParticles2D::setAsphericity(double val){
 	a0 = (NV*NV*l0*l0)/(4*PI*val);
 }
 
+void deformableParticles2D::setAsphericityConstA(double val){
+	if (val < 1.0){
+		cout << "	ERROR: trying to set asphericity to be < 1, ending." << endl;
+		exit(1);
+	}
+
+	l0 = (1.0/NV)*sqrt(4*PI*a0*val);
+}
+
 
 
 // update cpos based on vpos
