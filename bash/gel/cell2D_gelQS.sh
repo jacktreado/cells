@@ -6,7 +6,7 @@ srcdir=$cellsdir/src
 maindir=$cellsdir/main
 
 # directory for all output for cell simulations
-outputdir=/home/jdt45/project/cells
+outputdir=~/project/cells
 
 # directory for simulations specific to jamming
 simtypedir=$outputdir/gelQS
@@ -21,19 +21,20 @@ mkdir -p out
 
 # inputs
 NCELLS=$1
-asphericity=$2
-a=$3
-partition=$4
-time=$5
-numSeedsPerRun=$6
-numRuns=$7
-startSeed=$8
+NV=$2
+asphericity=$3
+a=$4
+partition=$5
+time=$6
+numSeedsPerRun=$7
+numRuns=$8
+startSeed=$9
 
 let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=gelQS_N"$NCELLS"_calA"$asphericity"_a"$a"
+basestr=gelQS_N"$NCELLS"_NV"$NV"_calA"$asphericity"_a"$a"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation
@@ -94,7 +95,7 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         enf=$specificdir/$filestr.en
 
         # append to runString
-        runString="$runString ; ./$binf $NCELLS $asphericity $a $runseed $posf $enf"
+        runString="$runString ; ./$binf $NCELLS $NV $asphericity $a $runseed $posf $enf"
     done
 
     # finish off run string
@@ -144,13 +145,14 @@ sbatch -t $time $slurmf
 #       INPUTS
 # ====================
 # 1. NCELLS
-# 2. asphericity
-# 3. a (attraction parameter)
-# 4. partition
-# 5. time
-# 6. num seeds per run (for each entry in array)
-# 7. number of runs (number of array entries, i.e. arraynum)
-# 8. start seed (end seed determined by number of runs)
+# 2. NV
+# 3. asphericity
+# 4. a (attraction)
+# 5. partition
+# 6. time
+# 7. num seeds per run (for each entry in array)
+# 8. number of runs (number of array entries, i.e. arraynum)
+# 9. start seed (end seed determined by number of runs)
 
 
 

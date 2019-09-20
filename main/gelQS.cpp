@@ -42,7 +42,7 @@ const double sizeRatio 			= 1.0;			// size ratio between large and small particl
 const int NPRINT 				= 500;			// number of time steps between prints
 const double timeStepMag 		= 0.02;			// time step in MD unit
 const double deltaPhi 			= 0.001;		// packing fraction step
-const double deltaCalA			= 0.003;		// asphericity increase step
+const double deltaCalA			= 0.0025;		// asphericity increase step
 const double kineticTol 		= 1e-24;		// kinetic energy tolerance
 const double potentialTol 		= 1e-16;		// potential energy tolerance
 const double initialPhi 		= 0.7;			// initial packing fraction
@@ -150,7 +150,7 @@ int main(int argc, char const *argv[])
 	packingObject.overlapRelief();
 
 	// run simulation 
-	double phiTarget = 0.75;
+	double phiTarget = 0.975;
 	plotIt = 0;
 	cout << "	** Compressing to a jammed state, do not plot yet" << endl;
 	packingObject.jammingFireRamp(deltaPhi,deltaCalA,asphericity,kb,phiTarget,kineticTol,potentialTol,plotIt);
