@@ -44,7 +44,7 @@ mkdir -p $simdatadir
 # compile into binary using packing.h
 binf=bin/"$runstr".o
 mainf=$maindir/gelQS.cpp
-echo Running $numSeeds sims of $NCELLS from input.dat, cal A = $asphericity, a = $a, will decompress to target phi
+echo Running $numSeeds sims of $NCELLS cells from initially dilute, cal A = $asphericity, a = $a, will compress then decompress to target phi
 
 # run compiler
 rm -f $binf
