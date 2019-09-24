@@ -42,6 +42,9 @@ private:
 	double L;						// boundary length
 	double T;						// system temperature
 	double phi;						// system packing/volume fraction
+
+	// virial stresses
+	double sigmaXX, sigmaXY, sigmaYX, sigmaYY;
 	
 	// array of cells
 	deformableParticles2D* cellArray;
@@ -167,6 +170,17 @@ public:
 	void printSystemStats();
 
 
+	/**************************
+
+		Forces and position 
+			updates
+
+	***************************/
+
+	void calculateForces();
+	void fverlet(int& np, double& alpha, double dampingParameter);
+	void activeBrownian(double diffusionConstant);	// NEEDS WORKS
+
 
 
 	/**************************
@@ -175,24 +189,17 @@ public:
 
 	***************************/
 
-
 	// looping functions
-	void msFire(double dphi0, double dphiJ, double phiJGuess, double Ktol, double Ftol);
-	void msDamping(double dphi, double Ktol, double Ftol, double dampingParameter);
-	int potentialRelaxFire(double kineticTol, double potentialTol, int plotIt, int& frameCount);
-	void jammingDamping(double dphi, double Ktol, double Utol, double dampingParameter);	// NEEDS WORKS
-	void jammingFire(double dphi, double Ktol, double Utol);	// NEEDS WORKS
 	void jammingFireRamp(double dphi, double dCalA, double asphericityTarget, double kbTarget, double phiTarget, double Ktol, double Utol, int plotIt);
 
 	// FIRE 2.0 relaxation function
-	void fireMinimize(double Ftol, double Utol, double Ktol, int plotIt, int& frameCount);
+	void fireMinimize(double Ptol, double Ktol, int plotIt, int& frameCount);
 
 	// non-equilibrium MD functions
-	void qsCompression(double phiTarget, double dphi);
-	void rateCompression(double phiTarget, double dphi, double dampingParameter);
 	void isoExtensionQS(int plotIt, int& frameCount, double phiTarget, double dphi);
 
 	// relaxation/ramp functions
+	void overlapRelief();
 	void attractionRamp(double attractionTarget, double dAttraction, int plotIt, int initialFrame);
 	void shapeRamp(double fixedPhi, double calATarget, double dCalA, double kbTarget, double dkb);
 
@@ -200,17 +207,6 @@ public:
 	void tumorNVE();
 	void tumorForce(int NTUMORCELLS, double forceScale, double adiposeDamping);
 
-
-	// wrapper functions for simulation protocols
-	void calculateForces();
-	void dverlet(double dampingParameter);
-	void fverlet(int& np, double& alpha, double dampingParameter);
-	void activeBrownian(double diffusionConstant);	// NEEDS WORKS
-
-	// relaxation
-	void shapeRelax(int plotIt);
-	void shapeRelaxRamp(double finalCalA, double initialDCalA, double kineticTol, double potentialTol);
-	void overlapRelief();
 
 	// fire energy minimization
 	void fireStep(int& np, double& alpha);

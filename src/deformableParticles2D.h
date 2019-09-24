@@ -154,7 +154,7 @@ public:
 	void surfaceTensionForce();
 	void bendForce();
 	int segmentForce(deformableParticles2D& onTheRight); // return 0 or 1, depending on contact
-	int vertexForce(deformableParticles2D& onTheRight);
+	int vertexForce(deformableParticles2D& onTheRight, std::vector<double>& fij, std::vector<double>& rij);
 	int radialForce(deformableParticles2D& onTheRight); 
 
 	// energy functions

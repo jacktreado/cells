@@ -1297,7 +1297,7 @@ int deformableParticles2D::segmentForce(deformableParticles2D &onTheRight){
 // 		* interacting parts are disks of diameter delta = l_0
 // 		* also updates interaction potential
 
-int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight){
+int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector<double>& fij, vector<double>& rij){
 	// return variable
 	int inContact = 0;
 
@@ -1324,6 +1324,7 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight){
 
 		// save distance in vector
 		deltaMuNu.at(d) = distTmp;
+		rij.at(d) = distTmp;
 
 		// calculate vector norm
 		centerDistance += pow(distTmp,2);
@@ -1409,6 +1410,10 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight){
 
 						// subtract off complement from force on j
 						onTheRight.setVForce(j,d,onTheRight.vforce(j,d) - ftmp);
+
+						// store force component in fij, to return to cellPacking.h function for 
+						// virial stress calculation
+						fij.at(d) += ftmp;
 					}
 				}
 
@@ -1431,6 +1436,10 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight){
 
 						// subtract off complement from force on j
 						onTheRight.setVForce(j,d,onTheRight.vforce(j,d) - ftmp);
+
+						// store force component in fij, to return to cellPacking.h function for 
+						// virial stress calculation
+						fij.at(d) += ftmp;
 					}
 				}
 			}
