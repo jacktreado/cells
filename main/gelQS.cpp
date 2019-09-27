@@ -9,14 +9,12 @@
 	Input parameters:
 		-- NCELLS: 				number of cells
 		-- asphericity: 		p^2/4*PI*a, deformability after relaxation
-		-- C: 					attraction parameter, defines strength of attractive shell in units of del
-		-- l: 					attraction parameter, defines distance of attractive shell in units of del
+		-- a: 					attraction parameter, defines strength & size of attractive shell in units of del
 		-- seed: 				initial seed for the simulation
 
 	Files to write to
 		-- positionFile: 	configuration during packing simulation
 		-- energyFile:		particle energies during packing simulation
-		-- statFile: 		packing statistics (final contact network, etc) after packing simulation
 
 	** In later versions, will add option to input desired input file
 
@@ -42,17 +40,20 @@ const double sizeRatio 			= 1.0;			// size ratio between large and small particl
 const int NPRINT 				= 500;			// number of time steps between prints
 const double timeStepMag 		= 0.02;			// time step in MD unit
 const double deltaPhi 			= 0.001;		// packing fraction step
-const double deltaCalA			= 0.0025;		// asphericity increase step
-const double kineticTol 		= 1e-24;		// kinetic energy tolerance
-const double potentialTol 		= 1e-16;		// potential energy tolerance
-const double initialPhi 		= 0.7;			// initial packing fraction
+const double kineticTol 		= 1e-12;		// kinetic energy tolerance
+const double pressureTol 		= 1e-6;			// potential energy tolerance
+const double initialPhi 		= 0.6;			// initial packing fraction
+const double repPhi 			= 0.79;			// packing fraction of repulsive cells before gelation
+const double initialCalA 		= 1.05;			// cal A at end of compression sim
+const double deltaA 			= 0.001;		// stepping in a during attraction ramp
+const double gelPhi 			= 0.02;			// final phi of gel phase
 
 // force parameters
-const double kl 			= 1.0;			// perimeter force constant
+const double kl 			= 0.2;			// perimeter force constant
 const double ka 			= 1.0;			// area force constant
 const double gam 			= 0.0;			// surface tension force constant
 const double kb 			= 0.0;			// bending energy constant
-const double kint 			= 2.0;			// interaction energy constant
+const double kint 			= 1.0;			// interaction energy constant
 const double del 			= 1.0;			// width of vertices (WHEN = 1, ITS A VERTEX FORCE!)
 const double aInitial 		= 0.0;			// attraction parameter to start
 
@@ -102,18 +103,18 @@ int main(int argc, char const *argv[])
 	packingObject.initializeForceConstants(kl,ka,gam,kb,kint);
 	packingObject.initializeInteractionParams(del,aInitial);
 
-	// initialize particle positions
-	cout << "	** Initializing particle positions on a square lattice" << endl;
-	packingObject.squareLattice();
+	// set time step
+	packingObject.setdt(timeStepMag);
 
-	// initialize particle velocities
-	cout << "	** Initializing particle velocities with temperature T0 = " << T0 << endl;
-	packingObject.initializeVelocities(T0);
+	// initialize particle positions by BIDISPERSE DISK PACKING
+	double initPhiTarget = 0.6;
+	cout << "	** Initializing particle positions as disk packing to packing fraction = " << initPhiTarget << endl;
+	packingObject.bidisperseDisks(sizeRatio,initPhiTarget);
 
-	// open print objects
+	// open output files
 	cout << "	** Opening print objects" << endl;
-	packingObject.openPackingObject(positionFile);
-	packingObject.openEnergyObject(energyFile);
+	packingObject.openPackingObject(posFile);
+	packingObject.openEnergyObject(enFile);
 
 
 
@@ -124,18 +125,15 @@ int main(int argc, char const *argv[])
 
 	*****************/
 
-	// set time step
+	// REset time step (in case initial conditions changed value)
 	packingObject.setdt(timeStepMag);
 
-	// set initial packing fraction
-	packingObject.setPackingFraction(initialPhi);
 
 	// print simulation header for initial compression
 	cout << endl << endl;
 	cout << "================================================" << endl << endl;
-	cout << "	Beginning compression algorithm using velocity-Verlet and FIRE" << endl;
+	cout << "	Beginning gel algorithm using velocity-Verlet and FIRE" << endl;
 	cout << " 		* NCELLS 				= " 	<< NCELLS << " and smaller cells have NV = " << NV << " vertices" << endl;
-	cout << "		* NT total 				= " 	<< NT << endl;
 	cout << "		* NPRINT 				= " 	<< NPRINT << endl;
 	cout << "		* target asphericity 	= " 	<< asphericity << endl;
 	cout << " 		* timeScale 			= " 	<< packingObject.timeScale() << endl;
@@ -145,30 +143,18 @@ int main(int argc, char const *argv[])
 	cout << "================================================" << endl;
 	cout << endl << endl;
 
-	// perform initial overlap relief
-	cout << "	** Peforming a wee relief of any initial overlaps" << endl;
-	packingObject.overlapRelief();
-
 	// run simulation 
-	double phiTarget = 0.975;
-	plotIt = 0;
-	cout << "	** Compressing to a jammed state, do not plot yet" << endl;
-	packingObject.jammingFireRamp(deltaPhi,deltaCalA,asphericity,kb,phiTarget,kineticTol,potentialTol,plotIt);
-
-	// ramp to fixed attraction and bending energy
 	int frameCount = 0;
-	double aTarget = a;
-	double da = 0.001;
-	cout << "	** QS ramp to attraction, target a = " << aTarget << endl;
-	packingObject.attractionRamp(aTarget, da, plotIt, frameCount);
+	cout << "	** Compressing to a target phi = " << phiTarget << endl;
+	packingObject.compressToTarget(deltaPhi,repPhi,initialCalA,kineticTol,pressureTol,1,frameCount);
 
-	// run isotropic extension
-	frameCount = 0;
-	phiTarget = 0.2;
-	plotIt = 1;
-	double dphi = 0.001;
-	cout << "	** QS isotropic extension to form cell gel, starting to plot! aTarget = " << aTarget << endl;
-	packingObject.isoExtensionQS(plotIt, frameCount, phiTarget, dphi);
+	// relax shape and attraction
+	cout << "	** Relaxing attraction and shape" << endl;
+	packingObject.attractionRamp(a, deltaA, asphericity, 1, frameCount);
+
+	// run gel simulation
+	cout << "	** Performing isostatic gelation sim" << endl;
+	packingObject.isoExtensionQS(1, frameCount, gelPhi, deltaPhi);
 
 	// end main successfully
 	return 0;

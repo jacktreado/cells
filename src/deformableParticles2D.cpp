@@ -304,6 +304,9 @@ void deformableParticles2D::regularPolygon(){
 		setVRel(i,1,polyRad*cos(angleArg));
 	}
 
+	// set a0 to be new area
+	// a0 = area();
+
 	// output
 	cout << " 	-- creating regular polygon with a0 = " << a0 << ", and area = " << area() << " and perimeter = " << perimeter() << endl;
 	cout << "	-- first segment length = " << segmentLength(0) << " and first area = " << area(0) << endl;
@@ -945,7 +948,6 @@ double deformableParticles2D::segmentDotProduct(int l1, int l2){
 
 
 
-
 /************************
 
 	Shape Forces
@@ -1302,7 +1304,7 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 	int inContact = 0;
 
 	// local variables
-	int i,j,d;
+	int i,j,d,dd;
 
 	// -------------------------
 	// 
@@ -1323,8 +1325,8 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 		distTmp = distTmp - L*round(distTmp/L);
 
 		// save distance in vector
+		rij.at(d) = -distTmp;
 		deltaMuNu.at(d) = distTmp;
-		rij.at(d) = distTmp;
 
 		// calculate vector norm
 		centerDistance += pow(distTmp,2);
@@ -1411,8 +1413,9 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 						// subtract off complement from force on j
 						onTheRight.setVForce(j,d,onTheRight.vforce(j,d) - ftmp);
 
-						// store force component in fij, to return to cellPacking.h function for 
-						// virial stress calculation
+						// calculate contribution from vertex-vertex interaction
+						// for (dd=0; dd<NDIM; dd++)
+							// virialStress.at(NDIM*d + dd) += ftmp*vertexVec.at(dd);
 						fij.at(d) += ftmp;
 					}
 				}
@@ -1437,8 +1440,9 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 						// subtract off complement from force on j
 						onTheRight.setVForce(j,d,onTheRight.vforce(j,d) - ftmp);
 
-						// store force component in fij, to return to cellPacking.h function for 
-						// virial stress calculation
+						// calculate contribution from vertex-vertex interaction
+						// for (dd=0; dd<NDIM; dd++)
+							// virialStress.at(NDIM*d + dd) += ftmp*vertexVec.at(dd);
 						fij.at(d) += ftmp;
 					}
 				}
@@ -1452,7 +1456,7 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 
 
 // harmonic spring force between centers of overlapping particles
-int deformableParticles2D::radialForce(deformableParticles2D &onTheRight){
+int deformableParticles2D::radialForce(deformableParticles2D &onTheRight, double bscale){
 	// local variables
 	int i, j, d, maxI, maxJ;
 	double viDotProduct, vDotProduct, ftmp, maxDotProduct, uTmp;
@@ -1467,7 +1471,7 @@ int deformableParticles2D::radialForce(deformableParticles2D &onTheRight){
 	double contactDistance = 0.0;			// distance based on vertices closest to pair
 
 	// buffer
-	buffer = 0.15*perimeter();
+	buffer = bscale*sqrt(area()/PI);
 
 	// calculate connecting vector deltaMuNu
 	for (d=0; d<NDIM; d++){
@@ -1484,26 +1488,33 @@ int deformableParticles2D::radialForce(deformableParticles2D &onTheRight){
 	centerDistance = sqrt(centerDistance);
 
 	// get contact distance by assuming regular polygons
-	c1 = sqrt((2*a0)/(NV*sin(2*PI/NV)));
-	c2 = sqrt((2*onTheRight.geta0())/(onTheRight.getNV()*sin(2*PI/onTheRight.getNV())));
+	c1 = sqrt((2.0*a0)/(NV*sin(2*PI/NV)));
+	c2 = sqrt((2.0*onTheRight.geta0())/(onTheRight.getNV()*sin(2*PI/onTheRight.getNV())));
+	// c1 = sqrt(area()/PI);
+	// c2 = sqrt(onTheRight.area()/PI);
 	contactDistance = c1 + c2 + buffer;
+
+	cout << "contactDistance = " << contactDistance << ", centerDistance = " << centerDistance << endl;
 
 	// check distance between centers
 	if (centerDistance < contactDistance){
 		inContact = 1;
 		for (d=0; d<NDIM; d++){
-			ftmp = -10*kint*(1 - centerDistance/contactDistance)*deltaMuNu.at(d)/centerDistance;
+			ftmp = -(kint/contactDistance)*(1 - (centerDistance/contactDistance))*deltaMuNu.at(d)/centerDistance;
+
+			// distribute force to vertices
 			for (i=0; i<NV; i++)
-				setVForce(i,d,vforce(i,d) + ftmp);
+				setVForce(i,d,vforce(i,d) + ftmp/NV);
 			for (j=0; j<onTheRight.getNV(); j++)
-				onTheRight.setVForce(j,d,onTheRight.vforce(j,d) - ftmp);
+				onTheRight.setVForce(j,d,onTheRight.vforce(j,d) - ftmp/onTheRight.getNV());
 		}
 
-		uTmp =  0.5 * 10* kint * pow(1 - (centerDistance/centerDistance),2);
+		uTmp =  0.5 * kint * pow((1 - (centerDistance/contactDistance)),2);
+
 		for (i=0; i<NV; i++)
-			setUInt(i,uTmp/NV);
+			setUInt(i,uInt(i) + uTmp/NV);
 		for (j=0; j<onTheRight.getNV(); j++)
-			onTheRight.setUInt(j,uTmp/onTheRight.getNV());
+			onTheRight.setUInt(j,onTheRight.uInt(j) + uTmp/onTheRight.getNV());
 	}
 
 	return inContact;
@@ -1676,9 +1687,11 @@ void deformableParticles2D::verletVelocityUpdate(double dt, double dampingParam)
 	// local variables
 	int i,d;
 	double veltmp,anew,segmentMass,b;
+	double ftmp, dampNum, dampDenom, dampUpdate;
 
 	// get segment mass
-	segmentMass = del*(l0 + del*PI*0.25);
+	// segmentMass = del*(l0 + del*PI*0.25);
+	segmentMass = PI*0.25*del*del;
 
 	// scale damping
 	b = dampingParam*sqrt(kint*segmentMass)/del;
@@ -1689,10 +1702,16 @@ void deformableParticles2D::verletVelocityUpdate(double dt, double dampingParam)
 			// get current velocities	
 			veltmp = vvel(i,d);
 
-			// scale vforce by damping
-			setVForce(i,d,vforce(i,d) - b*veltmp);
+			// calculate force damping update
+			ftmp = vforce(i,d);
+			dampNum = b*(veltmp - 0.5*vacc(i,d)*dt);
+			dampDenom = 1.0 + 0.5*b*dt;
+			dampUpdate = (ftmp - dampNum)/dampDenom;
 
-			// get the new acceleration from forces (add damping to acceleration)
+			// update force
+			setVForce(i,d,dampUpdate);
+
+			// get the new acceleration from forces with damping
 			anew = vforce(i,d)/segmentMass;
 
 			// update velocity

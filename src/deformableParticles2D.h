@@ -155,7 +155,7 @@ public:
 	void bendForce();
 	int segmentForce(deformableParticles2D& onTheRight); // return 0 or 1, depending on contact
 	int vertexForce(deformableParticles2D& onTheRight, std::vector<double>& fij, std::vector<double>& rij);
-	int radialForce(deformableParticles2D& onTheRight); 
+	int radialForce(deformableParticles2D& onTheRight, double bscale); 
 
 	// energy functions
 	double perimeterEnergy();

@@ -83,6 +83,7 @@ public:
 	// initialize positions
 	void squareLattice();
 	void hexagonalLattice();	// NEEDS WORKS
+	void bidisperseDisks(double sizeRatio, double phiT);
 
 	// initialize velocities
 	void initializeVelocities(double tmp0);
@@ -190,18 +191,21 @@ public:
 	***************************/
 
 	// looping functions
-	void jammingFireRamp(double dphi, double dCalA, double asphericityTarget, double kbTarget, double phiTarget, double Ktol, double Utol, int plotIt);
+	void jammingFireRamp(double dphi, double dCalA, double asphericityTarget, double kbTarget, double phiTarget, double Ktol, double Ptol, int plotIt);
+	void compressToTarget(double dphi, double phiTarget, double asphericityTarget, double Ktol, double Ptol, int plotIt, int& frameCount);
 
-	// FIRE 2.0 relaxation function
-	void fireMinimize(double Ptol, double Ktol, int plotIt, int& frameCount);
+	// FIRE 2.0 relaxation functions
+	void fireMinimizeP(double Ptol, double Ktol, int plotIt, int& frameCount);
+	void fireMinimizeF(double Ftol, double Ktol, int plotIt, int& frameCount);
 
 	// non-equilibrium MD functions
 	void isoExtensionQS(int plotIt, int& frameCount, double phiTarget, double dphi);
 
 	// relaxation/ramp functions
-	void overlapRelief();
-	void attractionRamp(double attractionTarget, double dAttraction, int plotIt, int initialFrame);
-	void shapeRamp(double fixedPhi, double calATarget, double dCalA, double kbTarget, double dkb);
+	void overlapRelief(double phiT);
+	void diskForces(std::vector<double>& radii);
+	void attractionRamp(double attractionTarget, double dAttraction, double asphericityTarget, int plotIt, int& initialFrame);
+	void shapeRamp(double fixedPhi, double asphericityTarget, double dCalA, double kbTarget, double dkb);
 
 	// tumor MD functions
 	void tumorNVE();
