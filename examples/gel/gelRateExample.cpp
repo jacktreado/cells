@@ -25,10 +25,10 @@ const double Ktol				= 1e-12;		// kinetic tolerance for compression protocol
 const double Ptol 				= 1e-4;			// pressure tolerance for compression protocol
 
 // force parameters
-const double kl 			= 0.2;			// perimeter force constant
+const double kl 			= 1.0;			// perimeter force constant
 const double ka 			= 1.0;			// area force constant
 const double gam 			= 0.0;			// surface tension force constant
-const double kb 			= 0.0;			// bending energy constant
+const double kb 			= 1.0;			// bending energy constant
 const double kint 			= 1.0;			// interaction energy constant
 const double del 			= 1.0;			// width of vertices (WHEN = 1, ITS A VERTEX FORCE!)
 const double aInitial 		= 0.0;			// attraction parameter to start
@@ -63,9 +63,10 @@ int main()
 	packingObject.setdt(timeStepMag);
 
 	// initialize particle positions by BIDISPERSE DISK PACKING
-	double initPhiTarget = 0.6;
+	double initPhiTarget = 0.2;
 	cout << "	** Initializing particle positions as disk packing to packing fraction = " << initPhiTarget << endl;
 	packingObject.bidisperseDisks(sizeRatio,initPhiTarget);
+	packingObject.cell(0).vertexPerturbation(0.1);
 
 	// open output files
 	cout << "	** Opening print objects" << endl;
