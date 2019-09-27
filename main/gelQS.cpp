@@ -36,9 +36,9 @@ const double PI = 4.0*atan(1);
 // simulation constants
 const int NT 					= 5e7; 			// number of time steps
 const double T0 				= 1e-4;			// temperature scale
-const double sizeRatio 			= 1.0;			// size ratio between large and small particles
+const double sizeRatio 			= 1.4;			// size ratio between large and small particles
 const int NPRINT 				= 500;			// number of time steps between prints
-const double timeStepMag 		= 0.02;			// time step in MD unit
+const double timeStepMag 		= 0.005;			// time step in MD unit
 const double deltaPhi 			= 0.001;		// packing fraction step
 const double kineticTol 		= 1e-12;		// kinetic energy tolerance
 const double pressureTol 		= 1e-6;			// potential energy tolerance
