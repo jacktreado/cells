@@ -113,7 +113,7 @@ int main(int argc, char const *argv[])
 
 	// open output files
 	cout << "	** Opening print objects" << endl;
-	packingObject.openPackingObject(posFile);
+	packingObject.openPackingObject(positionFile);
 	packingObject.openEnergyObject(energyFile);
 
 
@@ -144,7 +144,7 @@ int main(int argc, char const *argv[])
 
 	// run simulation 
 	int frameCount = 0;
-	cout << "	** Compressing to a target phi = " << phiTarget << endl;
+	cout << "	** Compressing to a target phi = " << repPhi << endl;
 	packingObject.compressToTarget(deltaPhi,repPhi,initialCalA,kineticTol,pressureTol,1,frameCount);
 
 	// relax shape and attraction
