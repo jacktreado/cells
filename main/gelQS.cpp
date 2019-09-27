@@ -114,7 +114,7 @@ int main(int argc, char const *argv[])
 	// open output files
 	cout << "	** Opening print objects" << endl;
 	packingObject.openPackingObject(posFile);
-	packingObject.openEnergyObject(enFile);
+	packingObject.openEnergyObject(energyFile);
 
 
 
@@ -139,7 +139,6 @@ int main(int argc, char const *argv[])
 	cout << " 		* timeScale 			= " 	<< packingObject.timeScale() << endl;
 	cout << "		* timeStepMag 			= " 	<< timeStepMag << endl;
 	cout << "		* delta phi 			= "	 	<< deltaPhi << endl;
-	cout << "		* delta calA 			= " 	<< deltaCalA << endl;
 	cout << "================================================" << endl;
 	cout << endl << endl;
 
