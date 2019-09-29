@@ -4,7 +4,7 @@
 projectdir=~/project/cells
 
 # directory for simulations specific to jamming
-simtypedir=$outputdir/gelQS
+simtypedir=$projectdir/gelQS
 
 # make directories, unless they already exist
 mkdir -p tasks
