@@ -328,7 +328,7 @@ if writeToVideo == 1
     vidObj = VideoWriter(simMovieFile,'MPEG-4');
     open(vidObj);
 
-    figure(v), clf;
+    f = figure(v); clf;
 
     fprintf('first visualizing on a loop...\n');
     for ff = NSTART:NSTEP:NEND
@@ -341,7 +341,7 @@ if writeToVideo == 1
         l0print = l0(ff,:);
         visualizeMultipleCells(v,NCELLS,BOXSZ,xprint,yprint,l0print,cellColor,lineColor);
 
-        currFrame = getframe(gcf);
+        currFrame = getframe(f);
         writeVideo(vidObj,currFrame);
     end
 
