@@ -70,7 +70,7 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         if [[ $movie -eq 1 ]]
         then
         	# name of movie file
-        	movief=$specificdir/$filestr.mp4
+        	movief=$specificdir/$filestr.avi
 
         	# code to run MATLAB
         	MCODE="gel2DSimPostprocess('$posf','$savef','$movief'); quit;"
