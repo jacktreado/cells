@@ -61,8 +61,8 @@ elseif nargin == 3
     if ~strcmp(saveFile(end-3:end),'.mat')
         error('Save file not *.mat, ending...\n');
     end
-    if ~strcmp(simMovieFile(end-3:end),'.mp4')
-        error('Movie file not *.mp4, ending...\n');
+    if ~strcmp(simMovieFile(end-3:end),'.avi')
+        error('Movie file not *.avi, ending...\n');
     end
     
     % print if successful
@@ -324,8 +324,9 @@ if writeToVideo == 1
     cellColor((NCELLS/2+1):end,:) = repmat(bidisperseScheme(2,:),NCELLS/2,1);
     lineColor = zeros(NCELLS,3);
 
-    % write into movie
-    vidObj = VideoWriter(simMovieFile,'MPEG-4');
+    % write into movie (WILL BE WRITTEN TO AVI, CAN LOCALLY WRITE TO MP4
+    % USING VideoReader FUNCTION IN MATLAB)
+    vidObj = VideoWriter(simMovieFile);
     open(vidObj);
 
     f = figure(v); clf;
