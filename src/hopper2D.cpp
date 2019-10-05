@@ -29,7 +29,7 @@ const double PI = 4*atan(1);
 // 
 // 	NOTE: radii should be input in units of sigma, the mean particle diameter
 // 		** also will give the ratio of nv_i to NV, the number of vertices on the mean
-void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double w, double th, int NV){
+void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double w, double th, double Lmin, int NV){
 	// local variables
 	int ci, vi, nvtmp;
 	double calA;
@@ -88,7 +88,7 @@ void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double 
 	cout << "		-- Ininitializing cell positions" << endl;
 	for (ci=0; ci<NCELLS; ci++){
 		// set min and max values of positions
-		xmin = -3.0*L;
+		xmin = -Lmin*L;
 		xmax = -radii.at(ci);
 		ymin = radii.at(ci);
 		ymax = w0 - radii.at(ci);

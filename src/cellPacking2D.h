@@ -202,7 +202,7 @@ public:
 	void isoExtensionQS(int plotIt, int& frameCount, double phiTarget, double dphi);
 
 	// Hopper functions
-	void initializeHopperSP(std::vector<double>& radii, double w0, double w, double th, int NV);
+	void initializeHopperSP(std::vector<double>& radii, double w0, double w, double th, double Lmin, int NV);
 	void fireMinimizeHopperSP(std::vector<double>& radii, double w0, double w, double th);
 	void fireMinimizeHopperDP(double w0, double w, double th);
 	void hopperForcesSP(std::vector<double>& radii, double w0, double w, double th, double g, int closed);

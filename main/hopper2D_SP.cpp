@@ -41,7 +41,7 @@ int main(int argc, char const *argv[])
 {
 	// local variables
 	int ci;
-	double r1, r2, grv;
+	double r1, r2, grv, Lmin;
 
 	// inputs from command line
 	string NCELLS_str 			= argv[1];
@@ -98,6 +98,9 @@ int main(int argc, char const *argv[])
 		radii.at(ci) = grv*sizeDispersion + meanRadius;
 	}
 
+	// determine scale of reservoir size to make sure that phi \approx 2 given width
+	Lmin = (NCELLS*PI)/(L*w0*3.0);
+
 	// instantiate object
 	cout << "	** Instantiating object with NCELLS = " << NCELLS << endl;
 	cellPacking2D packingObject(NCELLS,NT,NPRINT,L,seed);
@@ -108,7 +111,7 @@ int main(int argc, char const *argv[])
 
 	// initialize positions in hopper reservoir
 	cout << "	** Relaxing particle positions using SP model" << endl;
-	packingObject.initializeHopperSP(radii,w0,w,th,NV);
+	packingObject.initializeHopperSP(radii,w0,w,th,Lmin,NV);
 
 	// flow particles through hopper with force strength g
 	cout << "	** Running hopper FLOW with g = " << g << endl;

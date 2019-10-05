@@ -11,3 +11,6 @@ bash/*/tasks
 *.pos
 *.energy
 *.stats
+*.avi
+*.mp4
+*.mov
