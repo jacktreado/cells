@@ -448,6 +448,7 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 	double lw, lwx, lwy;					// elements of vector pointing from wall to particle
 	double overlap;							// overlap of particle with wall
 	double ftmp, utmp;						// force/energy of particle overlap with walls
+	bool nearEdge = false;					// boolean to check if near the edge of the hopper
 
 	// preliminary calculations
 	t = tan(th);
@@ -464,71 +465,79 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 		y = cell(ci).cpos(1);
 
 		// check hopper walls
-		if (x > -sigma*s && x < L){
-			// check ymin for walls
-			yPlusMin 	= w0 - x*t - 0.5*sigma/c;
-			yMinusMax 	= x*t + 0.5*sigma/c;
+		if (x > -sigma*s){
 
-			// if true, interacting with bottom wall
-			if (y < yMinusMax){
-				// vector to wall
-				lwx = s*(x*s - y*c);
-				lwy = c*(y*c - x*s);
+			// in hopper, but not near cusp at edge
+			nearEdge = (x > L - 0.5*sigma*s && x < L);
+			nearEdge = (nearEdge && (y > 0.5*(w0 + w) - 0.5*sigma || y < 0.5*(w0 - w) + 0.5*sigma));
 
-				// distance
-				lw = sqrt(lwx*lwx + lwy*lwy);
+			// if particle in hopper, either in bulk or near outflow point
+			if (x < L - 0.5*sigma*s || nearEdge){
+				// check ymin for walls
+				yPlusMin 	= w0 - x*t - 0.5*sigma/c;
+				yMinusMax 	= x*t + 0.5*sigma/c;
 
-				if (lw < 0.5*sigma){
-					// overlap with wall
-					overlap = 2.0*lw/sigma;
+				// if true, interacting with bottom wall
+				if (y < yMinusMax){
+					// vector to wall
+					lwx = s*(x*s - y*c);
+					lwy = c*(y*c - x*s);
 
-					// force
-					ftmp = 1 - overlap;
-					cell(ci).setCForce(0,cell(ci).cforce(0) + ftmp*(lwx/lw));
-					cell(ci).setCForce(1,cell(ci).cforce(1) + ftmp*(lwy/lw));
+					// distance
+					lw = sqrt(lwx*lwx + lwy*lwy);
 
-					// add to energies
-					utmp = 0.25*sigma*pow(1 - overlap,2);
-					for (vi=0; vi<cell(ci).getNV(); vi++)
-						cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
+					if (lw < 0.5*sigma){
+						// overlap with wall
+						overlap = 2.0*lw/sigma;
 
-					// virial stresses
-					sigmaXX += ftmp*(lwx/lw)*lwx;
-					sigmaXY += ftmp*(lwx/lw)*lwy;
-					sigmaYX += ftmp*(lwy/lw)*lwx;
-					sigmaYY += ftmp*(lwy/lw)*lwy;
+						// force
+						ftmp = 1 - overlap;
+						cell(ci).setCForce(0,cell(ci).cforce(0) + ftmp*(lwx/lw));
+						cell(ci).setCForce(1,cell(ci).cforce(1) + ftmp*(lwy/lw));
+
+						// add to energies
+						utmp = 0.25*sigma*pow(1 - overlap,2);
+						for (vi=0; vi<cell(ci).getNV(); vi++)
+							cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
+
+						// virial stresses
+						sigmaXX += ftmp*(lwx/lw)*lwx;
+						sigmaXY += ftmp*(lwx/lw)*lwy;
+						sigmaYX += ftmp*(lwy/lw)*lwx;
+						sigmaYY += ftmp*(lwy/lw)*lwy;
+					}
 				}
-			}
 
 
-			// if true, interacting with top wall
-			if (y > yPlusMin){
-				// vector to wall
-				lwx = s*(x*s + (y - w0)*c);
-				lwy = c*((y - w0)*c + x*s);
+				// if true, interacting with top wall
+				if (y > yPlusMin){
+					// vector to wall
+					lwx = s*(x*s + (y - w0)*c);
+					lwy = c*((y - w0)*c + x*s);
 
-				// distance
-				lw = sqrt(lwx*lwx + lwy*lwy);
+					// distance
+					lw = sqrt(lwx*lwx + lwy*lwy);
 
-				if (lw < 0.5*sigma){
-					// overlap with wall
-					overlap = 2.0*lw/sigma;
+					if (lw < 0.5*sigma){
+						// overlap with wall
+						overlap = 2.0*lw/sigma;
 
-					// force
-					ftmp = 1 - overlap;
-					cell(ci).setCForce(0,cell(ci).cforce(0) + ftmp*(lwx/lw));
-					cell(ci).setCForce(1,cell(ci).cforce(1) + ftmp*(lwy/lw));
+						// force
+						ftmp = 1 - overlap;
+						cell(ci).setCForce(0,cell(ci).cforce(0) + ftmp*(lwx/lw));
+						cell(ci).setCForce(1,cell(ci).cforce(1) + ftmp*(lwy/lw));
 
-					// add to energies
-					utmp = 0.25*sigma*pow(1 - overlap,2);
-					for (vi=0; vi<cell(ci).getNV(); vi++)
-						cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
+						// add to energies
+						utmp = 0.25*sigma*pow(1 - overlap,2);
+						for (vi=0; vi<cell(ci).getNV(); vi++)
+							cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
 
-					// virial stresses
-					sigmaXX += ftmp*(lwx/lw)*lwx;
-					sigmaXY += ftmp*(lwx/lw)*lwy;
-					sigmaYX += ftmp*(lwy/lw)*lwx;
-					sigmaYY += ftmp*(lwy/lw)*lwy;
+						// virial stresses
+						sigmaXX += ftmp*(lwx/lw)*lwx;
+						sigmaXY += ftmp*(lwx/lw)*lwy;
+						sigmaYX += ftmp*(lwy/lw)*lwx;
+						sigmaYY += ftmp*(lwy/lw)*lwy;
+					}
 				}
 			}
 		}
@@ -612,7 +621,7 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 
 // wall forces between cells as droplets (DP model)
 // 	** if closed = 1, orifice is closed off by wall
-void cellPacking2D::hopperWallForcesDP(double w0, double w, double th, int closed){
+;void cellPacking2D::hopperWallForcesDP(double w0, double w, double th, int closed){
 	
 }
 
