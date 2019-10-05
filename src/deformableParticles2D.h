@@ -31,6 +31,9 @@ private:
 	// number of vertices
 	int NV;
 
+	// periodic boundary conditions
+	std::vector<int> pbc;
+
 	// box length cell lives in (important for PBCs)
 	double L;
 
@@ -93,6 +96,7 @@ public:
 	double geta0() { return a0; };
 	double getdel() { return del; };
 	double geta() { return a; };
+	double getpbc(int d) { return pbc.at(d); };
 
 	double vpos(int vertex, int dim);
 	double vrel(int vertex, int dim);
@@ -103,6 +107,8 @@ public:
 	double cvel(int dim);
 	double cforce(int dim);
 	double uInt(int vertex);
+	double distance(double p2, double p1, int d);
+	double cellDistance(deformableParticles2D& onTheRight, int d);
 
 	// setters (simple mutation)
 	void setNV(int nv) { NV = nv; };
@@ -116,6 +122,7 @@ public:
 	void seta0(double val) { a0 = val; };
 	void setdel(double val) { del = val; };
 	void seta(double val) { a = val; };
+	void setpbc(int d, int val) { pbc.at(d) = val; };
 
 	void setVPos(int vertex, int dim, double val);
 	void setVRel(int vertex, int dim, double val);

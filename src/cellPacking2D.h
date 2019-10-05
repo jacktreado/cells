@@ -201,6 +201,24 @@ public:
 	// non-equilibrium MD functions
 	void isoExtensionQS(int plotIt, int& frameCount, double phiTarget, double dphi);
 
+	// Hopper functions
+	void initializeHopperSP(std::vector<double>& radii, double w0, double w, double th, int NV);
+	void fireMinimizeHopperSP(std::vector<double>& radii, double w0, double w, double th);
+	void fireMinimizeHopperDP(double w0, double w, double th);
+	void hopperForcesSP(std::vector<double>& radii, double w0, double w, double th, double g, int closed);
+	void hopperForcesDP(double w0, double w, double th, double g, int closed);
+	void hopperWallForcesSP(std::vector<double>& radii, double w0, double w, double th, int closed);
+	void hopperWallForcesDP(double w0, double w, double th, int closed);
+	void hopperSPNVE(std::vector<double>& radii, double w0, double w, double th, double T0);
+	void flowHopperSP(std::vector<double>& radii, double w0, double w, double th, double g);
+	void flowHopperDP(double w0, double w, double th, double g);
+	double hopperPackingFraction(std::vector<double>& radii, double w0, double w, double th);
+	void setHopperPackingFraction(std::vector<double>& radii, double phiNew, double w0, double w, double th);
+	void hopperPosVerletSP();
+	void hopperVelVerletSP(std::vector<double>& radii);
+	void printHopperSP(std::vector<double>& radii, double w0, double w, double th, double g);
+	void printHopperDP(double w0, double w, double th, double g);
+
 	// relaxation/ramp functions
 	void overlapRelief(double phiT);
 	void diskForces(std::vector<double>& radii);

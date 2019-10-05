@@ -213,7 +213,7 @@ cellPacking2D::cellPacking2D(int ncells, int ntumor, int tumorNV, int adiposeNV,
 	squareLattice();
 }
 
-// overloaded constryctor with file stream object as argument
+// overloaded constructor with file stream object as argument
 cellPacking2D::cellPacking2D(ifstream& inputFileObject, double asphericity, double s){
 	// set initial seed
 	seed = s;
@@ -648,11 +648,11 @@ void cellPacking2D::initializeVelocities(double tmp0){
 	// initialize random velocities
 	for (ci=0; ci<NCELLS; ci++){
 
-		// get random direction
-		rv = drand48();
-
 		// add to velocities and mean
 		for (d=0; d<NDIM; d++){
+			// get random direction
+			rv = drand48();
+
 			cell(ci).setCVel(d,rv);
 			vmean.at(d) += rv;
 		}
@@ -1229,8 +1229,8 @@ void cellPacking2D::printSystemEnergy(int frame, double Pval, double Kval){
 	// loop over particles, print cell energy
 	energyPrintObject << setw(6) << right << frame;
 	energyPrintObject << setw(30) << setprecision(16) << right << Kval;
-	energyPrintObject << setw(30) << setprecision(16) << right << interactionPotentialEnergy()/cell(0).getkint();
-	energyPrintObject << setw(30) << setprecision(16) << right << totalPotentialEnergy()/cell(0).getkint();
+	energyPrintObject << setw(30) << setprecision(16) << right << interactionPotentialEnergy();
+	energyPrintObject << setw(30) << setprecision(16) << right << totalPotentialEnergy();
 
 	// ADD ON STUFF FOR DEBUGGING JAMMING FINDER
 	double calA0, meanCalA;
@@ -1244,8 +1244,6 @@ void cellPacking2D::printSystemEnergy(int frame, double Pval, double Kval){
 	energyPrintObject << endl;
 
 	// NOTE: HOW TO ADD ENERGIES OF INDIVIDUAL CELLS?
-	// for (i=0; i<NCELLS; i++)
-	// 	cell(i).printCellEnergy(energyPrintObject,frame);
 }
 
 
@@ -1304,8 +1302,6 @@ void cellPacking2D::calculateForces(){
 			for (d=0; d<NDIM; d++){
 				fij.at(d) = 0.0;
 				rij.at(d) = 0.0;
-				// for (dd=0; dd<NDIM; dd++)
-				// 	virialStress.at(NDIM*d + dd) = 0.0;
 			}
 
 			// calculate forces
@@ -1314,10 +1310,6 @@ void cellPacking2D::calculateForces(){
 				addContact(ci,cj);
 
 			// compute virial stresses
-			// sigmaXX += virialStress.at(0);
-			// sigmaXY += virialStress.at(1);
-			// sigmaYX += virialStress.at(2);
-			// sigmaYY += virialStress.at(3);
 			sigmaXX += fij.at(0)*rij.at(0);
 			sigmaXY += fij.at(1)*rij.at(0);
 			sigmaYX += fij.at(0)*rij.at(1);
@@ -1899,10 +1891,6 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol, int plotIt, int& fra
 			}
 		}
 
-		// get norms
-		vstarnrm = sqrt(vstarnrm);
-		fstarnrm = sqrt(fstarnrm);
-
 
 		// Step 2. Adjust simulation based on net motion of system
 		if (P > 0){
@@ -2330,10 +2318,6 @@ void cellPacking2D::isoExtensionQS(int plotIt, int& frameCount, double phiTarget
 
 
 
-
-
-
-
 // TUMOR TISSUE FUNCTIONS
 
 
@@ -2503,6 +2487,13 @@ void cellPacking2D::tumorForce(int NTUMORCELLS, double forceScale, double adipos
 
 
 
+
+
+
+
+
+
+
 // RELAXATION FUNCTIONS
 
 
@@ -2643,8 +2634,7 @@ void cellPacking2D::diskForces(vector<double>& radii){
 			centerDistance = 0.0;
 			for (d=0; d<NDIM; d++){
 				// get distance component
-				distTmp = cell(cj).cpos(d) - cell(ci).cpos(d);
-				distTmp -= L*round(distTmp/L);
+				distTmp = cell(ci).cellDistance(cell(cj),d);
 
 				// add to vector
 				distVec.at(d) = distTmp;
@@ -2680,6 +2670,16 @@ void cellPacking2D::diskForces(vector<double>& radii){
 					// add to forces
 					cell(ci).setCForce(d,cell(ci).cforce(d) + ftmp);
 					cell(cj).setCForce(d,cell(cj).cforce(d) - ftmp);
+
+					// add to virial stresses
+					if (d == 0){
+						sigmaXX += ftmp*distVec.at(0);
+						sigmaXY += ftmp*distVec.at(1);
+					}
+					else{
+						sigmaYX += ftmp*distVec.at(0);
+						sigmaYY += ftmp*distVec.at(1);
+					}
 				}
 			}
 		}

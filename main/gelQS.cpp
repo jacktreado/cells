@@ -1,6 +1,6 @@
 /*
 
-	Main file to take an initial dense state ("input.dat")
+	Main file to take an initial dense state
 	and quasistatically, isotropically extend boundaries
 	by shrinking particles. Attraction should be non zero
 

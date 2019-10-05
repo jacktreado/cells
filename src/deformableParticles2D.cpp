@@ -55,6 +55,11 @@ deformableParticles2D::deformableParticles2D(){
 	vertexForces 			= nullptr;
 	cellPosition 			= nullptr;
 	interactionPotential 	= nullptr;
+
+	// periodic boundary conditions set to on
+	pbc.resize(NDIM);
+	for (int d=0; d<NDIM; d++)
+		pbc.at(d) = 1;
 }
 
 // constructor to specify number of vertices
@@ -417,8 +422,9 @@ double deformableParticles2D::vrel(int vertex, int dim){
 	double relDist;
 
 	// get relative distance with MIC
-	relDist = vertexPositions[index] - cpos(dim);
-	relDist -= L*round(relDist/L);
+	relDist = distance(vertexPositions[index],cpos(dim),dim);
+	// relDist = vertexPositions[index] - cpos(dim);
+	// relDist -= L*round(relDist/L);
 
 	// return value
 	return relDist;
@@ -523,7 +529,7 @@ double deformableParticles2D::cvel(int dim){
 double deformableParticles2D::cforce(int dim){
 	// check input
 	if (dim >= NDIM){
-		cout << "	ERROR: dim input in cvel = " << dim << ", which is >= NDIM. Ending." << endl;
+		cout << "	ERROR: dim input in cforce = " << dim << ", which is >= NDIM. Ending." << endl;
 		exit(1);
 	}
 
@@ -553,6 +559,39 @@ double deformableParticles2D::uInt(int vertex){
 }
 
 
+// distance between points
+double deformableParticles2D::distance(double p2, double p1, int d){
+	// local variables
+	double dp;
+
+	// calculate distance between points
+	dp = p2 - p1;
+
+	// if pbc, check minimum image distance
+	if (pbc.at(d) == 1)
+		dp -= L*round(dp/L);
+
+	// return value
+	return dp;
+}
+
+
+
+// distance between two cells: points from this to cell onTheRight
+double deformableParticles2D::cellDistance(deformableParticles2D& onTheRight, int d){
+	// local variables
+	double distComp;
+
+	// calculate normal distance component between centers
+	distComp = onTheRight.cpos(d) - cpos(d);
+
+	// if pbcs are on, check minimum image distance
+	if (pbc.at(d) == 1)
+		distComp -= L*(distComp/L);
+
+	// return distance component
+	return distComp;
+}
 
 
 /************************
@@ -905,8 +944,9 @@ double deformableParticles2D::segment(int vertex, int dim){
 	ip1 = (vertex+1) % NV;
 
 	// check minimum image
-	seg = vpos(ip1,dim)-vpos(vertex,dim);
-	seg -= L*round(seg/L);
+	seg = distance(vpos(ip1,dim),vpos(vertex,dim), dim);
+	// seg = vpos(ip1,dim)-vpos(vertex,dim);
+	// seg -= L*round(seg/L);
 
 	// return dim component of segment vector
 	return seg;
@@ -1194,8 +1234,9 @@ int deformableParticles2D::segmentForce(deformableParticles2D &onTheRight){
 	// calculate connecting vector deltaMuNu
 	for (d=0; d<NDIM; d++){
 		// get distance
-		distTmp = onTheRight.cpos(d)-cpos(d);
-		distTmp = distTmp - L*round(distTmp/L);
+		distTmp = cellDistance(onTheRight,d);
+		// distTmp = onTheRight.cpos(d)-cpos(d);
+		// distTmp = distTmp - L*round(distTmp/L);
 
 		// save distance in vector
 		deltaMuNu.at(d) = distTmp;
@@ -1321,8 +1362,9 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 	// calculate connecting vector deltaMuNu
 	for (d=0; d<NDIM; d++){
 		// get distance
-		distTmp = onTheRight.cpos(d)-cpos(d);
-		distTmp = distTmp - L*round(distTmp/L);
+		distTmp = cellDistance(onTheRight,d);
+		// distTmp = onTheRight.cpos(d)-cpos(d);
+		// distTmp = distTmp - L*round(distTmp/L);
 
 		// save distance in vector
 		rij.at(d) = -distTmp;
@@ -1366,8 +1408,9 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 			vertexDist = 0.0;
 			for (d=0; d<NDIM; d++){
 				// get distance to nearest image
-				distTmp = onTheRight.vpos(j,d) - vpos(i,d);
-				distTmp -= L*round(distTmp/L);
+				distTmp = distance(onTheRight.vpos(j,d),vpos(i,d),d);
+				// distTmp = onTheRight.vpos(j,d) - vpos(i,d);
+				// distTmp -= L*round(distTmp/L);
 
 				// add to vertex distance
 				vertexVec.at(d) = distTmp;
@@ -1476,8 +1519,9 @@ int deformableParticles2D::radialForce(deformableParticles2D &onTheRight, double
 	// calculate connecting vector deltaMuNu
 	for (d=0; d<NDIM; d++){
 		// get distance
-		distTmp = onTheRight.cpos(d)-cpos(d);
-		distTmp = distTmp - L*round(distTmp/L);
+		distTmp = cellDistance(onTheRight,d);
+		// distTmp = onTheRight.cpos(d)-cpos(d);
+		// distTmp = distTmp - L*round(distTmp/L);
 
 		// save distance in vector
 		deltaMuNu.at(d) = distTmp;
@@ -1663,7 +1707,7 @@ void deformableParticles2D::verletPositionUpdate(double dt){
 
 	// update vertex positions
 	for (i=0; i<NV; i++){
-		for (d=0; d<2; d++){
+		for (d=0; d<NDIM; d++){
 			// update positions using velocity-Verlet with PBCs
 			postmp = vpos(i,d) + dt*vvel(i,d) + 0.5*vacc(i,d)*dt*dt;
 			// if (postmp < 0)
@@ -1690,11 +1734,10 @@ void deformableParticles2D::verletVelocityUpdate(double dt, double dampingParam)
 	double ftmp, dampNum, dampDenom, dampUpdate;
 
 	// get segment mass
-	// segmentMass = del*(l0 + del*PI*0.25);
-	segmentMass = PI*0.25*del*del;
+	segmentMass = 0.25*PI;
 
 	// scale damping
-	b = dampingParam*sqrt(kint*segmentMass)/del;
+	b = dampingParam*sqrt(segmentMass);
 
 	// update vertex velocities
 	for (i=0; i<NV; i++){
