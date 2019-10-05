@@ -34,7 +34,7 @@ const double PI = 4.0*atan(1);
 const int NPRINT 				= 2e2;			// number of steps between printing
 const int NV 					= 12;			// number of vertices (not important for SP model)
 const double meanRadius 		= 0.5;			// mean radius (diameter is length unit)
-const double th 				= PI/6.0;		// hopper angle (pi - th = deflection angle from horizontal)
+const double th 				= PI/3.0;		// hopper angle (pi - th = deflection angle from horizontal)
 
 // int main
 int main(int argc, char const *argv[])
