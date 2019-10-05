@@ -448,7 +448,7 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 	double lw, lwx, lwy;					// elements of vector pointing from wall to particle
 	double overlap;							// overlap of particle with wall
 	double ftmp, utmp;						// force/energy of particle overlap with walls
-	bool nearEdge = false;					// boolean to check if near the edge of the hopper
+	double yline;							// line separating edge force from wall force
 
 	// preliminary calculations
 	t = tan(th);
@@ -466,13 +466,8 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 
 		// check hopper walls
 		if (x > -sigma*s){
-
-			// in hopper, but not near cusp at edge
-			nearEdge = (x > L - 0.5*sigma*s && x < L);
-			nearEdge = (nearEdge && (y > 0.5*(w0 + w) - 0.5*sigma || y < 0.5*(w0 - w) + 0.5*sigma));
-
-			// if particle in hopper, either in bulk or near outflow point
-			if (x < L - 0.5*sigma*s || nearEdge){
+			// if particle in hopper bulk
+			if (x < L - 0.5*sigma*s){
 				// check ymin for walls
 				yPlusMin 	= w0 - x*t - 0.5*sigma/c;
 				yMinusMax 	= x*t + 0.5*sigma/c;
@@ -537,6 +532,142 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 						sigmaXY += ftmp*(lwx/lw)*lwy;
 						sigmaYX += ftmp*(lwy/lw)*lwx;
 						sigmaYY += ftmp*(lwy/lw)*lwy;
+					}
+				}
+			}
+
+			// if particle is near edge; either do wall force or force due to edge
+			else if (x > L - 0.5*sigma*s && x < L + 0.5*sigma){
+				// check on top wall
+				if (y > 0.5*w0){
+					// define line separating wall force and edge force regime
+					yline = 0.5*(w0 + w) - ((L - x)/t);
+
+					// if above yline, use wall force
+					if (y > yline){
+						// vector to wall
+						lwx = s*(x*s + (y - w0)*c);
+						lwy = c*((y - w0)*c + x*s);
+
+						// distance
+						lw = sqrt(lwx*lwx + lwy*lwy);
+
+						if (lw < 0.5*sigma){
+							// overlap with wall
+							overlap = 2.0*lw/sigma;
+
+							// force
+							ftmp = 1 - overlap;
+							cell(ci).setCForce(0,cell(ci).cforce(0) + ftmp*(lwx/lw));
+							cell(ci).setCForce(1,cell(ci).cforce(1) + ftmp*(lwy/lw));
+
+							// add to energies
+							utmp = 0.25*sigma*pow(1 - overlap,2);
+							for (vi=0; vi<cell(ci).getNV(); vi++)
+								cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
+
+							// virial stresses
+							sigmaXX += ftmp*(lwx/lw)*lwx;
+							sigmaXY += ftmp*(lwx/lw)*lwy;
+							sigmaYX += ftmp*(lwy/lw)*lwx;
+							sigmaYY += ftmp*(lwy/lw)*lwy;
+						}
+					}
+					// else if below yline but above radius cutoff, use edge force
+					else if (y < yline && y > 0.5*(w0 + w - sigma)){
+						// vector to edge point on top lip
+						lwx = x - L;
+						lwy = y - 0.5*(w0 + w);
+
+						// distance
+						lw = sqrt(lwx*lwx + lwy*lwy);
+
+						if (lw < 0.5*sigma){
+							// overlap with wall
+							overlap = 2.0*lw/sigma;
+
+							// force
+							ftmp = 1 - overlap;
+							cell(ci).setCForce(0,cell(ci).cforce(0) + ftmp*(lwx/lw));
+							cell(ci).setCForce(1,cell(ci).cforce(1) + ftmp*(lwy/lw));
+
+							// add to energies
+							utmp = 0.25*sigma*pow(1 - overlap,2);
+							for (vi=0; vi<cell(ci).getNV(); vi++)
+								cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
+
+							// virial stresses
+							sigmaXX += ftmp*(lwx/lw)*lwx;
+							sigmaXY += ftmp*(lwx/lw)*lwy;
+							sigmaYX += ftmp*(lwy/lw)*lwx;
+							sigmaYY += ftmp*(lwy/lw)*lwy;
+						}
+					}
+				}
+				// check on bottom wall
+				else{
+					// define line separating wall force and edge force regime
+					yline = 0.5*(w0 - w) + ((L - x)/t);
+
+					// if below yline, use wall force
+					if (y < yline){
+						// vector to wall
+						lwx = s*(x*s - y*c);
+						lwy = c*(y*c - x*s);
+
+						// distance
+						lw = sqrt(lwx*lwx + lwy*lwy);
+
+						if (lw < 0.5*sigma){
+							// overlap with wall
+							overlap = 2.0*lw/sigma;
+
+							// force
+							ftmp = 1 - overlap;
+							cell(ci).setCForce(0,cell(ci).cforce(0) + ftmp*(lwx/lw));
+							cell(ci).setCForce(1,cell(ci).cforce(1) + ftmp*(lwy/lw));
+
+							// add to energies
+							utmp = 0.25*sigma*pow(1 - overlap,2);
+							for (vi=0; vi<cell(ci).getNV(); vi++)
+								cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
+
+							// virial stresses
+							sigmaXX += ftmp*(lwx/lw)*lwx;
+							sigmaXY += ftmp*(lwx/lw)*lwy;
+							sigmaYX += ftmp*(lwy/lw)*lwx;
+							sigmaYY += ftmp*(lwy/lw)*lwy;
+						}
+					}
+					// else if above yline but below radius cutoff, use edge force
+					else if (y > yline && y < 0.5*(w0 - w + sigma)){
+						// vector to edge point on bottom lip
+						lwx = x - L;
+						lwy = y - 0.5*(w0 - w);
+
+						// distance
+						lw = sqrt(lwx*lwx + lwy*lwy);
+
+						if (lw < 0.5*sigma){
+							// overlap with wall
+							overlap = 2.0*lw/sigma;
+
+							// force
+							ftmp = 1 - overlap;
+							cell(ci).setCForce(0,cell(ci).cforce(0) + ftmp*(lwx/lw));
+							cell(ci).setCForce(1,cell(ci).cforce(1) + ftmp*(lwy/lw));
+
+							// add to energies
+							utmp = 0.25*sigma*pow(1 - overlap,2);
+							for (vi=0; vi<cell(ci).getNV(); vi++)
+								cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
+
+							// virial stresses
+							sigmaXX += ftmp*(lwx/lw)*lwx;
+							sigmaXY += ftmp*(lwx/lw)*lwy;
+							sigmaYX += ftmp*(lwy/lw)*lwx;
+							sigmaYY += ftmp*(lwy/lw)*lwy;
+						}
 					}
 				}
 			}
