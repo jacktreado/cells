@@ -99,7 +99,7 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         enf=$specificdir/$filestr.en
 
         # append to runString
-        runString="$runString ; ./$binf $NCELLS $NT $sizeDisp $f $w0 $w $runseed $posf"
+        runString="$runString ; ./$binf $NCELLS $NT $sizeDisp $g $w0 $w $runseed $posf"
     done
 
     # finish off run string
@@ -142,7 +142,7 @@ cat $slurmf
 
 # run sbatch file
 echo -- running on slurm in partition $partition
-sbatch -t $time $slurmf
+echo sbatch -t $time $slurmf
 
 
 # ====================
