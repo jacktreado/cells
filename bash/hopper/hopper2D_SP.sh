@@ -29,7 +29,7 @@ w0=$5
 w=$6
 partition=$7
 time=$8
-numSeedPerRun=$9
+numSeedsPerRun=$9
 numRuns="${10}"
 startSeed="${11}"
 
