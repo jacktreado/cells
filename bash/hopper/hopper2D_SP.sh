@@ -29,6 +29,9 @@ w0=$5
 w=$6
 partition=$7
 time=$8
+numSeedPerRun=$9
+numRuns="${10}"
+startSeed="${11}"
 
 let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
