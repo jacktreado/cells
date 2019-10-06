@@ -31,7 +31,7 @@ simdatadir=$simtypedir/$basestr
 savef=$simdatadir/"$basestr".mat
 
 # code to run matlab
-MCODE="hopper2D_SP_PostProcess('$simdatadir','$basestr',$savef'); quit;"
+MCODE="hopper2D_SP_PostProcess('$simdatadir','$basestr','$savef'); quit;"
 
 # setup slurm files
 slurmf=slurm/"$runstr".slurm
