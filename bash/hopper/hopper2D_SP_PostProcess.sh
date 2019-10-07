@@ -28,7 +28,7 @@ runstr="$basestr"_PP
 simdatadir=$simtypedir/$basestr
 
 # save file
-savef=$simdatadir/"$basestr".mat
+savef=$simtypedir/matfiles/"$basestr".mat
 
 # code to run matlab
 MCODE="hopper2D_SP_PostProcess('$simdatadir','$basestr','$savef'); quit;"
