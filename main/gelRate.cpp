@@ -61,7 +61,7 @@ int main(int argc, char const *argv[])
 	string phiTarget_str 		= argv[4];
 	string gelRate_str 			= argv[5];
 	string kl_str 				= argv[6];
-	string ka_str 				= argv[7];
+	string ka_str 				= argv[7];						
 	string kb_str 				= argv[8];
 	string del_str 				= argv[9];
 	string asphericity_str 		= argv[10];
