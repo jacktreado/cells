@@ -120,7 +120,7 @@ int main(int argc, char const *argv[])
 	packingObject.gelForceVals(asphericity,kl,ka,gam,kb,kint,del,aInitial);
 
 	// update time scale for compresion protocol
-	packingObject.setdt(0.5*timeStepMag);
+	packingObject.setdt(0.2*timeStepMag);
 
 	// compress to set packing fraction using FIRE, pressure relaxation
 	cout << "	** QS compresison protocol to phiTarget = " << phiTarget << endl;
@@ -134,7 +134,7 @@ int main(int argc, char const *argv[])
 
 	// -- decrease phi as if boundary was growing: phi(t) = phi(0)/(1 + a*t)
 	cout << "	** Running gel extension simulation with gelRate = " << gelRate << ", phiGel = " << phiGel << endl;
-	packingObject.gelRateExtension(phiGel,gelRate,timeStepMag);
+	packingObject.gelRateExtension(phiGel,gelRate,0.2*timeStepMag);
 
 	// end main successfully
 	return 0;
