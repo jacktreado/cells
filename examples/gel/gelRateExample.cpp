@@ -23,14 +23,14 @@ const int NT 					= 1e7;
 const int NPRINT				= 5e2;
 
 // simulation constants
-const double sizeDispersion 	= 0.15;		// size dispersion (std dev of cell sizes)
+const double sizeDispersion 	= 0.125;		// size dispersion (std dev of cell sizes)
 const double timeStepMag 		= 0.0075;			// time step in MD units (zeta * lenscale / forcescale)
 
 // disk constants
 const double phiDisk	 		= 0.75;			// initial packing fraction of disks (sets boundary)
 
 // compression constants
-const double phiTarget			= 0.85;			// cell packing fraction (regardless of final pressure)
+const double phiTarget			= 0.9;			// cell packing fraction (regardless of final pressure)
 const double deltaPhi			= 0.0025;		// compression step size
 
 // gelation constants
@@ -40,7 +40,7 @@ const double aGelation			= 0.1;				// attraction parameter during gelation sim
 
 // force parameters
 const double kl 			= 0.25;				// perimeter force constant
-const double ka 			= 1.0;				// area force constant
+const double ka 			= 0.5;				// area force constant
 const double gam 			= 0.0;				// surface tension force constant
 const double kb 			= 0.01;				// bending energy constant
 const double kint 			= 1.0;				// interaction energy constant
