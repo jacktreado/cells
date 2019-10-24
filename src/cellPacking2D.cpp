@@ -2120,7 +2120,7 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 				cout << "	* Printing cell contacts to file" << endl;
 				printSystemContacts();
 			}
-			
+
 			break;
 		}
 	}
@@ -2625,6 +2625,9 @@ void cellPacking2D::gelRateExtension(double phiGel, double gelRate, double timeS
 	double t = 0.0;
 	double phi0, phitmp, veltmp;
 
+	// damping
+	const double b = 0.5;
+
 	// update time step
 	dt = timeStepMag;
 	dt0 = dt;
@@ -2675,6 +2678,23 @@ void cellPacking2D::gelRateExtension(double phiGel, double gelRate, double timeS
 			cout << endl << endl;
 		}
 
+		// do verlet update
+		for (ci=0; ci<NCELLS; ci++){
+			cell(ci).verletPositionUpdate(dt);
+			cell(ci).updateCPos();
+		}
+
+		// reset contacts before force calculation
+		resetContacts();
+
+		// calculate forces
+		calculateForces();
+
+		// update velocities
+		for (ci=0; ci<NCELLS; ci++)
+			cell(ci).verletVelocityUpdate(dt,b);
+
+		/*
 		// reset forces and uint for RK4 update below
 		for (ci=0; ci<NCELLS; ci++){
 			// loop over vertices
@@ -2684,11 +2704,11 @@ void cellPacking2D::gelRateExtension(double phiGel, double gelRate, double timeS
 					// get velocities (= forces in overdamped regime)
 					// veltmp = cell(ci).vforce(vi,d);
 
-					// update positions (EULER STEP)
+					// // update positions (EULER STEP)
 					// cell(ci).setVPos(vi,d,cell(ci).vpos(vi,d) + dt*veltmp);
 
 					// update velocities
-					// cell(ci).setVVel(vi,d,veltmp);
+					cell(ci).setVVel(vi,d,veltmp);
 
 					// reset forces
 					cell(ci).setVForce(vi,d,0.0);
@@ -2703,7 +2723,9 @@ void cellPacking2D::gelRateExtension(double phiGel, double gelRate, double timeS
 		resetContacts();
 
 		// use RK4 to update positions
+		// calculateForces();
 		gelRK4();
+		*/
 
 		// increment
 		t += dt;

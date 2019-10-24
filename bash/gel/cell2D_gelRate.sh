@@ -25,25 +25,25 @@ NV=$2
 asphericity=$3
 gelRate=$4
 phiTarget=$5
-partition=$6
-time=$7
-numSeedsPerRun=$8
-numRuns=$9
-startSeed="${10}"
+aGelation=$6
+partition=$7
+time=$8
+numSeedsPerRun=$9
+numRuns="${10}"
+startSeed="${11}"
 
 # other parameters
 sizeDisp=0.15
 kl=0.25
-ka=0.5
+ka=1.0
 kb=0.01
 del=1.0
-a=0.1
 
 let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=gelRate_N"$NCELLS"_NV"$NV"_al"$asphericity"_gr"$gelRate"_pt"$phiTarget"
+basestr=gelRate_N"$NCELLS"_NV"$NV"_al"$asphericity"_gr"$gelRate"_pt"$phiTarget"_a"$aGelation"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation
@@ -53,7 +53,7 @@ mkdir -p $simdatadir
 # compile into binary using packing.h
 binf=bin/"$runstr".o
 mainf=$maindir/gelRate.cpp
-echo Running $numSeeds sims of $NCELLS cells from initially dilute, cal A = $asphericity, gel decompression rate = $gelRate, pt = $phiTarget, will compress then decompress to target phi
+echo Running $numSeeds sims of $NCELLS cells from initially dilute, cal A = $asphericity, gel decompression rate = $gelRate, pt = $phiTarget, attraction $aGelation, will compress then decompress to target phi
 
 # run compiler
 rm -f $binf
@@ -105,7 +105,7 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         contactf=$specificdir/$filestr.cm
 
         # append to runString
-        runString="$runString ; ./$binf $NCELLS $NV $sizeDisp $phiTarget $gelRate $kl $ka $kb $del $asphericity $a $runseed $posf $enf $contactf"
+        runString="$runString ; ./$binf $NCELLS $NV $sizeDisp $phiTarget $gelRate $kl $ka $kb $del $asphericity $aGelation $runseed $posf $enf $contactf"
     done
 
     # finish off run string

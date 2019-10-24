@@ -20,7 +20,7 @@ const double PI = 4.0*atan(1);
 
 // length paramaters
 const int NT 					= 1e7;
-const int NPRINT				= 2e2;
+const int NPRINT				= 5e2;
 
 // simulation constants
 const double sizeDispersion 	= 0.125;		// size dispersion (std dev of cell sizes)
@@ -30,22 +30,22 @@ const double timeStepMag 		= 0.02;			// time step in MD units (zeta * lenscale /
 const double phiDisk	 		= 0.75;			// initial packing fraction of disks (sets boundary)
 
 // compression constants
-const double phiTarget			= 0.95;			// cell packing fraction (regardless of final pressure)
+const double phiTarget			= 0.9;			// cell packing fraction (regardless of final pressure)
 const double deltaPhi			= 0.0025;		// compression step size
 
 // gelation constants
-const double phiGel 			= 0.2;			// final packing fraction
+const double phiGel 			= 0.4;			// final packing fraction
 const double gelRate 			= 0.001;		// rate of size decrease (i.e. area loss relative to initial box area)
+const double aGelation			= 0.2;				// attraction parameter during gelation sim
 
 // force parameters
 const double kl 			= 0.5;				// perimeter force constant
-const double ka 			= 0.25;				// area force constant
+const double ka 			= 1.0;				// area force constant
 const double gam 			= 0.0;				// surface tension force constant
 const double kb 			= 0.01;				// bending energy constant
 const double kint 			= 1.0;				// interaction energy constant
 const double del 			= 1.0;				// width of vertices in units of l0, vertex sep on regular polygon
 const double aInitial 		= 0.0;				// attraction parameter to start
-const double aGelation		= 0.1;				// attraction parameter during gelation sim
 const double da 			= 0.001;			// attraction increment
 
 // deformability
@@ -61,8 +61,8 @@ int main()
 	string enFile = "en.test";
 
 	// system details
-	int NCELLS 		= 12;
-	int NV			= 18;
+	int NCELLS 		= 10;
+	int NV			= 20;
 	int seed 		= 10;
 	double Ltmp 	= 1.0;
 
@@ -83,7 +83,7 @@ int main()
 	packingObject.gelForceVals(calA0,kl,ka,gam,kb,kint,del,aInitial);
 
 	// update time scale
-	packingObject.setdt(0.2*timeStepMag);
+	packingObject.setdt(0.1*timeStepMag);
 
 	// compress to set packing fraction using FIRE, pressure relaxation
 	cout << "	** QS compresison protocol to phiTarget = " << phiTarget << endl;
@@ -102,7 +102,7 @@ int main()
 
 	// -- decrease phi as if boundary was growing: phi(t) = phi(0)/(1 + a*t)
 	cout << "	** Running gel extension simulation with gelRate = " << gelRate << ", phiGel = " << phiGel << endl;
-	packingObject.gelRateExtension(phiGel,gelRate,0.5*timeStepMag);
+	packingObject.gelRateExtension(phiGel,gelRate,timeStepMag);
 
 	return 0;
 }

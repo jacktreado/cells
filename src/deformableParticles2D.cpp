@@ -1796,7 +1796,7 @@ void deformableParticles2D::verletVelocityUpdate(double dt, double dampingParam)
     double ftmp, dampNum, dampDenom, dampUpdate;
 
     // get segment mass                                                                                                                                                                                                                
-    segmentMass = 0.25*PI;
+    segmentMass = PI*pow(0.5*del*l0,2);
 
     // scale damping                                                                                                                                                                                                                   
     b = dampingParam*sqrt(segmentMass);
