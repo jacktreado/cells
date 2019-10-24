@@ -53,7 +53,7 @@ mkdir -p $simdatadir
 # compile into binary using packing.h
 binf=bin/"$runstr".o
 mainf=$maindir/gelRate.cpp
-echo Running $numSeeds sims of $NCELLS cells from initially dilute, cal A = $asphericity, gel decompression rate = $gr, pt = $phiTarget, will compress then decompress to target phi
+echo Running $numSeeds sims of $NCELLS cells from initially dilute, cal A = $asphericity, gel decompression rate = $gelRate, pt = $phiTarget, will compress then decompress to target phi
 
 # run compiler
 rm -f $binf
