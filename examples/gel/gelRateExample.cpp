@@ -34,7 +34,7 @@ const double phiTarget			= 0.9;			// cell packing fraction (regardless of final 
 const double deltaPhi			= 0.0025;		// compression step size
 
 // gelation constants
-const double phiGel 			= 0.4;			// final packing fraction
+const double phiGel 			= 0.;			// final packing fraction
 const double gelRate 			= 0.001;		// rate of size decrease (i.e. area loss relative to initial box area)
 const double aGelation			= 0.2;				// attraction parameter during gelation sim
 
