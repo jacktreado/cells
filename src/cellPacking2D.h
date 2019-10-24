@@ -153,7 +153,8 @@ public:
 	void setL(double val) { L = val; };
 	void setT(double val) { T = val; };
 
-	void setdt(double val) { dt0 = val*timeScale(); dt = dt0; };
+	// set dt: NOTE, IN NON-DIMENSIONAL FORM, so mass = rho pi r^2 = pi
+	void setdt(double val) { dt0 = val*sqrt(4*atan(1)); dt = dt0; };
 	void addContact(int ci, int cj);
 	void deleteContact(int ci, int cj);
 	void resetContacts();
@@ -164,12 +165,6 @@ public:
 	void scaleLengths(double val);
 	void rescaleVelocities(double temperature);
 	int removeRattlers(int krcrs);
-
-	// printers
-	void printSystemPositions(int frame);
-	void printSystemEnergy(int frame, double Uval, double Kval);
-	void printSystemStats();
-
 
 	/**************************
 
@@ -190,16 +185,36 @@ public:
 
 	***************************/
 
+	// NVE test function
+	void cellNVE();
+	void cellOverDamped();
+
 	// looping functions
 	void jammingFireRamp(double dphi, double dCalA, double asphericityTarget, double kbTarget, double phiTarget, double Ktol, double Ptol, int plotIt);
 	void compressToTarget(double dphi, double phiTarget, double asphericityTarget, double Ktol, double Ptol, int plotIt, int& frameCount);
 
 	// FIRE 2.0 relaxation functions
-	void fireMinimizeP(double Ptol, double Ktol, int plotIt, int& frameCount);
+	void fireMinimizeP(double Ptol, double Ktol);
 	void fireMinimizeF(double Ftol, double Ktol, int plotIt, int& frameCount);
+
+	// Gelation functions
+	void initializeGel(int NV, double phiDisk, double sizeDispersion, double delval);
+	void gelForceVals(double calA0, double kl, double ka, double gam, double kb, double kint, double del, double a);
+	void qsIsoCompression(double phiTarget, double deltaPhi);
+	void attractionRamp(double attractionTarget, double dAttraction);
+	void gelRateExtension(double phiGel, double gelRate, double timeStepMag);
+	void gelRK4();
+
+
+	void fireMinimizeSP(std::vector<double>& lenscales);
+	void spForces(std::vector<double>& lenscales);
+	void spPosVerlet();
+	void spVelVerlet(std::vector<double>& lenscales);
+	void shrinkSP(std::vector<double>& lenscales);
 
 	// non-equilibrium MD functions
 	void isoExtensionQS(int plotIt, int& frameCount, double phiTarget, double dphi);
+
 
 	// Hopper functions
 	void initializeHopperSP(std::vector<double>& radii, double w0, double w, double th, double Lmin, int NV);
@@ -222,17 +237,26 @@ public:
 	// relaxation/ramp functions
 	void overlapRelief(double phiT);
 	void diskForces(std::vector<double>& radii);
-	void attractionRamp(double attractionTarget, double dAttraction, double asphericityTarget, int plotIt, int& initialFrame);
 	void shapeRamp(double fixedPhi, double asphericityTarget, double dCalA, double kbTarget, double dkb);
 
 	// tumor MD functions
-	void tumorNVE();
+	
 	void tumorForce(int NTUMORCELLS, double forceScale, double adiposeDamping);
 
 
 	// fire energy minimization
 	void fireStep(int& np, double& alpha);
 	void fireStep(std::vector<int>& np, std::vector<double>& alphaVec);
+
+
+	// printers
+	void printSystemPositions();
+	void printSystemEnergy();
+	void printSystemContacts();
+	void printSystemPositions(int frame);
+	void printSystemEnergy(int frame, double Uval, double Kval);
+	void printSystemStats();
+
 };
 
 #endif

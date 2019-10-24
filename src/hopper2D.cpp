@@ -537,7 +537,7 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 			}
 
 			// if particle is near edge; either do wall force or force due to edge
-			else if (x > L - 0.5*sigma*s && x < L + 0.5*sigma){
+			else if (x > L - 0.5*sigma*s && x < L){
 				// check on top wall
 				if (y > 0.5*w0){
 					// define line separating wall force and edge force regime
@@ -752,7 +752,7 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 
 // wall forces between cells as droplets (DP model)
 // 	** if closed = 1, orifice is closed off by wall
-;void cellPacking2D::hopperWallForcesDP(double w0, double w, double th, int closed){
+void cellPacking2D::hopperWallForcesDP(double w0, double w, double th, int closed){
 	
 }
 

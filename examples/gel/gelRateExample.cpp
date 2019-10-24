@@ -18,99 +18,115 @@ using namespace std;
 // define PI
 const double PI = 4.0*atan(1);
 
+// length paramaters
+const int NT 					= 1e7;
+const int NPRINT				= 2e2;
+
 // simulation constants
-const double sizeRatio 			= 1.4;			// size ratio between large and small particles
-const double timeStepMag 		= 0.005;			// time step in MD units
-const double Ktol				= 1e-12;		// kinetic tolerance for compression protocol
-const double Ptol 				= 1e-4;			// pressure tolerance for compression protocol
+const double sizeDispersion 	= 0.125;		// size dispersion (std dev of cell sizes)
+const double timeStepMag 		= 0.02;			// time step in MD units (zeta * lenscale / forcescale)
+
+// disk constants
+const double phiDisk	 		= 0.75;			// initial packing fraction of disks (sets boundary)
+
+// compression constants
+const double phiTarget			= 0.95;			// cell packing fraction (regardless of final pressure)
+const double deltaPhi			= 0.0025;		// compression step size
+
+// gelation constants
+const double phiGel 			= 0.2;			// final packing fraction
+const double gelRate 			= 0.001;		// rate of size decrease (i.e. area loss relative to initial box area)
 
 // force parameters
-const double kl 			= 1.0;			// perimeter force constant
-const double ka 			= 1.0;			// area force constant
-const double gam 			= 0.0;			// surface tension force constant
-const double kb 			= 1.0;			// bending energy constant
-const double kint 			= 1.0;			// interaction energy constant
-const double del 			= 1.0;			// width of vertices (WHEN = 1, ITS A VERTEX FORCE!)
-const double aInitial 		= 0.0;			// attraction parameter to start
+const double kl 			= 0.5;				// perimeter force constant
+const double ka 			= 0.25;				// area force constant
+const double gam 			= 0.0;				// surface tension force constant
+const double kb 			= 0.01;				// bending energy constant
+const double kint 			= 1.0;				// interaction energy constant
+const double del 			= 1.0;				// width of vertices in units of l0, vertex sep on regular polygon
+const double aInitial 		= 0.0;				// attraction parameter to start
+const double aGelation		= 0.1;				// attraction parameter during gelation sim
+const double da 			= 0.001;			// attraction increment
 
+// deformability
+const double calA0 			= 1.05;				// ratio of preferred perimeter^2 to preferred area
 
 // main function
 int main()
 {
+	// local variables
+
 	// output files
 	string posFile = "pos.test";
 	string enFile = "en.test";
 
 	// system details
 	int NCELLS 		= 12;
-	int NV			= 24;
+	int NV			= 18;
 	int seed 		= 10;
-	int initNT 		= 5e7;
-	int initNPRINT 	= 1e3;
-	double L 		= 10.0*NCELLS;
+	double Ltmp 	= 1.0;
 
 	// instantiate object
-	cout << "	** Instantiating object" << endl;
-	cellPacking2D packingObject(NCELLS,initNT,initNPRINT,L,seed);
+	cout << "	** Instantiating object for initial disk packing to be turned into a cell packing" << endl;
+	cout << "	** NCELLS = " << NCELLS << endl;
+	cellPacking2D packingObject(NCELLS,NT,NPRINT,Ltmp,seed); 	// NOTE: NEED TO MAKE NEW CONSTRUCTOR, EVERYTHING ELSE DONE IN initializeGel AND regularPolygon FUNCTIONS
 
-	// set values in setting up packing
-	cout << "	** Initializing particle quantities, particles are initially regular polygons" << endl;
-	packingObject.initializeBidisperse(NV,sizeRatio);
-	packingObject.initializeForceConstants(kl,ka,gam,kb,kint);
-	packingObject.initializeInteractionParams(del,aInitial);
-
-	// set time step
-	packingObject.setdt(timeStepMag);
-
-	// initialize particle positions by BIDISPERSE DISK PACKING
-	double initPhiTarget = 0.2;
-	cout << "	** Initializing particle positions as disk packing to packing fraction = " << initPhiTarget << endl;
-	packingObject.bidisperseDisks(sizeRatio,initPhiTarget);
-	packingObject.cell(0).vertexPerturbation(0.1);
-
-	// open output files
-	cout << "	** Opening print objects" << endl;
+	// open position output file
 	packingObject.openPackingObject(posFile);
 	packingObject.openEnergyObject(enFile);
 
-	// print positions
-	// packingObject.printSystemPositions(0);
+	// set initial conditions as if disks in box with given packing fraction (sets boundary size)
+	cout << "	** Initializing gel at phiDisk = " << phiDisk << " using SP model" << endl;
+	packingObject.initializeGel(NV, phiDisk, sizeDispersion, del);
 
+	// set deformability, force values
+	packingObject.gelForceVals(calA0,kl,ka,gam,kb,kint,del,aInitial);
 
-	/****************
+	// update time scale
+	packingObject.setdt(0.2*timeStepMag);
 
-		Simulation
+	// compress to set packing fraction using FIRE, pressure relaxation
+	cout << "	** QS compresison protocol to phiTarget = " << phiTarget << endl;
 
-	*****************/
+	// TO DO: 
+	// 	** FIRE MIN FUNCTION IS UNSTABLE, NVE LOOKS GOOD
+	packingObject.setNPRINT(NPRINT);
+	packingObject.setNT(NT);
+	// packingObject.cellNVE();
+	// packingObject.cellOverDamped();
+	packingObject.qsIsoCompression(phiTarget,deltaPhi);
 
-	// REset time step (in case initial conditions changed value)
-	packingObject.setdt(timeStepMag);
+	// -- ramp attraction
+	cout << "	** Ramping attraction to a = " << aGelation << endl;
+	packingObject.attractionRamp(aGelation,da);
 
-	// cout << packingObject.getdt() << endl;
-	// cout << packingObject.timeScale() << endl;
-	// cout << packingObject.meanAsphericity() << endl;
-	// cout << packingObject.cell(0).getkint() << endl;
-	// return 0;
-
-	// run simulation 
-	double deltaPhi = 0.001;
-	double phiTarget = 0.79;
-	double asphericityTarget = 1.05;
-	int frameCount = 0;
-	cout << "	** Compressing to a target phi = " << phiTarget << endl;
-	packingObject.compressToTarget(deltaPhi,phiTarget,asphericityTarget,Ktol,Ptol,1,frameCount);
-
-	// relax shape and attraction
-	double aTarget = 0.01;
-	double dAttraction = 0.001;
-	asphericityTarget = 1.1;
-	cout << "	** Relaxing attraction and shape" << endl;
-	packingObject.attractionRamp(aTarget, dAttraction, asphericityTarget, 1, frameCount);
-
-	// run gel simulation
-	phiTarget = 0.2;
-	deltaPhi = 0.001;
-	packingObject.isoExtensionQS(1, frameCount, phiTarget, deltaPhi);
+	// -- decrease phi as if boundary was growing: phi(t) = phi(0)/(1 + a*t)
+	cout << "	** Running gel extension simulation with gelRate = " << gelRate << ", phiGel = " << phiGel << endl;
+	packingObject.gelRateExtension(phiGel,gelRate,0.5*timeStepMag);
 
 	return 0;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

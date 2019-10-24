@@ -152,6 +152,7 @@ public:
 	double segment(int vertex, int dim);			// vector connecting i and i+1
 	double dotProduct(int v1, int v2);				// dot product between vertices v1 and v2
 	double segmentDotProduct(int l1, int l2);		// dot product between segments l1 and l2
+	double segmentCosine(int l1);					// dot product between segment l1 - 1 and l1
 
 	// force functions
 	void shapeForces();
@@ -178,6 +179,7 @@ public:
 
 	// integrator options
 	void verletPositionUpdate(double dt);
+	void verletVelocityUpdate(double dt);
 	void verletVelocityUpdate(double dt, double dampingParam);
 	
 	// print functions
