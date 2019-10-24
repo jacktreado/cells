@@ -148,7 +148,7 @@ cat $slurmf
 
 # run sbatch file
 echo -- running on slurm in partition $partition
-sbatch -t $time $slurmf
+echo sbatch -t $time $slurmf
 
 
 # ====================
@@ -159,11 +159,12 @@ sbatch -t $time $slurmf
 # 3. asphericity
 # 4. gel rate
 # 5. target phi
-# 6. partition
-# 7. time
-# 8. num seeds per run (for each entry in array)
-# 9. number of runs (number of array entries, i.e. arraynum)
-# 10. start seed (end seed determined by number of runs)
+# 6. attraction parameter
+# 7. partition
+# 8. time
+# 9. num seeds per run (for each entry in array)
+# 10. number of runs (number of array entries, i.e. arraynum)
+# 11. start seed (end seed determined by number of runs)
 
 
 
