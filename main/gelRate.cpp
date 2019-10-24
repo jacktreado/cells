@@ -36,8 +36,8 @@ const double PI = 4.0*atan(1);
 // simulation constants
 const int NT 					= 5e7; 			// number of time steps
 const int NPRINT 				= 5e2;			// number of time steps between prints
-const double timeStepMag 		= 0.0075;		// time step in MD unit
-const double deltaPhi 			= 0.0025;		// packing fraction step
+const double timeStepMag 		= 0.01;		// time step in MD unit
+const double deltaPhi 			= 0.002;		// packing fraction step
 const double deltaA 			= 0.001;		// stepping in a during attraction ramp
 const double phiDisk 			= 0.75;			// initial phi of SP disks
 const double phiGel 			= 0.4;			// final phi of gel phase
