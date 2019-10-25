@@ -24,7 +24,7 @@ const int NPRINT				= 1000;
 
 // simulation constants
 const double sizeDispersion 	= 0.125;		// size dispersion (std dev of cell sizes)
-const double timeStepMag 		= 0.0001;			// time step in MD units (zeta * lenscale / forcescale)
+const double timeStepMag 		= 0.001;			// time step in MD units (zeta * lenscale / forcescale)
 
 // disk constants
 const double phiDisk	 		= 0.82;			// initial packing fraction of disks (sets boundary)
@@ -35,7 +35,7 @@ const double deltaPhi			= 0.0025;		// compression step size
 
 // gelation constants
 const double phiGel 			= 0.4;			// final packing fraction
-const double gelRate 			= 5e-3;			// rate of size decrease (i.e. area loss relative to initial box area)
+const double gelRate 			= 1e-3;			// rate of size decrease (i.e. area loss relative to initial box area)
 const double aGelation			= 0.1;			// attraction parameter during gelation sim
 
 // force parameters

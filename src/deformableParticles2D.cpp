@@ -1876,6 +1876,8 @@ void deformableParticles2D::printVertexPositions(ofstream& vertexPrintObject, in
 	vertexPrintObject << setw(wNUM) << right << "Y pos";
 	vertexPrintObject << setw(wNUM) << right << "X vel";
 	vertexPrintObject << setw(wNUM) << right << "Y vel";
+	vertexPrintObject << setw(wNUM) << right << "X frc";
+	vertexPrintObject << setw(wNUM) << right << "Y frc";
 	vertexPrintObject << endl;
 
 	// loop over vertices, print
@@ -1892,6 +1894,8 @@ void deformableParticles2D::printVertexPositions(ofstream& vertexPrintObject, in
 		}
 		for (d=0; d<NDIM; d++)
 			vertexPrintObject << setw(wNUM) << setprecision(p) << right << vvel(i,d);
+		for (d=0; d<NDIM; d++)
+			vertexPrintObject << setw(wNUM) << setprecision(p) << right << vforce(i,d);
 		vertexPrintObject << endl;
 	}
 }

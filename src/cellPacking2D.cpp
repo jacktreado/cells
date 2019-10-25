@@ -1097,7 +1097,7 @@ void cellPacking2D::setPackingFraction(double val){
 	double scaleFactor;
 
 	// update packing fraction
-	phi = packingFraction();
+	// phi = packingFraction();
 
 	// calculate val to scale lengths with
 	scaleFactor	= pow(val/phi,1.0/NDIM);
@@ -2720,6 +2720,7 @@ void cellPacking2D::gelRateExtension(double phiGel, double gelRate, double timeS
 	// loop time until packing fraction below threshold
 	while (phitmp > phiGel){
 		// update phi
+		phi = phitmp;
 		phitmp = phi0/(gelRate*t + 1.0);
 		setPackingFraction(phitmp);
 
@@ -2755,6 +2756,28 @@ void cellPacking2D::gelRateExtension(double phiGel, double gelRate, double timeS
 			cout << "	* nc 		= " << totalNumberOfContacts() << endl;
 			cout << endl << endl;
 		}
+
+		// // DEBUG: PRINT OUT EVERY TIME FOR k > 78000
+		// if (k > 78000){
+		// 	cout << "Printing everything, nan coming up soon!" << endl;
+
+		// 	// print config and energy
+		// 	if (packingPrintObject.is_open()){
+		// 		cout << "	* Printing vetex positions to file" << endl;
+		// 		printSystemPositions();
+		// 	}
+			
+		// 	if (energyPrintObject.is_open()){
+		// 		cout << "	* Printing cell energy to file" << endl;
+		// 		printSystemEnergy();
+		// 	}
+
+		// 	if (k > 79000){
+		// 		cout << "should have found a nan by now, ending" << endl;
+		// 		exit(1);
+		// 	}
+
+		// }
 
 		// do verlet update
 		for (ci=0; ci<NCELLS; ci++){
