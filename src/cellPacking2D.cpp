@@ -2724,6 +2724,9 @@ void cellPacking2D::gelRateExtension(double phiGel, double gelRate, double timeS
 		phitmp = phi0/(gelRate*t + 1.0);
 		setPackingFraction(phitmp);
 
+		// NOTE: BUG THAT CAUSES RANDOM NANS IS IN THE PACKING FRACTION CALC FUNCTION, WOULD
+		// ONLY ACTIVATE IN THIS WHILE LOOP. 
+
 		// update iterator
 		k++;
 
