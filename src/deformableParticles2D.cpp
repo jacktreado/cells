@@ -1466,16 +1466,17 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 
 				// update force and energy scales
 				forceScale = kint;
-				energyScale = forceScale*contactDistance;
+				energyScale = kint * contactDistance;
+				// energyScale = forceScale;
 
 				// IF in zone to use repulsive force (and, if a > 0, bottom of attractive well)
 				if (vertexDist < contactDistance){
 
 					// add to interaction potential
-					uTmp = 0.5 * energyScale * pow(1 - distScale,2);
+					uTmp = 0.5 * energyScale * pow(1 - distScale,2) - (energyScale*a*a)/6.0;
 		
-					setUInt(i,uInt(i) + uTmp);
-					onTheRight.setUInt(j,onTheRight.uInt(j) + uTmp);
+					setUInt(i,uInt(i) + 0.5*uTmp);
+					onTheRight.setUInt(j,onTheRight.uInt(j) + 0.5*uTmp);
 
 					// add to vectorial forces
 					for (d=0; d<NDIM; d++){
@@ -1499,10 +1500,10 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 				else if (vertexDist >= contactDistance && vertexDist < contactDistance*p1 && a > 0.0){
 
 					// add to interaction potential
-					uTmp =  (-energyScale/(6.0*a)) * pow(distScale - 1.0,2) * (2*(distScale - 1.0) - 3*a);
+					uTmp =  (-energyScale/(6.0*a)) * pow(distScale - 1.0,2) * (2*(distScale - 1.0) - 3*a) - (energyScale*a*a)/6.0;
 		
-					setUInt(i,uInt(i) + uTmp);
-					onTheRight.setUInt(j,onTheRight.uInt(j) + uTmp);
+					setUInt(i,uInt(i) + 0.5*uTmp);
+					onTheRight.setUInt(j,onTheRight.uInt(j) + 0.5*uTmp);
 
 					// add to vectorial forces
 					for (d=0; d<NDIM; d++){
@@ -1516,8 +1517,6 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 						onTheRight.setVForce(j,d,onTheRight.vforce(j,d) - ftmp);
 
 						// calculate contribution from vertex-vertex interaction
-						// for (dd=0; dd<NDIM; dd++)
-							// virialStress.at(NDIM*d + dd) += ftmp*vertexVec.at(dd);
 						fij.at(d) += ftmp;
 					}
 				}
@@ -1609,7 +1608,8 @@ double deformableParticles2D::perimeterEnergy(){
 
 	if (kl > 0){
 		// energy based on perimeter deviations
-		val = 0.5*kl*pow(perimeter() - NV*l0,2);
+		for (i=0; i<NV; i++)
+			val += 0.5*kl*pow(segmentLength(i) - l0,2.0);
 
 		// return value
 		return val;
@@ -1661,13 +1661,8 @@ double deformableParticles2D::bendEnergy(){
 	// check if energy is activated
 	if (kb > 0){
 		// loop over vertices to calculate energy
-		for (i=0; i<NV; i++){
-			// wrap vertex labels
-			ip1 = (i+1) % NV;
-			
-			// update value
-			val += 0.5*kb*pow((segmentDotProduct(i,ip1)/(segmentLength(i)*segmentLength(ip1))) - c0,2.0);
-		}
+		for (i=0; i<NV; i++)
+			val += 0.5*kb*pow(segmentCosine(i) - c0,2.0);
 
 		// return value
 		return val;
@@ -1711,7 +1706,9 @@ double deformableParticles2D::totalKineticEnergy(){
 	// local variables
 	int i,d;
 	double val = 0.0;
-	double segmentMass = l0*del + (PI*del*0.5*del*0.5);
+
+	// vertex mass
+	double segmentMass = PI*pow(0.5*del*l0,2.0);
 
 	// loop over vertices, get kinetic energy
 	for (i=0; i<NV; i++){

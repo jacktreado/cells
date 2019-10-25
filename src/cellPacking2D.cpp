@@ -2371,6 +2371,83 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, int plotIt, int& fra
 
 // GELATION FUNCTIONS
 
+
+// function to test isotropic extension protocol
+void cellPacking2D::twoParticleContact(int NV){
+	// local variables
+	int ci, vi, d, nvtmp;
+	double rtmp, l0tmp, a0tmp, p0tmp;
+
+	// box length from 3 particle diameters (each has unit radius)
+	L = 6.0;
+
+	// number of vertices on both particles
+	nvtmp = NV;
+
+	// generate cells and sizes
+	for (ci=0; ci<NCELLS; ci++){
+		// boundary information ( SET PBCS TO 1 for plant cells )
+		cell(ci).setL(L);
+		cell(ci).setpbc(0,1);
+		cell(ci).setpbc(1,1);
+
+		// set number of vertices
+		cell(ci).setNV(nvtmp);
+
+		// array information
+		cell(ci).initializeVertices();
+		cell(ci).initializeCell();
+
+		// unit radius
+		rtmp = 1.0;
+
+		// calculate a0 and l0 based on fact that they are regular polygons
+		a0tmp = 0.5*nvtmp*pow(rtmp,2.0)*sin(2.0*PI/nvtmp);
+		l0tmp = 2.0*rtmp*sin(PI/nvtmp);
+		p0tmp = l0tmp*nvtmp;
+
+		// set preferred area and length 
+		cell(ci).seta0(a0tmp);
+		cell(ci).setl0(l0tmp);
+		cell(ci).setdel(1.0);
+	}
+
+	// initialize particle positions
+	cout << "		-- Ininitializing cell positions" << endl;
+	// set as initial position of com
+	cell(0).setCPos(0,0.5*L - 1.0 - 0.5*cell(0).getl0());
+	cell(0).setCPos(1,0.5*L);
+
+	cell(1).setCPos(0,0.5*L + 1.0 + 0.5*cell(0).getl0());
+	cell(1).setCPos(1,0.5*L);
+
+	// initialize vertices as a regular polygon
+	for (ci=0; ci<NCELLS; ci++)
+		cell(ci).regularPolygon();
+
+	// initial time scales ( = sqrt(m*sigma/f_0) = sqrt(PI)))
+	cout << "		-- Ininitializing time scale" << endl;
+
+	// packing fraction
+	phi = packingFraction();
+
+	// print config and energy
+	if (packingPrintObject.is_open()){
+		cout << "	* Printing vetex positions to file" << endl;
+		printSystemPositions();
+	}
+	
+	if (energyPrintObject.is_open()){
+		cout << "	* Printing cell energy to file" << endl;
+		printSystemEnergy();
+	}
+
+	if (statPrintObject.is_open()){
+		cout << "	* Printing cell contacts to file" << endl;
+		printSystemContacts();
+	}
+}
+
 // initialize plant cell particles as disks at input packing fraction
 void cellPacking2D::initializeGel(int NV, double phiDisk, double sizeDispersion, double delval){
 	// local variables
@@ -2517,7 +2594,7 @@ void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi){
 	int NSTEPS, k;
 
 	// tolerances
-	const double Ktol = 1e-12;
+	const double Ktol = 1e-15;
 	const double Ptol = 1e-6;
 
 	// relax shapes (energies calculated in relax function)
@@ -2624,12 +2701,13 @@ void cellPacking2D::gelRateExtension(double phiGel, double gelRate, double timeS
 	int ci, vi, d, k;
 	double t = 0.0;
 	double phi0, phitmp, veltmp;
+	cellPacking2D checkObj;
 
 	// damping
 	const double b = 0.5;
 
 	// update time step
-	dt = timeStepMag;
+	dt = timeStepMag*sqrt(PI);
 	dt0 = dt;
 
 	// get initial packing fraction
@@ -2786,8 +2864,6 @@ void cellPacking2D::gelRK4(){
 		}
 	}
 }
-
-
 
 
 

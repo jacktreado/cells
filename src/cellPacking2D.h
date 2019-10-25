@@ -198,6 +198,7 @@ public:
 	void fireMinimizeF(double Ftol, double Ktol, int plotIt, int& frameCount);
 
 	// Gelation functions
+	void twoParticleContact(int NV);
 	void initializeGel(int NV, double phiDisk, double sizeDispersion, double delval);
 	void gelForceVals(double calA0, double kl, double ka, double gam, double kb, double kint, double del, double a);
 	void qsIsoCompression(double phiTarget, double deltaPhi);
