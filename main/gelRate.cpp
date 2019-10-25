@@ -36,7 +36,7 @@ const double PI = 4.0*atan(1);
 // simulation constants
 const int NT 					= 5e7; 			// number of time steps
 const int NPRINT 				= 5e2;			// number of time steps between prints
-const double timeStepMag 		= 0.0001;		// time step in MD unit
+const double timeStepMag 		= 0.001;		// time step in MD unit
 const double deltaPhi 			= 0.002;		// packing fraction step
 const double deltaA 			= 0.001;		// stepping in a during attraction ramp
 const double phiDisk 			= 0.8;			// initial phi of SP disks
@@ -120,7 +120,7 @@ int main(int argc, char const *argv[])
 	packingObject.gelForceVals(asphericity,kl,ka,gam,kb,kint,del,aInitial);
 
 	// update time scale for compresion protocol
-	packingObject.setdt(10.0*timeStepMag);
+	packingObject.setdt(2.0*timeStepMag);
 
 	// compress to set packing fraction using FIRE, pressure relaxation
 	cout << "	** QS compresison protocol to phiTarget = " << phiTarget << endl;
