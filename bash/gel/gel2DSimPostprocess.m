@@ -31,32 +31,40 @@ function gel2DSimPostprocess(varargin)
 % check function arguments
 if nargin < 2
     error('Need at least two arguments to function\n');
-elseif nargin == 2
+elseif nargin == 3
     % get arguments
     simulationFile  = varargin{1};
     saveFile        = varargin{2};
+    contactFile     = varargin{3};
     writeToVideo    = 0;
     
     % test error in file names
     if ~strcmp(simulationFile(end-3:end),'.pos') && ~strcmp(simulationFile(end-4:end),'.test')
         error('Simulation file not *.pos or *.test, ending...\n');
     end
+    if ~strcmp(contactFile(end-2:end),'.cm') && ~strcmp(contactFile(end-4:end),'.test')
+        error('Contact file file not *.cm or *.test, ending...\n');
+    end
     if ~strcmp(saveFile(end-3:end),'.mat')
         error('Save file not *.mat, ending...\n');
     end
     
     % print if successful
-    fprintf('Found 2 arguments to gelSimPostprocess function, so reading in from sim file %s and saving data to data file %s\n',simulationFile,saveFile);
-elseif nargin == 3
+    fprintf('Found 3 arguments to gelSimPostprocess function, so reading in from sim file %s with cm file %s\n\t and saving data to data file %s\n',simulationFile,contactFile,saveFile);
+elseif nargin == 4
     % get arguments
     simulationFile  = varargin{1};
     saveFile        = varargin{2};
-    simMovieFile    = varargin{3};
+    contactFile     = varargin{3};
+    simMovieFile    = varargin{4};
     writeToVideo    = 1;
     
     % test error in file names
     if ~strcmp(simulationFile(end-3:end),'.pos') && ~strcmp(simulationFile(end-4:end),'.test')
         error('Simulation file not *.pos or *.test, ending...\n');
+    end
+    if ~strcmp(simulationFile(end-2:end),'.cm') && ~strcmp(contactFile(end-4:end),'.test')
+        error('Contact file file not *.cm or *.test, ending...\n');
     end
     if ~strcmp(saveFile(end-3:end),'.mat')
         error('Save file not *.mat, ending...\n');
@@ -66,7 +74,7 @@ elseif nargin == 3
     end
     
     % print if successful
-    fprintf('Found 3 arguments to gelSimPostprocess function, so reading in from sim file %s and saving data to data file %s, \n\tand movie to movie file %s\n',simulationFile,saveFile,simMovieFile);
+    fprintf('Found 4 arguments to gelSimPostprocess function, so reading in from sim file %s and saving data to data file %s, \n\tand movie to movie file %s\n',simulationFile,saveFile,simMovieFile);
 else
     error('4 or more arguments passed to gelSimPostprocess function, which is too many, ending.');
 end

@@ -34,7 +34,7 @@ startSeed="${11}"
 
 # other parameters
 sizeDisp=0.125
-kl=0.5
+kl=0.1
 ka=0.5
 kb=0.01
 del=1.0
