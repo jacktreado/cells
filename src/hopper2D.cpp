@@ -24,14 +24,24 @@ const double PI = 4*atan(1);
 // WITH DIAMETER SIGMA
 // 
 // assume following will already be initialized:
-// 	** NCELLS, NPRINT, L (using w,w0,th)
+// 	** NCELLS, NPRINT, L.at(0) (using w,w0,th)
 // 	** SET PBCS TO 0
+// 
+// 
+// 	******************************************************************************************
+// 	NOTE ABOUT LEN: right now, assume using the constructor that assigns Lx = Ly = input, so 
+//  use of L in the below code will always be L.at(0). A BETTER WAY TO DO IT would be to 
+//  use Lx = L.at(0) = the L parameter (length of tapered region) and Ly = L.at(1) = w0, 
+//  i.e. width of hopper in y-direction. Then you can eliminate the th variable and calculate
+// 	it in situ, and decrease the number of required input parameters
+// 	******************************************************************************************
+// 
 // 
 // 	NOTE: radii should be input in units of sigma, the mean particle diameter
 // 		** also will give the ratio of nv_i to NV, the number of vertices on the mean
 void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double w, double th, double Lmin, int NV){
 	// local variables
-	int ci, vi, nvtmp;
+	int ci, vi, d, nvtmp;
 	double calA;
 	double xpos, ypos;
 	double xmin, xmax, ymin, ymax;
@@ -63,10 +73,11 @@ void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double 
 	// initialize cell information
 	cout << "		-- Ininitializing cell objects" << endl;
 	for (ci=0; ci<NCELLS; ci++){
-		// boundary information ( SET PBCS TO 0 )
-		cell(ci).setL(L);
-		cell(ci).setpbc(0,0);
-		cell(ci).setpbc(1,0);
+		// boundary information ( SET PBCS TO 1 )
+		for (d=0; d<NDIM; d++){
+			cell(ci).setL(d,L.at(0));
+			cell(ci).setpbc(d,0);
+		}
 
 		// number of vertices ( SIGMA SETS # OF VERTS )
 		nvtmp = round(2.0*radii.at(ci)*NV);
@@ -88,7 +99,7 @@ void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double 
 	cout << "		-- Ininitializing cell positions" << endl;
 	for (ci=0; ci<NCELLS; ci++){
 		// set min and max values of positions
-		xmin = -Lmin*L;
+		xmin = -Lmin*L.at(0);
 		xmax = -radii.at(ci);
 		ymin = radii.at(ci);
 		ymax = w0 - radii.at(ci);
@@ -467,7 +478,7 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 		// check hopper walls
 		if (x > -sigma*s){
 			// if particle in hopper bulk
-			if (x < L - 0.5*sigma*s){
+			if (x < L.at(0) - 0.5*sigma*s){
 				// check ymin for walls
 				yPlusMin 	= w0 - x*t - 0.5*sigma/c;
 				yMinusMax 	= x*t + 0.5*sigma/c;
@@ -537,11 +548,11 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 			}
 
 			// if particle is near edge; either do wall force or force due to edge
-			else if (x > L - 0.5*sigma*s && x < L){
+			else if (x > L.at(0) - 0.5*sigma*s && x < L.at(0)){
 				// check on top wall
 				if (y > 0.5*w0){
 					// define line separating wall force and edge force regime
-					yline = 0.5*(w0 + w) - ((L - x)/t);
+					yline = 0.5*(w0 + w) - ((L.at(0) - x)/t);
 
 					// if above yline, use wall force
 					if (y > yline){
@@ -576,7 +587,7 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 					// else if below yline but above radius cutoff, use edge force
 					else if (y < yline && y > 0.5*(w0 + w - sigma)){
 						// vector to edge point on top lip
-						lwx = x - L;
+						lwx = x - L.at(0);
 						lwy = y - 0.5*(w0 + w);
 
 						// distance
@@ -607,7 +618,7 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 				// check on bottom wall
 				else{
 					// define line separating wall force and edge force regime
-					yline = 0.5*(w0 - w) + ((L - x)/t);
+					yline = 0.5*(w0 - w) + ((L.at(0) - x)/t);
 
 					// if below yline, use wall force
 					if (y < yline){
@@ -642,7 +653,7 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 					// else if above yline but below radius cutoff, use edge force
 					else if (y > yline && y < 0.5*(w0 - w + sigma)){
 						// vector to edge point on bottom lip
-						lwx = x - L;
+						lwx = x - L.at(0);
 						lwy = y - 0.5*(w0 - w);
 
 						// distance
@@ -724,10 +735,10 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 
 		// if orifice closed, check orifice wall
 		if (closed == 1){
-			if (x > L - radii.at(ci)){
+			if (x > L.at(0) - radii.at(ci)){
 
 				// vector from particle to wall
-				lwx = L - x;
+				lwx = L.at(0) - x;
 
 				// overlap with wall
 				overlap = 2.0*lwx/sigma;
@@ -888,7 +899,7 @@ void cellPacking2D::flowHopperSP(vector<double>& radii, double w0, double w, dou
 	// flow until max x is near orifice
 	itr = 0;
 	itrMax = 1e6;
-	while (xmax < L - 1.0 && itr < itrMax){
+	while (xmax < L.at(0) - 1.0 && itr < itrMax){
 		// update virial pressure
 		Pvirial = 0.5*(sigmaXX + sigmaYY);
 
@@ -923,7 +934,7 @@ void cellPacking2D::flowHopperSP(vector<double>& radii, double w0, double w, dou
 			cout << "	* phi 		= " << phi << endl;
 			cout << "	* dt 		= " << dt << endl;
 			cout << "	* g 		= " << g << endl;
-			cout << "	* xmax/L 	= " << xmax/L << endl;
+			cout << "	* xmax/L 	= " << xmax/L.at(0) << endl;
 			cout << endl << endl;
 		}
 
@@ -1010,7 +1021,7 @@ void cellPacking2D::flowHopperSP(vector<double>& radii, double w0, double w, dou
 		}
 
 		// find left-most grain
-		xmin = 2*L;
+		xmin = 2*L.at(0);
 		for (ci=0; ci<NCELLS; ci++){
 			if (cell(ci).cpos(0) < xmin)
 				xmin = cell(ci).cpos(0);
@@ -1026,7 +1037,7 @@ void cellPacking2D::flowHopperSP(vector<double>& radii, double w0, double w, dou
 				// if new position in outflow region, place back in hopper
 				postmp = cell(ci).cpos(d) + dt*veltmp;
 
-				if (d == 0 && postmp > L + 2.0*radii.at(ci)){
+				if (d == 0 && postmp > L.at(0) + 2.0*radii.at(ci)){
 					// put particle somewhere near back of reservoir
 					postmp = xmin + radii.at(ci);
 
@@ -1083,7 +1094,7 @@ double cellPacking2D::hopperPackingFraction(vector<double>& radii, double w0, do
 	double aH, aR, aT;
 
 	// reservoir area
-	aR = w0*L;
+	aR = w0*L.at(0);
 
 	// hopper area
 	aH = w*w0 + pow(w0-w,2)/(4.0*tan(th));
@@ -1096,7 +1107,7 @@ double cellPacking2D::hopperPackingFraction(vector<double>& radii, double w0, do
 
 	// loop over radii of cells in flow part of hopper
 	for (ci=0; ci<NCELLS; ci++){
-		if (cell(ci).cpos(0) > -L)
+		if (cell(ci).cpos(0) > -L.at(0))
 			phi += PI*pow(radii.at(ci),2);
 	}
 

@@ -34,8 +34,8 @@ private:
 	// periodic boundary conditions
 	std::vector<int> pbc;
 
-	// box length cell lives in (important for PBCs)
-	double L;
+	// box lengths (Lx and Ly)
+	std::vector<double> L;
 
 	// vertex positions relative to center of mass
 	double* vertexPositions;
@@ -86,7 +86,6 @@ public:
 
 	// getters (simple access)
 	int getNV() { return NV; };
-	double getL() { return L; };
 	double getkl() { return kl; };
 	double getka() { return ka; };
 	double getgam() { return gam; };
@@ -96,7 +95,10 @@ public:
 	double geta0() { return a0; };
 	double getdel() { return del; };
 	double geta() { return a; };
-	double getpbc(int d) { return pbc.at(d); };
+
+	// access pbc and box length information
+	int getpbc(int d) { return pbc.at(d); };
+	double getL(int d) { return L.at(d); };
 
 	double vpos(int vertex, int dim);
 	double vrel(int vertex, int dim);
@@ -112,7 +114,6 @@ public:
 
 	// setters (simple mutation)
 	void setNV(int nv) { NV = nv; };
-	void setL(double val) { L = val; };
 	void setkl(double val) { kl = val; };
 	void setka(double val) { ka = val; };
 	void setgam(double val) { gam = val; };
@@ -123,6 +124,7 @@ public:
 	void setdel(double val) { del = val; };
 	void seta(double val) { a = val; };
 	void setpbc(int d, int val) { pbc.at(d) = val; };
+	void setL(int d, double val) { L.at(d) = val; };
 
 	void setVPos(int vertex, int dim, double val);
 	void setVRel(int vertex, int dim, double val);
@@ -163,6 +165,8 @@ public:
 	void bendForce();
 	int segmentForce(deformableParticles2D& onTheRight); // return 0 or 1, depending on contact
 	int vertexForce(deformableParticles2D& onTheRight, std::vector<double>& fij, std::vector<double>& rij);
+	int vertexForce(deformableParticles2D &onTheRight, std::vector<double>& fij, std::vector<double>& rij, double aij);
+	int pwAttractiveContacts(deformableParticles2D &onTheRight);
 	int radialForce(deformableParticles2D& onTheRight, double bscale); 
 
 	// energy functions

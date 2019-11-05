@@ -37,7 +37,6 @@ deformableParticles2D::deformableParticles2D(){
 
 	// scalar variables set to 0
 	NV 		= 0;
-	L 		= 0.0;
 	kl 		= 0.0;
 	ka 		= 0.0;
 	gam 	= 0.0;
@@ -60,6 +59,11 @@ deformableParticles2D::deformableParticles2D(){
 	pbc.resize(NDIM);
 	for (int d=0; d<NDIM; d++)
 		pbc.at(d) = 1;
+
+	// box lengths set to 1.0
+	L.resize(NDIM);
+	for (int d=0; d<NDIM; d++)
+		L.at(d) = 1.0;
 }
 
 // constructor to specify number of vertices
@@ -69,7 +73,6 @@ deformableParticles2D::deformableParticles2D(int n){
 
 	// scalar variables set to 0
 	NV 		= 0;
-	L 		= 0.0;
 	kl 		= 0.0;
 	ka 		= 0.0;
 	gam 	= 0.0;
@@ -79,6 +82,11 @@ deformableParticles2D::deformableParticles2D(int n){
 	a0 		= 0.0;
 	del 	= 0.0;
 	a 		= 0.0;
+
+	// box lengths set to 1.0
+	L.resize(NDIM);
+	for (int d=0; d<NDIM; d++)
+		L.at(d) = 1.0;
 
 	// pointer variables point to nullptr
 	vertexPositions 		= nullptr;
@@ -150,7 +158,6 @@ void deformableParticles2D::operator=(deformableParticles2D& onTheRight){
 
 	// scalar variables set to 0
 	NV 		= 0;
-	L 		= 0.0;
 	kl 		= 0.0;
 	ka 		= 0.0;
 	gam 	= 0.0;
@@ -160,6 +167,11 @@ void deformableParticles2D::operator=(deformableParticles2D& onTheRight){
 	a0 		= 0.0;
 	del 	= 0.0;
 	a 		= 0.0;
+
+	// box lengths set to 1.0
+	L.resize(NDIM);
+	for (int d=0; d<NDIM; d++)
+		L.at(d) = 1.0;
 
 	// pointer variables point to nullptr
 	vertexPositions 		= nullptr;
@@ -171,7 +183,6 @@ void deformableParticles2D::operator=(deformableParticles2D& onTheRight){
 
 	// copy scalar member variables
 	NV 		= onTheRight.NV;
-	L 		= onTheRight.L;
 	kl 		= onTheRight.kl;
 	ka 		= onTheRight.ka;
 	gam 	= onTheRight.gam;
@@ -181,6 +192,12 @@ void deformableParticles2D::operator=(deformableParticles2D& onTheRight){
 	a0 		= onTheRight.a0;
 	del 	= onTheRight.del;
 	a 		= onTheRight.a;
+
+	// set box lengths equal
+	for (int d=0; d<NDIM; d++){
+		pbc.at(d) = onTheRight.pbc.at(d);
+		L.at(d) = onTheRight.L.at(d);
+	}
 
 	// initialize everything else
 	initializeVertices();
@@ -567,7 +584,7 @@ double deformableParticles2D::distance(double p2, double p1, int d){
 
 	// if pbc, check minimum image distance
 	if (pbc.at(d) == 1)
-		dp -= L*round(dp/L);
+		dp -= L.at(d)*round(dp/L.at(d));
 
 	// return value
 	return dp;
@@ -585,7 +602,7 @@ double deformableParticles2D::cellDistance(deformableParticles2D& onTheRight, in
 
 	// if pbcs are on, check minimum image distance
 	if (pbc.at(d) == 1)
-		distComp -= L*round(distComp/L);
+		distComp -= L.at(d)*round(distComp/L.at(d));
 
 	// return distance component
 	return distComp;
@@ -789,15 +806,15 @@ void deformableParticles2D::updateCPos(){
 	cposy /= NV;
 
 	// check PBCs
-	if (cposx > L)
-		cposx -= L;
+	if (cposx > L.at(0))
+		cposx -= L.at(0);
 	else if (cposx < 0)
-		cposx += L;
+		cposx += L.at(0);
 
-	if (cposy > L)
-		cposy -= L;
+	if (cposy > L.at(1))
+		cposy -= L.at(1);
 	else if (cposy < 0)
-		cposy += L;
+		cposy += L.at(1);
 
 	// divide cpos by NV to get centroid
 	setCPos(0,cposx);
@@ -1269,8 +1286,6 @@ int deformableParticles2D::segmentForce(deformableParticles2D &onTheRight){
 	for (d=0; d<NDIM; d++){
 		// get distance
 		distTmp = cellDistance(onTheRight,d);
-		// distTmp = onTheRight.cpos(d)-cpos(d);
-		// distTmp = distTmp - L*round(distTmp/L);
 
 		// save distance in vector
 		deltaMuNu.at(d) = distTmp;
@@ -1528,6 +1543,250 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 	return inContact;
 }
 
+int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector<double>& fij, vector<double>& rij, double aij){
+	// return variable
+	int inContact = 0;
+
+	// local variables
+	int i,j,d,dd;
+
+	// -------------------------
+	// 
+	// 	   Distance cutoff
+	//
+	// -------------------------
+
+	// section variables
+	double centerDistance = 0.0; 			// center-to-center distance
+	vector<double> deltaMuNu(NDIM,0.0);		// vector to store center-to-center distance vector
+	double muREff,nuREff,buffer;			// variables to determine effect cell contact distance
+	double distTmp = 0.0;					// temporary distance, for mimimum image convention (MIC)
+
+	// calculate connecting vector deltaMuNu
+	for (d=0; d<NDIM; d++){
+		// get distance
+		distTmp = cellDistance(onTheRight,d);
+
+		// save distance in vector
+		rij.at(d) = -distTmp;
+		deltaMuNu.at(d) = distTmp;
+
+		// calculate vector norm
+		centerDistance += pow(distTmp,2);
+	}
+	centerDistance = sqrt(centerDistance);
+
+	// get effect radii
+	muREff = sqrt(area()/PI);
+	nuREff = sqrt(onTheRight.area()/PI);
+	buffer = 0.1*perimeter();
+
+	// if not close enough, return 0
+	if ((muREff + nuREff + del + buffer) < centerDistance)
+		return 0;
+
+
+	// -------------------------
+	// 
+	// 	   Vertex forces
+	//
+	// -------------------------
+
+	double forceScale = kint;					// force scale
+	double energyScale = forceScale;			// energy scale
+	double distScale = 0.0;						// distance scale
+	double l1 = aij;							// magnitude of interaction
+	double l2 = a;								// interaction range
+	double p1 = 1.0 + aij;						// point where attraction is max (in units of delta)
+	double p2 = 1.0 + a;						// point where attractive zone ends (in units of delta)
+	double ftmp = 0.0;							// temporary force variable
+	double uTmp = 0.0;							// temporary energy variable
+	double vertexDist = 0.0;					// distance variable
+	vector<double> vertexVec(NDIM,0.0);			// vector to hold vectorial distance quantity
+	double contactDistance = 0.0;				// contact distance variable
+
+	// loop over vertex pairs, check for contact
+	for (i=0; i<NV; i++){
+		for (j=0; j<onTheRight.NV; j++){
+
+			// get distance between vertices i and j
+			vertexDist = 0.0;
+			for (d=0; d<NDIM; d++){
+				// get distance to nearest image
+				distTmp = distance(onTheRight.vpos(j,d),vpos(i,d),d);
+
+				// add to vertex distance
+				vertexVec.at(d) = distTmp;
+
+				// add to scalar distance
+				vertexDist += distTmp*distTmp;
+			}
+
+			// get contact distance
+			contactDistance = 0.5*(del*l0 + onTheRight.del*onTheRight.l0);
+
+			// get vertex distance
+			vertexDist = sqrt(vertexDist);
+
+			// check overlap distances
+			if (vertexDist < contactDistance*p2){
+				// set inContact to 1 for return
+				inContact = 1;
+
+				// define scaled distance (x = distance/contact distance)
+				distScale = vertexDist/contactDistance;
+
+				// update force and energy scales
+				forceScale = kint;
+				energyScale = kint * contactDistance;
+
+				// IF in zone to use repulsive force (and, if aij > 0, bottom of attractive well)
+				if (vertexDist < contactDistance*p1){
+
+					// add to interaction potential
+					uTmp = 0.5 * energyScale * (pow(1 - distScale,2) - l1*l2);
+		
+					setUInt(i,uInt(i) + 0.5*uTmp);
+					onTheRight.setUInt(j,onTheRight.uInt(j) + 0.5*uTmp);
+
+					// add to vectorial forces
+					for (d=0; d<NDIM; d++){
+						// get force value
+						ftmp = -forceScale * (1 - distScale) * vertexVec.at(d) / vertexDist;
+
+						// add to force on i
+						setVForce(i,d,vforce(i,d) + ftmp);
+
+						// subtract off complement from force on j
+						onTheRight.setVForce(j,d,onTheRight.vforce(j,d) - ftmp);
+
+						// calculate force contribution from vertex-vertex interaction
+						fij.at(d) += ftmp;
+					}
+				}
+
+				// IF aij > 0, in attractive well
+				else if (vertexDist >= contactDistance*p1){
+
+					// add to interaction potential
+					uTmp =  -(0.5*energyScale*l1/(l2 - l1)) * pow(distScale - 1 - l2,2);
+		
+					setUInt(i,uInt(i) + 0.5*uTmp);
+					onTheRight.setUInt(j,onTheRight.uInt(j) + 0.5*uTmp);
+
+					// add to vectorial forces
+					for (d=0; d<NDIM; d++){
+						// get force value
+						ftmp = -(forceScale*l1/(l2 - l1)) * (distScale - 1.0 - l2) * vertexVec.at(d) / vertexDist;
+
+						// add to force on i
+						setVForce(i,d,vforce(i,d) + ftmp);
+
+						// subtract off complement from force on j
+						onTheRight.setVForce(j,d,onTheRight.vforce(j,d) - ftmp);
+
+						// calculate contribution from vertex-vertex interaction
+						fij.at(d) += ftmp;
+					}
+				}
+			}
+		}
+	}
+
+	// return if in contact or not
+	return inContact;
+}
+
+
+// check how many vertex-vertex attractive contacts exist between two cells
+int deformableParticles2D::pwAttractiveContacts(deformableParticles2D &onTheRight){
+	// return variable
+	int numAttractiveContacts = 0;
+
+	// local variables
+	int i,j,d,dd;
+
+	// -------------------------
+	// 
+	// 	   Distance cutoff
+	//
+	// -------------------------
+
+	// section variables
+	double centerDistance = 0.0; 			// center-to-center distance
+	vector<double> deltaMuNu(NDIM,0.0);		// vector to store center-to-center distance vector
+	double muREff,nuREff,buffer;			// variables to determine effect cell contact distance
+	double distTmp = 0.0;					// temporary distance, for mimimum image convention (MIC)
+
+	// calculate connecting vector deltaMuNu
+	for (d=0; d<NDIM; d++){
+		// get distance
+		distTmp = cellDistance(onTheRight,d);
+
+		// save distance in vector
+		deltaMuNu.at(d) = distTmp;
+
+		// calculate vector norm
+		centerDistance += pow(distTmp,2);
+	}
+	centerDistance = sqrt(centerDistance);
+
+	// get effect radii
+	muREff = sqrt(area()/PI);
+	nuREff = sqrt(onTheRight.area()/PI);
+	buffer = 0.1*perimeter();
+
+	// if not close enough, return 0
+	if ((muREff + nuREff + del + buffer) < centerDistance)
+		return 0;
+
+
+	// -------------------------
+	// 
+	// 	   Vertex forces
+	//
+	// -------------------------
+
+	double distScale = 0.0;						// distance scale
+	double l2 = a;								// interaction range
+	double p2 = 1.0 + a;						// point where attractive zone ends (in units of delta)
+	double vertexDist = 0.0;					// distance variable
+	vector<double> vertexVec(NDIM,0.0);			// vector to hold vectorial distance quantity
+	double contactDistance = 0.0;				// contact distance variable
+
+	// loop over vertex pairs, check for contact
+	for (i=0; i<NV; i++){
+		for (j=0; j<onTheRight.NV; j++){
+
+			// get distance between vertices i and j
+			vertexDist = 0.0;
+			for (d=0; d<NDIM; d++){
+				// get distance to nearest image
+				distTmp = distance(onTheRight.vpos(j,d),vpos(i,d),d);
+
+				// add to vertex distance
+				vertexVec.at(d) = distTmp;
+
+				// add to scalar distance
+				vertexDist += distTmp*distTmp;
+			}
+
+			// get contact distance
+			contactDistance = 0.5*(del*l0 + onTheRight.del*onTheRight.l0);
+
+			// get vertex distance
+			vertexDist = sqrt(vertexDist);
+
+			// check overlap distance, IF in attractive zone, increment number of attractive contacts
+			if (vertexDist >= contactDistance && vertexDist < contactDistance*p2 && l2 > 0.0)
+				numAttractiveContacts++;
+		}
+	}
+
+	// return if in contact or not
+	return numAttractiveContacts;
+}
+
 
 // harmonic spring force between centers of overlapping particles
 int deformableParticles2D::radialForce(deformableParticles2D &onTheRight, double bscale){
@@ -1551,8 +1810,6 @@ int deformableParticles2D::radialForce(deformableParticles2D &onTheRight, double
 	for (d=0; d<NDIM; d++){
 		// get distance
 		distTmp = cellDistance(onTheRight,d);
-		// distTmp = onTheRight.cpos(d)-cpos(d);
-		// distTmp = distTmp - L*round(distTmp/L);
 
 		// save distance in vector
 		deltaMuNu.at(d) = distTmp;
@@ -1741,11 +1998,6 @@ void deformableParticles2D::verletPositionUpdate(double dt){
 		for (d=0; d<NDIM; d++){
 			// update positions using velocity-Verlet with PBCs
 			postmp = vpos(i,d) + dt*vvel(i,d) + 0.5*vacc(i,d)*dt*dt;
-			// if (postmp < 0)
-			// 	postmp += L;
-			// else if (postmp > L)
-			// 	postmp -= L;
-
 			setVPos(i,d,postmp);
 
 			// set forces to 0
@@ -1885,10 +2137,10 @@ void deformableParticles2D::printVertexPositions(ofstream& vertexPrintObject, in
 		vertexPrintObject << setw(wNAME) << left << "VERTP";
 		vertexPrintObject << setw(wID) << right << i;
 		for (d=0; d<NDIM; d++){
-			if (vpos(i,d) - cpos(d) > 0.5*L)
-				vertexPrintObject << setw(wNUM) << setprecision(p) << right << vpos(i,d) - L;
-			else if (cpos(d) - vpos(i,d) > 0.5*L)
-				vertexPrintObject << setw(wNUM) << setprecision(p) << right << vpos(i,d) + L;
+			if (vpos(i,d) - cpos(d) > 0.5*L.at(d))
+				vertexPrintObject << setw(wNUM) << setprecision(p) << right << vpos(i,d) - L.at(d);
+			else if (cpos(d) - vpos(i,d) > 0.5*L.at(d))
+				vertexPrintObject << setw(wNUM) << setprecision(p) << right << vpos(i,d) + L.at(d);
 			else
 				vertexPrintObject << setw(wNUM) << setprecision(p) << right << vpos(i,d);
 		}

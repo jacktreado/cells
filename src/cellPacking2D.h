@@ -39,9 +39,11 @@ private:
 	double seed;					// initial seed
 	double dt;						// time step size
 	double dt0;						// initial time step size (for dynamic time step methods)
-	double L;						// boundary length
 	double T;						// system temperature
 	double phi;						// system packing/volume fraction
+
+	// boundary lengths
+	std::vector<double> L;
 
 	// virial stresses
 	double sigmaXX, sigmaXY, sigmaYX, sigmaYY;
@@ -83,7 +85,6 @@ public:
 	// initialize positions
 	void squareLattice();
 	void hexagonalLattice();	// NEEDS WORKS
-	void bidisperseDisks(double sizeRatio, double phiT);
 
 	// initialize velocities
 	void initializeVelocities(double tmp0);
@@ -122,9 +123,11 @@ public:
 	int getNT() { return NT; };
 	int getNPRINT() { return NPRINT; };
 	double getdt() { return dt; };
-	double getL() { return L; };
 	double getT() { return T; };
 	double getphi() { return phi; };
+
+	// box len
+	double getL(int d) { return L.at(d); };
 
 	deformableParticles2D& cell(int ci);	// return cell object ci
 	int nframes();							// number of frames in the simulation
@@ -150,8 +153,10 @@ public:
 	void setNCELLS(int nc) { NCELLS = nc; };
 	void setNT(int nt) { NT = nt; };
 	void setNPRINT(int nprint) { NPRINT = nprint; };
-	void setL(double val) { L = val; };
 	void setT(double val) { T = val; };
+
+	// box len
+	void setL(int d, double val) { L.at(d) = val; };
 
 	// set dt: NOTE, IN NON-DIMENSIONAL FORM, so mass = rho pi r^2 = pi
 	void setdt(double val) { dt0 = val*sqrt(4*atan(1)); dt = dt0; };
@@ -174,6 +179,7 @@ public:
 	***************************/
 
 	void calculateForces();
+	void gelationForces();
 	void fverlet(int& np, double& alpha, double dampingParameter);
 	void activeBrownian(double diffusionConstant);	// NEEDS WORKS
 
@@ -206,12 +212,22 @@ public:
 	void gelRateExtension(double phiGel, double gelRate, double timeStepMag);
 	void gelRK4();
 
+	// Sticky SP particle functions
+	void initializeStickySP(std::vector<double>& radii, double phiDisk, double sizeDispersion);
+	void stickySPTriangularLattice(std::vector<double>& radii, double phiDisk);
+	void stickySPGelationQS(std::vector<double>& radii, double phiGel, double dphiGel, double attractiveParam);
+	void stickySPGelationRate(std::vector<double>& radii, double phiGel, double gelRate, double attractiveParam, double timeStepMag);
+	void printPositionsStickySP(std::vector<double>& radii);
+	void printEnergyStickySP();
 
+	// Repulsive SP particle functions
 	void fireMinimizeSP(std::vector<double>& lenscales);
+	void fireMinimizeSP(std::vector<double>& radii, double attractiveParam);
 	void spForces(std::vector<double>& lenscales);
+	void spAttractiveForces(std::vector<double>& radii, double attractiveParam);
 	void spPosVerlet();
 	void spVelVerlet(std::vector<double>& lenscales);
-	void shrinkSP(std::vector<double>& lenscales);
+	void spNVE(std::vector<double>& lenscales, int nt);
 
 	// non-equilibrium MD functions
 	void isoExtensionQS(int plotIt, int& frameCount, double phiTarget, double dphi);
@@ -235,13 +251,8 @@ public:
 	void printHopperSP(std::vector<double>& radii, double w0, double w, double th, double g);
 	void printHopperDP(double w0, double w, double th, double g);
 
-	// relaxation/ramp functions
-	void overlapRelief(double phiT);
-	void diskForces(std::vector<double>& radii);
-	void shapeRamp(double fixedPhi, double asphericityTarget, double dCalA, double kbTarget, double dkb);
 
 	// tumor MD functions
-	
 	void tumorForce(int NTUMORCELLS, double forceScale, double adiposeDamping);
 
 

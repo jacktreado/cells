@@ -34,13 +34,17 @@ void cellPacking2D::defaultvars(){
 	NPRINT 		= 0;
 	dt 			= 0.0;
 	dt0 		= 0.0;
-	L 			= 0.0;
 	T 			= -1.0;
 	phi 		= -1.0;
 	sigmaXX 	= 0.0;
 	sigmaXY 	= 0.0;
 	sigmaYX 	= 0.0;
 	sigmaYY 	= 0.0;
+
+	// set box lengths to 1.0
+	L.resize(NDIM);
+	for (int d=0; d<NDIM; d++)
+		L.at(d) = 1.0;
 
 	// pointer variables point to nullptr
 	cellArray 				= nullptr;
@@ -62,7 +66,7 @@ cellPacking2D::cellPacking2D(){
 // overloaded constructor with system information as arguments
 cellPacking2D::cellPacking2D(int ncells, int nt, int nprint, double l, double s){
 	// local variables
-	int i,NC;
+	int i, d, NC;
 
 	// set initial seed
 	seed = s;
@@ -74,7 +78,10 @@ cellPacking2D::cellPacking2D(int ncells, int nt, int nprint, double l, double s)
 	NCELLS 		= ncells;
 	NT 			= nt;
 	NPRINT 		= nprint;
-	L 			= l;
+
+	// set box lengths to be square
+	for (d=0; d<NDIM; d++)
+		L.at(d) = l;
 
 	// test for error in inputs
 	if (NCELLS <= 0){
@@ -89,7 +96,7 @@ cellPacking2D::cellPacking2D(int ncells, int nt, int nprint, double l, double s)
 		cout << "	ERROR: in overloaded operator, NPRINT <= 0 so cannot run simulations, ending code here." << endl;
 		exit(1);
 	}
-	else if (L <= 0.0){
+	else if (L.at(0) <= 0.0 || L.at(1) <= 0.0){
 		cout << "	ERROR: in overloaded operator, L <= 0.0 so cannot run simulations, ending code here." << endl;
 		exit(1);
 	}
@@ -115,7 +122,7 @@ cellPacking2D::cellPacking2D(int ncells, int nt, int nprint, double l, double s)
 // overloaded constructor for tumorous tissue simulation
 cellPacking2D::cellPacking2D(int ncells, int ntumor, int tumorNV, int adiposeNV, double tumorCalA, double adiposeCalA, int s){
 	// local variables
-	int i, ci, NC;
+	int i, ci, d, NC;
 
 	// set initial seed
 	seed = s;
@@ -125,7 +132,10 @@ cellPacking2D::cellPacking2D(int ncells, int ntumor, int tumorNV, int adiposeNV,
 
 	// set member variables based on inputs
 	NCELLS 		= ncells;
-	L 			= 10.0*NCELLS;
+	
+	// set box lengths to be square
+	for (d=0; d<NDIM; d++)
+		L.at(d) = 5.0*NCELLS;
 
 	// test for error in inputs
 	if (NCELLS <= 0){
@@ -163,8 +173,11 @@ cellPacking2D::cellPacking2D(int ncells, int ntumor, int tumorNV, int adiposeNV,
 	// initialize cells as ntumor tumor cells, rest adipose
 	for (ci=0; ci<NCELLS; ci++){
 
-		// set box length for each cell
-		cell(ci).setL(L);
+		// set box length for each cell ( WITH PBCs = 1 )
+		for (d=0; d<NDIM; d++){
+			cell(ci).setL(d,L.at(d));
+			cell(ci).setpbc(d,1);
+		}
 
 		// tumor cells
 		if (ci < ntumor){
@@ -223,25 +236,28 @@ cellPacking2D::cellPacking2D(ifstream& inputFileObject, double asphericity, doub
 
 	// local variables
 	int NC, ci, vi, nv, d;
-	double l0tmp, l0, a0, posTmp;
+	double ltmp, l0tmp, l0, a0, posTmp;
 
 	// read in simulation information
 	inputFileObject >> NCELLS;
-	inputFileObject >> L;
+	inputFileObject >> ltmp;
 	inputFileObject >> l0tmp;
 
 	cout << "NCELLS = " << NCELLS << endl;
-	cout << "L = " << L << endl;
+	cout << "L = " << ltmp << endl;
 
-	// reset length scales to be in units of l0
-	L /= l0tmp;
+	// set box lengths to be square, reset lengths to be in units of l0
+	for (d=0; d<NDIM; d++){
+		L.at(d) = ltmp;
+		L.at(d) /= l0tmp;
+	}
 
 	// test for error in inputs
 	if (NCELLS <= 0){
 		cout << "	ERROR: in overloaded operator, NCELLS <= 0 so cannot initialize arrays, ending code here." << endl;
 		exit(1);
 	}
-	else if (L <= 0.0){
+	else if (L.at(0) <= 0.0 || L.at(1) <= 0.0){
 		cout << "	ERROR: in overloaded operator, L <= 0.0 so cannot run simulations, ending code here." << endl;
 		exit(1);
 	}
@@ -260,8 +276,12 @@ cellPacking2D::cellPacking2D(ifstream& inputFileObject, double asphericity, doub
 		// number of vertices
 		inputFileObject >> nv;
 
-		// initialize cell objects
-		cell(ci).setL(L);
+		// initialize cell objects ( set PBCs = 1 )
+		for (d=0; d<NDIM; d++){
+			cell(ci).setL(d,L.at(d));
+			cell(ci).setpbc(d,1);
+		}
+
 		cell(ci).setNV(nv);
 		cell(ci).initializeVertices();
 		cell(ci).initializeCell();
@@ -340,9 +360,12 @@ void cellPacking2D::operator=(cellPacking2D& onTheRight){
 	seed 	= onTheRight.seed;
 	dt 		= onTheRight.dt;
 	dt0 	= onTheRight.dt0;
-	L 		= onTheRight.L;
 	T 		= onTheRight.T;
 	phi 	= onTheRight.phi;
+
+	// box length
+	for (int d=0; d<NDIM; d++)
+		L.at(d) = onTheRight.getL(d);
 
 	sigmaXX = onTheRight.sigmaXX;
 	sigmaXY = onTheRight.sigmaXY;
@@ -390,7 +413,7 @@ void cellPacking2D::operator=(cellPacking2D& onTheRight){
 // monodisperse system
 void cellPacking2D::initializeMonodisperse(int NV, double asphericity){
 	// local variables
-	int i;
+	int i, d;
 	double a0;
 
 	// check that NCELLS has been initialized
@@ -411,8 +434,11 @@ void cellPacking2D::initializeMonodisperse(int NV, double asphericity){
 
 	// setup each cell
 	for (i=0; i<NCELLS; i++){
-		// set box length for each cell
-		cell(i).setL(L);
+		// set box length for each cell ( set PBCs = 1 )
+		for (d=0; d<NDIM; d++){
+			cell(i).setL(d,L.at(d));
+			cell(i).setpbc(d,1);
+		}
 
 		// need to initialize stuff in each cell object
 		cell(i).setNV(NV);
@@ -430,7 +456,7 @@ void cellPacking2D::initializeMonodisperse(int NV, double asphericity){
 // bidisperse system initialized to regular polygons
 void cellPacking2D::initializeBidisperse(int NV, double sizeRatio){
 	// local variables
-	int i,nv,nvLarge,smallIndex;
+	int i,nv,nvLarge,smallIndex,d;
 	double a0,asphericity;
 
 	// check that NCELLS has been initialized
@@ -454,8 +480,11 @@ void cellPacking2D::initializeBidisperse(int NV, double sizeRatio){
 
 	// setup each cell
 	for (i=0; i<NCELLS; i++){
-		// set box length for each cell
-		cell(i).setL(L);
+		// set box length for each cell ( set PBCs = 1 )
+		for (d=0; d<NDIM; d++){
+			cell(i).setL(d,L.at(d));
+			cell(i).setpbc(d,1);
+		}
 
 		// determine number of vertices
 		if (i >= smallIndex)
@@ -478,7 +507,7 @@ void cellPacking2D::initializeBidisperse(int NV, double sizeRatio){
 // bidisperse system
 void cellPacking2D::initializeBidisperse(int NV, double sizeRatio, double asphericity){
 	// local variables
-	int i,nv,nvLarge,smallIndex;
+	int i,nv,nvLarge,smallIndex,d;
 	double a0;
 
 	// check that NCELLS has been initialized
@@ -502,8 +531,11 @@ void cellPacking2D::initializeBidisperse(int NV, double sizeRatio, double aspher
 
 	// setup each cell
 	for (i=0; i<NCELLS; i++){
-		// set box length for each cell
-		cell(i).setL(L);
+		// set box length for each cell ( set PBC = 1 )
+		for (d=0; d<NDIM; d++){
+			cell(i).setL(d,L.at(d));
+			cell(i).setpbc(d,1);
+		}
 
 		// determine number of vertices
 		if (i >= smallIndex)
@@ -568,8 +600,8 @@ void cellPacking2D::squareLattice(){
 	int gridPoints = round(1.5*NCELLS);
 
 	double xpos, ypos;
-	double buffer = 0.05*L;
-	double spacing = (L - 2.0*buffer)/(gridPoints-1);
+	double buffer = 0.05*L.at(0);
+	double spacing = (L.at(0) - 2.0*buffer)/(gridPoints-1);
 
 	// loop over cells, give random initial cell positions, initialize as regular polygons
 	for (ci=0; ci<NCELLS; ci++){
@@ -602,60 +634,6 @@ void cellPacking2D::squareLattice(){
 	// print statement
 	cout << "Particles initialized on square lattice with initial packing fraction phi = " << phi << endl;
 }
-
-
-// set positions as if particles were bidisperse spheres
-void cellPacking2D::bidisperseDisks(double sizeRatio, double phiT){
-	// local variables
-	int it = 0;
-	int itMax = 1e5;
-	int ci;
-	double xpos, ypos, T0;
-	double phiTol = 1e-8;
-	double rSmall, rLarge;
-	double phiInit = 0.1;
-	double phi = phiInit;
-	double dphi = 0.01;
-	double dphiTmp = dphi;
-
-	// set random initial positions, cells as regular polygon
-	for (ci=0; ci<NCELLS; ci++){
-		// get random location in box
-		xpos = L*drand48();
-		ypos = L*drand48();
-
-		// set as initial position of com
-		cell(ci).setCPos(0,xpos);
-		cell(ci).setCPos(1,ypos);
-
-		// set particles as regular polygons
-		cell(ci).regularPolygon();
-	}
-
-	// initialize velocities
-	T0 = 1e-8;
-	cout << "\n\nIn initial bidisperse disk packing, setting initial T = " << T0 << endl;
-	initializeVelocities(T0);
-
-	// loop over packing fractions
-	while (phi < phiT){
-
-		// relax overlaps
-		cout << "Relieving overlaps of particles as disks" << endl;
-		overlapRelief(phi);
-
-		// update phi appropriately
-		if (phi + dphi < phiT)
-			phi += dphi;
-		else{
-			dphiTmp = dphi;
-			while(phi + dphiTmp > phiT && dphiTmp > 1e-8)
-				dphiTmp *= 0.9;
-			phi += dphiTmp;
-		}
-		cout << "updating phi to phi + dphi = " << phi << endl;
-	}
-} 
 
 
 // set initial COM velocities based on temperature
@@ -862,7 +840,7 @@ double cellPacking2D::packingFraction(){
 	}
 
 	// divide by box area
-	val /= pow(L,NDIM);
+	val /= L.at(0)*L.at(1);
 
 	// return value
 	return val;
@@ -1225,7 +1203,6 @@ void cellPacking2D::calculateForces(){
 	int ci,cj,d,dd,inContact;
 
 	// vector to store pairwise forces
-	// vector<double> virialStress(NDIM*NDIM,0.0);
 	vector<double> fij(NDIM,0.0);
 	vector<double> rij(NDIM,0.0);
 
@@ -1256,8 +1233,80 @@ void cellPacking2D::calculateForces(){
 			if (inContact == 1)
 				addContact(ci,cj);
 
-			// DEBUG: OUTPUT PAIRWISE FORCES
-			// cout << "ci = " << ci << ", cj = " << cj << ": " << fij.at(0) << " " << fij.at(1) << endl;
+			// compute virial stresses
+			sigmaXX += fij.at(0)*rij.at(0);
+			sigmaXY += fij.at(1)*rij.at(0);
+			sigmaYX += fij.at(0)*rij.at(1);
+			sigmaYY += fij.at(1)*rij.at(1);
+		}
+
+		// forces on vertices due to shape
+		cell(ci).shapeForces();
+	}
+
+	// normalize virial stresses by the area
+	sigmaXX /= L.at(0)*L.at(1);
+	sigmaXY /= L.at(0)*L.at(1);
+	sigmaYX /= L.at(0)*L.at(1);
+	sigmaYY /= L.at(0)*L.at(1);
+}
+
+void cellPacking2D::gelationForces(){
+	// local variables
+	int ci,cj,d,dd,inContact,numACtmp;
+	double aij;
+
+	// vector to store pairwise forces
+	vector<double> fij(NDIM,0.0);
+	vector<double> rij(NDIM,0.0);
+
+	// vector to store number of attractive contacts per cell
+	vector<int> nac(NCELLS,0);
+
+	// reset virial stresses to 0
+	sigmaXX = 0.0;
+	sigmaXY = 0.0;
+	sigmaYX = 0.0;
+	sigmaYY = 0.0;
+
+	// reset forces
+	for (ci=0; ci<NCELLS; ci++){
+		for (d=0; d<NDIM; d++)
+			cell(ci).setCForce(d,0.0);
+	}
+
+	// get number of attractive contacts
+	// loop over cell pairs
+	for (ci=0; ci<NCELLS; ci++){
+		for (cj=ci+1; cj<NCELLS; cj++){
+
+			// find number of pairwise attractive contacts between vertices
+			// on ci and cj
+			numACtmp = cell(ci).pwAttractiveContacts(cell(cj));
+			nac.at(ci) += numACtmp;
+			nac.at(cj) += numACtmp;
+
+		}
+	}
+
+	// loop over cells and cell pairs, calculate shape and interaction forces
+	for (ci=0; ci<NCELLS; ci++){
+
+		// loop over pairs, add info to contact matrix
+		for (cj=ci+1; cj<NCELLS; cj++){
+			// reset virial stresses
+			for (d=0; d<NDIM; d++){
+				fij.at(d) = 0.0;
+				rij.at(d) = 0.0;
+			}
+
+			// get effective attractions
+			aij = 0.25*(cell(ci).geta()/nac.at(ci) + cell(cj).geta()/nac.at(cj));
+
+			// calculate forces
+			inContact = cell(ci).vertexForce(cell(cj),fij,rij,aij);
+			if (inContact == 1)
+				addContact(ci,cj);
 
 			// compute virial stresses
 			sigmaXX += fij.at(0)*rij.at(0);
@@ -1271,10 +1320,10 @@ void cellPacking2D::calculateForces(){
 	}
 
 	// normalize virial stresses by the area
-	sigmaXX /= pow(L,2);
-	sigmaXY /= pow(L,2);
-	sigmaYX /= pow(L,2);
-	sigmaYY /= pow(L,2);
+	sigmaXX /= L.at(0)*L.at(1);
+	sigmaXY /= L.at(0)*L.at(1);
+	sigmaYX /= L.at(0)*L.at(1);
+	sigmaYY /= L.at(0)*L.at(1);
 }
 
 // fire energy minimization
@@ -2379,7 +2428,8 @@ void cellPacking2D::twoParticleContact(int NV){
 	double rtmp, l0tmp, a0tmp, p0tmp;
 
 	// box length from 3 particle diameters (each has unit radius)
-	L = 6.0;
+	L.at(0) = 6.0;
+	L.at(1) = 6.0;
 
 	// number of vertices on both particles
 	nvtmp = NV;
@@ -2387,9 +2437,10 @@ void cellPacking2D::twoParticleContact(int NV){
 	// generate cells and sizes
 	for (ci=0; ci<NCELLS; ci++){
 		// boundary information ( SET PBCS TO 1 for plant cells )
-		cell(ci).setL(L);
-		cell(ci).setpbc(0,1);
-		cell(ci).setpbc(1,1);
+		for (d=0; d<NDIM; d++){
+			cell(ci).setL(d,L.at(d));
+			cell(ci).setpbc(d,1);
+		}
 
 		// set number of vertices
 		cell(ci).setNV(nvtmp);
@@ -2415,11 +2466,11 @@ void cellPacking2D::twoParticleContact(int NV){
 	// initialize particle positions
 	cout << "		-- Ininitializing cell positions" << endl;
 	// set as initial position of com
-	cell(0).setCPos(0,0.5*L - 1.0 - 0.5*cell(0).getl0());
-	cell(0).setCPos(1,0.5*L);
+	cell(0).setCPos(0,0.5*L.at(0) - 1.0 - 0.5*cell(0).getl0());
+	cell(0).setCPos(1,0.5*L.at(0));
 
-	cell(1).setCPos(0,0.5*L + 1.0 + 0.5*cell(0).getl0());
-	cell(1).setCPos(1,0.5*L);
+	cell(1).setCPos(0,0.5*L.at(1) + 1.0 + 0.5*cell(0).getl0());
+	cell(1).setCPos(1,0.5*L.at(1));
 
 	// initialize vertices as a regular polygon
 	for (ci=0; ci<NCELLS; ci++)
@@ -2488,7 +2539,8 @@ void cellPacking2D::initializeGel(int NV, double phiDisk, double sizeDispersion,
 	}
 
 	// determine box length from particle sizes and input packing fraction
-	L = sqrt(PI*radsum/phiDisk);
+	for (d=0; d<NDIM; d++)
+		L.at(d) = sqrt(PI*radsum/phiDisk);
 
 	// set phi to input
 	phi = phiDisk;
@@ -2500,9 +2552,10 @@ void cellPacking2D::initializeGel(int NV, double phiDisk, double sizeDispersion,
 	cout << "		-- Ininitializing plant cell objects" << endl;
 	for (ci=0; ci<NCELLS; ci++){
 		// boundary information ( SET PBCS TO 1 for plant cells )
-		cell(ci).setL(L);
-		cell(ci).setpbc(0,1);
-		cell(ci).setpbc(1,1);
+		for (d=0; d<NDIM; d++){
+			cell(ci).setL(d,L.at(d));
+			cell(ci).setpbc(d,1);
+		}
 
 		// number of vertices ( SIGMA SETS # OF VERTS )
 		nvtmp = ceil(lenscales.at(ci)*NV);
@@ -2537,9 +2590,9 @@ void cellPacking2D::initializeGel(int NV, double phiDisk, double sizeDispersion,
 	for (ci=0; ci<NCELLS; ci++){
 		// set min and max values of positions
 		xmin = 0;
-		xmax = L;
+		xmax = L.at(0);
 		ymin = 0;
-		ymax = L;
+		ymax = L.at(1);
 
 		// get random location in box
 		xpos = (xmax-xmin)*drand48() + xmin;
@@ -2594,7 +2647,7 @@ void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi){
 	int NSTEPS, k;
 
 	// tolerances
-	const double Ktol = 1e-15;
+	const double Ktol = 1e-12;
 	const double Ptol = 1e-6;
 
 	// relax shapes (energies calculated in relax function)
@@ -2792,7 +2845,7 @@ void cellPacking2D::gelRateExtension(double phiGel, double gelRate, double timeS
 		resetContacts();
 
 		// calculate forces
-		calculateForces();
+		gelationForces();
 
 		// update velocities
 		for (ci=0; ci<NCELLS; ci++)
@@ -3269,76 +3322,19 @@ void cellPacking2D::spVelVerlet(vector<double>& radii){
 	}
 }
 
-void cellPacking2D::shrinkSP(vector<double>& lenscales){
-	// local variables
-	int ci, cj, vi, d;
-	double Utmp, Utol;
-	double contactDistance, centerDistance, overlap, ftmp, utmp;
-	vector<double> distanceVec(NDIM,0.0);
+void cellPacking2D::spNVE(vector<double>& lenscales, int nt){
+	for (int t=0; t<nt; t++){
+		// verlet position update
+		spPosVerlet();
 
-	// tolerance for potential energy
-	Utol = 1e-16;
-	Utmp = Utol*10;
+		// reset contacts before force calculation
+		resetContacts();
 
-	// loop over sizes while potential energy too large
-	while(Utmp > Utol){
-		// reset potential to 0
-		Utmp = 0.0;
+		// calculate forces between disks (with door closed)
+		spForces(lenscales);
 
-		// reset forces to 0
-		for (ci=0; ci<NCELLS; ci++){
-			for (d=0; d<NDIM; d++)
-				cell(ci).setCForce(d,0.0);
-		}
-
-		// loop over particles, get total energy, update lenscales based on forces
-		// (STORE FORCES IN d = 0 ARRAY ENTRY OF CFORCE)
-		for (ci=0; ci<NCELLS; ci++){
-			for (cj=ci+1; cj<NCELLS; cj++){
-				// contact distance
-				contactDistance = lenscales.at(ci) + lenscales.at(cj);
-
-				// center-to-center distance
-				centerDistance = 0.0;
-				for (d=0; d<NDIM; d++){
-					// vectorial quantity
-					distanceVec.at(d) = cell(ci).cellDistance(cell(cj),d);
-
-					// add to distance
-					centerDistance += pow(distanceVec.at(d),2);
-				}
-
-				// check for contact
-				if (contactDistance*contactDistance > centerDistance){
-					// get true distance
-					centerDistance = sqrt(centerDistance);
-
-					// overlap scale
-					overlap = centerDistance/contactDistance;
-
-					// force scale (force on radii, NOT positions)
-					ftmp = -(overlap/contactDistance)*(1 - overlap);
-
-					// add to forces
-					cell(ci).setCForce(0,cell(ci).cforce(0) + ftmp);
-					cell(cj).setCForce(0,cell(cj).cforce(0) - ftmp);
-
-					// add to potential energy (energy should increase because particles are growing)
-					utmp = 0.5*contactDistance*pow(1 - overlap,2);
-					for (vi=0; vi<cell(ci).getNV(); vi++)
-						cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
-					for (vi=0; vi<cell(cj).getNV(); vi++)
-						cell(cj).setUInt(vi,cell(cj).uInt(vi) + utmp/cell(cj).getNV());
-
-					// update monitor U
-					Utmp += utmp;
-				}
-			}
-		}
-
-		// update sizes based on radii force (assume overdamped motion, so eq of motion is first order)
-		for (ci=0; ci<NCELLS; ci++)
-			lenscales.at(ci) += dt*cell(ci).cforce(0);
+		// verlet velocity update
+		spVelVerlet(lenscales);
 	}
 }
 
@@ -3504,288 +3500,6 @@ void cellPacking2D::tumorForce(int NTUMORCELLS, double forceScale, double adipos
 
 
 
-
-
-
-// RELAXATION FUNCTIONS
-
-
-// relieve overlap between particles
-void cellPacking2D::overlapRelief(double phiT){
-	// local variables
-	int k = 0;
-	int kmax = 1e5;
-	int np = 0;
-	int ci, cj, inContact;
-	double alpha = 0.25;
-	double rmsF, U, Ftol, Utol, energyScale, forceScale, nvScale;
-	double FtolScale, UtolScale;
-	double phi0;
-
-	// vector to store radii
-	vector<double> radii(NCELLS,0.0);
-	double cellArea;
-	int cellNV;
-
-	// calculate radii, phi0 based on particle sizes
-	phi0 = 0.0;
-	for (ci=0; ci<NCELLS; ci++){
-		// get radii
-		cellArea = cell(ci).area();
-		cellNV = cell(ci).getNV();
-		radii.at(ci) = sqrt((2.0*cellArea)/(cellNV*sin(2*PI/cellNV)));
-
-		// update current packing fraction
-		phi0 += PI*pow(radii.at(ci),2);
-	}
-	phi0 /= L*L;
-
-	// scale radii to fit new packing fraction
-	scaleLengths(sqrt(phiT/phi0));
-	for (ci=0; ci<NCELLS; ci++)
-		radii.at(ci) *= sqrt(phiT/phi0);
-
-	// scale kint to make forces greater
-	// for (ci=0; ci<NCELLS; ci++)
-	// 	cell(ci).setkint(cell(ci).getkint()*cell(ci).getNV());
-
-	// update time step
-	setdt(0.1);
-
-	// get initial forces
-	diskForces(radii);
-
-	// initialize force and potential
-	rmsF = forceRMS();
-	U = interactionPotentialEnergy();
-	cout << "initial rmsF = " << rmsF << " and U = " << U << endl;
-
-	// force and energy scales
-	energyScale = cell(0).getkint();
-	forceScale = energyScale/cell(0).getdel();
-	nvScale = cell(0).getNV();
-
-	// force and potential energy tolerance
-	FtolScale = 1e-12;
-	UtolScale = 1e-12;
-
-	Ftol = NDIM*NCELLS*nvScale*forceScale*FtolScale;
-	Utol = NCELLS*nvScale*energyScale*UtolScale;
-
-	// loop over MD until force/U is minimized
-	while (rmsF > Ftol && U > Utol && k < kmax){
-		// do verlet update
-		for (ci=0; ci<NCELLS; ci++){
-			cell(ci).verletPositionUpdate(dt);
-			cell(ci).updateCPos();
-		}
-
-		// reset contacts before force calculation
-		resetContacts();
-
-		// calculate forces
-		diskForces(radii);
-
-		// update velocities
-		for (ci=0; ci<NCELLS; ci++)
-			cell(ci).verletVelocityUpdate(dt,0.0);
-
-		// fire step
-		fireStep(np, alpha);
-
-		// update forces
-		rmsF = forceRMS();
-		U = interactionPotentialEnergy();
-
-		// update iterator
-		k++;
-	}
-
-	if (k == kmax){
-		cout << "	** ERROR: overlap relief could not converge in kmax = " << kmax << " iterations " << endl;
-		exit(1);
-	}
-
-	// print ending information
-	cout << "Starting phi as disks = " << phi0 << ", cell phi now = " << phiT << endl;
-	cout << "ending rmsF/Ftol = " << rmsF/Ftol << ", U/Utol = " << U/Utol << endl;
-	cout << "first radii = " << radii.at(0) << endl;
-	cout << "rel radii = " << sqrt(cell(0).vrel(1,0)*cell(0).vrel(1,0) + cell(0).vrel(1,1)*cell(0).vrel(1,1)) << endl;
-	cout << "meas radii = " << sqrt(pow(cell(0).vpos(1,0)-cell(0).cpos(0),2) + pow(cell(0).vpos(1,1)-cell(0).cpos(1),2)) << endl;
-}
-
-
-
-// calculate forces as if cells were disks
-void cellPacking2D::diskForces(vector<double>& radii){
-	// local variables
-	int ci, cj, vi, d;
-	double contactDistance, centerDistance, distTmp;
-	double ftmp, utmp;
-	vector<double> distVec(NDIM,0.0);
-	double forceScale, energyScale, x, ur;
-
-	// set force and energy scales
-	energyScale = cell(0).getkint();
-
-	// reset forces, interaction energy to 0
-	for (ci=0; ci<NCELLS; ci++){
-		for (vi=0; vi<cell(ci).getNV(); vi++){
-			cell(ci).setUInt(vi,0.0);
-			for (d=0; d<NDIM; d++)
-				cell(ci).setVForce(vi,d,0.0);
-		}
-	}
-
-	// loop over pairwise forces
-	for (ci=0; ci<NCELLS; ci++){
-		for (cj=ci+1; cj<NCELLS; cj++){
-			// get contact distance
-			contactDistance = radii.at(ci) + radii.at(cj) + cell(ci).getdel();
-
-			// get actual distance
-			centerDistance = 0.0;
-			for (d=0; d<NDIM; d++){
-				// get distance component
-				distTmp = cell(ci).cellDistance(cell(cj),d);
-
-				// add to vector
-				distVec.at(d) = distTmp;
-
-				// add to magnitude
-				centerDistance += distTmp*distTmp;
-			}
-			centerDistance = sqrt(centerDistance);
-
-			// add forces if overlapping
-			if (centerDistance < contactDistance){
-				// normalized distance x
-				x = centerDistance/contactDistance;
-
-				// force scale
-				forceScale = energyScale/contactDistance;
-
-				// add to interaction potential
-				utmp = 0.5*energyScale*pow(1 - x,2);
-				for (vi=0; vi<cell(ci).getNV(); vi++)
-					cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
-				for (vi=0; vi<cell(cj).getNV(); vi++)
-					cell(cj).setUInt(vi,cell(cj).uInt(vi) + utmp/cell(cj).getNV());
-
-				// add to center-of-mass forces
-				for (d=0; d<NDIM; d++){
-					// unit vector pointing in OPPOSITE direction of force
-					ur = distVec.at(d)/centerDistance;
-
-					// component of force
-					ftmp = -forceScale*(1 - x)*ur;
-
-					// add to forces
-					cell(ci).setCForce(d,cell(ci).cforce(d) + ftmp);
-					cell(cj).setCForce(d,cell(cj).cforce(d) - ftmp);
-
-					// add to virial stresses
-					if (d == 0){
-						sigmaXX += ftmp*distVec.at(0);
-						sigmaXY += ftmp*distVec.at(1);
-					}
-					else{
-						sigmaYX += ftmp*distVec.at(0);
-						sigmaYY += ftmp*distVec.at(1);
-					}
-				}
-			}
-		}
-	}
-}
-
-// ramp shape changes
-void cellPacking2D::shapeRamp(double fixedPhi, double calATarget, double dCalA, double kbTarget, double dkb){
-	// local variables
-	int k, ci, delSgn, frameCount;
-	double da, currCalA, decScale, Ptol, Ktol;
-	double calACheck, tol;
-	double kb = cell(0).getkb();
-
-	// set check and tolerance
-	tol = 1e-8;
-	calACheck = 10*tol;
-
-	// set tolerance for relaxation
-	Ptol = 1e-8;
-	Ktol = 1e-24;
-
-	// get current attraction (assuming all attraction the same)
-	currCalA = cell(0).calA0();
-
-	// set decrease scale to be 1
-	decScale = 1.0;
-
-	// check whether to increase or decrease
-	if (currCalA < calATarget)
-		delSgn = 1;
-	else
-		delSgn = -1;
-
-	// loop until attraction is the correct value
-	k=0;
-	frameCount=0;
-	while (calACheck > tol && k < NT){
-		// output to console
-		cout << "===================================================" << endl << endl << endl;
-		cout << " 	Ramping cal A to calATarget = " << calATarget << endl << endl;
-		cout << "===================================================" << endl;
-		cout << "	* k 			= " << k << endl;
-		cout << "	* current CalA 	= " << currCalA << endl;
-		cout << "	* current kb 	= " << kb << endl;
-		cout << endl << endl;
-
-		// decide whether attraction is too large or too small
-		if (delSgn*currCalA < delSgn*calATarget)
-			da = delSgn*dCalA;
-		else{
-			decScale *= 0.9;
-			da = -delSgn*decScale*dCalA;
-		}
-
-		// update current attraction parameter
-		currCalA += da;
-
-		// update attraction in all of the cells
-		for (ci=0; ci<NCELLS; ci++)
-			cell(ci).setAsphericityConstA(currCalA);
-
-		// relax potential energy
-		// potentialRelaxFire(Ktol, Utol, 1, frameCount);
-		fireMinimizeP(Ptol, Ktol);
-
-		// update check
-		calACheck = abs(currCalA - calATarget);
-
-		// update packing fraction (keep fixed)
-		phi = packingFraction();
-		setPackingFraction(fixedPhi);
-
-		// increase bending energy (ASSUME DISTANCE TO kbTarget IS NOT PART OF WHILE LOOP)
-		if (kb < kbTarget){
-			kb += dkb;
-
-			for (ci=0; ci<NCELLS; ci++)
-				cell(ci).setkb(kb);
-		}
-
-		// update iterator
-		k++;
-	}
-
-	if (k == NT){
-		cout << "	ERROR: particle shapes could not relax to desired calA in allotted time, ending." << endl;
-		exit(1);
-	}
-}
-
-
-
 /************************
 
 	Printers
@@ -3810,7 +3524,7 @@ void cellPacking2D::printSystemPositions(int frame){
 		packingPrintObject << setw(w1) << left << "START" << " " << endl;
 		packingPrintObject << setw(w1) << left << "NUMCL" << setw(w2) << right << NCELLS << endl;
 		packingPrintObject << setw(w1) << left << "NUMFR" << setw(w2) << right << nframes() << endl;
-		packingPrintObject << setw(w1) << left << "BOXSZ" << setw(w2) << right << L << endl;
+		packingPrintObject << setw(w1) << left << "BOXSZ" << setw(w2) << right << L.at(0) << setw(w2) << right << L.at(1) << endl;
 	}
 
 	// print cell information for 0, to get new frame header
@@ -3875,7 +3589,8 @@ void cellPacking2D::printSystemPositions(){
 
 	// print hopper information
 	packingPrintObject << setw(w1) << left << "BOXSZ";
-	packingPrintObject << setw(w2) << right << L;
+	packingPrintObject << setw(w2) << right << L.at(0);
+	packingPrintObject << setw(w2) << right << L.at(1);
 	packingPrintObject << endl;
 
 	// print stress information
@@ -3941,7 +3656,7 @@ void cellPacking2D::printSystemStats(){
 
 	// print information
 	statPrintObject << NCELLS << endl;
-	statPrintObject << L << endl;
+	statPrintObject << L.at(0) << setw(w) << L.at(1) << endl;
 	statPrintObject << setprecision(p) << phi << endl;
 
 	// print contact matrix
