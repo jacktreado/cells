@@ -30,7 +30,7 @@ const double timeStepMag 		= 0.01;			// time step in MD units (zeta * lenscale /
 const double phiDisk	 		= 0.75;			// initial packing fraction of disks (sets boundary)
 
 // compression constants
-const double phiTarget			= 0.85;			// cell packing fraction (regardless of final pressure)
+const double phiTarget			= 0.95;			// cell packing fraction (regardless of final pressure)
 const double deltaPhi			= 0.0025;		// compression step size
 
 // gelation constants
@@ -49,7 +49,7 @@ const double aInitial 		= 0.0;				// attraction parameter to start
 const double da 			= 0.001;			// attraction increment
 
 // deformability
-const double calA0 			= 1.02;				// ratio of preferred perimeter^2 to preferred area
+const double calA0 			= 1.3;				// ratio of preferred perimeter^2 to preferred area
 
 // main function
 int main()

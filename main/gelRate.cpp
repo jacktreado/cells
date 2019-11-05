@@ -35,7 +35,7 @@ const double PI = 4.0*atan(1);
 
 // simulation constants
 const int NT 					= 5e7; 			// number of time steps
-const int NPRINT 				= 5e2;			// number of time steps between prints
+const int NPRINT 				= 1e3;			// number of time steps between prints
 const double timeStepMag 		= 0.001;		// time step in MD unit
 const double deltaPhi 			= 0.002;		// packing fraction step
 const double deltaA 			= 0.001;		// stepping in a during attraction ramp
@@ -107,11 +107,6 @@ int main(int argc, char const *argv[])
 	cout << "	** NCELLS = " << NCELLS << endl;
 	cellPacking2D packingObject(NCELLS,NT,NPRINT,Ltmp,seed); 	// NOTE: NEED TO MAKE NEW CONSTRUCTOR, EVERYTHING ELSE DONE IN initializeGel AND regularPolygon FUNCTIONS
 
-	// open position output file
-	packingObject.openPackingObject(positionFile);
-	packingObject.openEnergyObject(energyFile);
-	packingObject.openStatObject(contactFile);
-
 	// set initial conditions as if disks in box with given packing fraction (sets boundary size)
 	cout << "	** Initializing gel at phiDisk = " << phiDisk << " using SP model" << endl;
 	packingObject.initializeGel(NV,phiDisk,sizeDisp,del);
@@ -129,6 +124,11 @@ int main(int argc, char const *argv[])
 	// -- ramp attraction
 	cout << "	** Ramping attraction to a = " << a << endl;
 	packingObject.attractionRamp(a,deltaA);
+
+	// open position output file
+	packingObject.openPackingObject(positionFile);
+	packingObject.openEnergyObject(energyFile);
+	packingObject.openStatObject(contactFile);
 
 	// -- decrease phi as if boundary was growing: phi(t) = phi(0)/(1 + a*t)
 	cout << "	** Running gel extension simulation with gelRate = " << gelRate << ", phiGel = " << phiGel << endl;
