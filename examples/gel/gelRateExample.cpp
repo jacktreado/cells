@@ -20,22 +20,22 @@ const double PI = 4.0*atan(1);
 
 // length paramaters
 const int NT 					= 1e7;
-const int NPRINT				= 1000;
+const int NPRINT				= 500;
 
 // simulation constants
 const double sizeDispersion 	= 0.0;		// size dispersion (std dev of cell sizes)
-const double timeStepMag 		= 0.01;			// time step in MD units (zeta * lenscale / forcescale)
+const double timeStepMag 		= 0.001;			// time step in MD units (zeta * lenscale / forcescale)
 
 // disk constants
-const double phiDisk	 		= 0.75;			// initial packing fraction of disks (sets boundary)
+const double phiDisk	 		= 0.8;			// initial packing fraction of disks (sets boundary)
 
 // compression constants
 const double phiTarget			= 0.95;			// cell packing fraction (regardless of final pressure)
-const double deltaPhi			= 0.0025;		// compression step size
+const double deltaPhi			= 0.002;		// compression step size
 
 // gelation constants
-const double phiGel 			= 0.5;			// final packing fraction
-const double gelRate 			= 1e-3;			// rate of size decrease (i.e. area loss relative to initial box area)
+const double phiGel 			= 0.2;			// final packing fraction
+const double gelRate 			= 5e-4;			// rate of size decrease (i.e. area loss relative to initial box area)
 const double aGelation			= 0.05;			// attraction parameter during gelation sim
 
 // force parameters
@@ -61,7 +61,7 @@ int main()
 	string enFile = "en.test";
 
 	// system details
-	int NCELLS 		= 12;
+	int NCELLS 		= 16;
 	int NV			= 24;
 	int seed 		= 1;
 	double Ltmp 	= 1.0;
@@ -71,10 +71,6 @@ int main()
 	cout << "	** NCELLS = " << NCELLS << endl;
 	cellPacking2D packingObject(NCELLS,NT,NPRINT,Ltmp,seed); 	// NOTE: NEED TO MAKE NEW CONSTRUCTOR, EVERYTHING ELSE DONE IN initializeGel AND regularPolygon FUNCTIONS
 
-	// open position output file
-	packingObject.openPackingObject(posFile);
-	packingObject.openEnergyObject(enFile);
-
 	// set initial conditions as if disks in box with given packing fraction (sets boundary size)
 	cout << "	** Initializing gel at phiDisk = " << phiDisk << " using SP model" << endl;
 	packingObject.initializeGel(NV, phiDisk, sizeDispersion, del);
@@ -83,7 +79,7 @@ int main()
 	packingObject.gelForceVals(calA0,kl,ka,gam,kb,kint,del,aInitial);
 
 	// update time scale
-	packingObject.setdt(timeStepMag);
+	packingObject.setdt(5.0*timeStepMag);
 
 	// compress to set packing fraction using FIRE, pressure relaxation
 	cout << "	** QS compresison protocol to phiTarget = " << phiTarget << endl;
@@ -92,6 +88,10 @@ int main()
 	// -- ramp attraction
 	cout << "	** Ramping attraction to a = " << aGelation << endl;
 	packingObject.attractionRamp(aGelation,da);
+
+	// open position output file
+	packingObject.openPackingObject(posFile);
+	packingObject.openEnergyObject(enFile);
 
 	// -- decrease phi as if boundary was growing: phi(t) = phi(0)/(1 + a*t)
 	cout << "	** Running gel extension simulation with gelRate = " << gelRate << ", phiGel = " << phiGel << endl;

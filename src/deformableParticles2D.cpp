@@ -439,7 +439,7 @@ double deformableParticles2D::vrel(int vertex, int dim){
 	double relDist;
 
 	// get relative distance with MIC
-	relDist = distance(vertexPositions[index],cpos(dim),dim);
+	relDist = distance(vertexPositions[index],cellPosition[dim],dim);
 
 	// return value
 	return relDist;
@@ -886,6 +886,85 @@ double deformableParticles2D::area(){
 	// return area
 	return totalArea;
 }
+
+
+// calculate cell area with vertex inclusions
+double deformableParticles2D::vertexArea(){
+	// local variables
+	int i;
+	double totalArea = 0.0;
+
+	// loop over vertices, get area of each triangle and relevant vertex area
+	for (i=0; i<NV; i++)
+		totalArea += area(i) + freeVertexArea(i);
+
+	// return area
+	return totalArea;
+}
+
+
+// calculate free vertex area of a given vertex by measuring local convecity
+double deformableParticles2D::freeVertexArea(int i){
+	// local variables
+	double bondAngle, vertexRad;
+	double areaval;
+
+	// angle
+	bondAngle = acos(segmentCosine(i));
+
+	// vertex radius
+	vertexRad = 0.5*del*l0;
+
+	// check convexity
+	if (localConvexity(i) == 1)
+		areaval = 0.5*(PI + bondAngle)*pow(vertexRad,2.0);
+	else
+		areaval = 0.5*(PI - bondAngle)*pow(vertexRad,2.0);
+
+	return areaval;
+}
+
+
+// check local convexity of a bond (i-1 -> i -> i+1)
+int deformableParticles2D::localConvexity(int i){
+	// local variables
+	int im1, ip1, d; 
+	double a1, a2;
+	double bilen, hitmp, hilen, C;
+
+	// neighboring bonds
+	im1 = (i-1+NV) % NV;
+	ip1 = (i+1) % NV;
+
+	// 
+	// measure area of triangle formed by i-1, i+1 and center
+	//
+
+	// measure length between i-1 and i+1
+	bilen = 0.0;
+	for (d=0; d<NDIM; d++)
+		bilen = pow(vrel(ip1,d) - vrel(im1,d), 2.0);
+
+	// measure height of triangle (note: -ri-1 = \Delta P, so minus signs flip)
+	hilen = 0.0;
+	for (d=0; d<NDIM; d++){
+		hitmp =  ((dotProduct(im1,ip1) - dotProduct(im1,im1))/bilen)*(vrel(ip1,d) - vrel(im1,d)) - vrel(im1,d);
+		hilen += hitmp*hitmp;
+	}
+
+	// get first triangle area
+	a1 = 0.5*sqrt(hilen)*sqrt(bilen);
+
+	// get area of two triangles (aim1 + ai)
+	a2 = area(im1) + area(i);
+
+	// check convexity
+	if (a1 > a2)
+		return 0;
+	else
+		return 1;
+}
+
 
 
 // calculate cell perimeter

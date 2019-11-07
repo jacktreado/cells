@@ -817,27 +817,12 @@ double cellPacking2D::timeScale(){
 // Calculate the packing fraction
 double cellPacking2D::packingFraction(){
 	// local variables
-	int ci, vi;
-	double vrad, segangle;
+	int ci, vi;;
 	double val = 0.0;
 
 	// loop over cells, packing fraction is : triangular area + 0.5*delta*perimeter area + area of circular corners
-	for (ci=0; ci<NCELLS; ci++){
-		// val += cell(ci).area() + (0.5*cell(ci).getdel())*cell(ci).perimeter() + PI*0.25*cell(ci).getdel()*cell(ci).getdel();
-		val += cell(ci).area();		// needs to be this if vertex forces only
-
-		// add contribution from vertices
-		for (vi=0; vi<cell(ci).getNV(); vi++){
-			// vertex radius
-			vrad = 0.5*cell(ci).getdel()*cell(ci).getl0();
-
-			// angle between successive segments
-			segangle = acos(cell(ci).segmentCosine(vi));
-
-			// add extra area
-			val += 0.5*pow(vrad,2)*(PI+segangle);
-		}
-	}
+	for (ci=0; ci<NCELLS; ci++)
+		val += cell(ci).vertexArea();		// needs to be this if vertex forces only
 
 	// divide by box area
 	val /= L.at(0)*L.at(1);
@@ -1074,9 +1059,6 @@ void cellPacking2D::setPackingFraction(double val){
 	int i;
 	double scaleFactor;
 
-	// update packing fraction
-	// phi = packingFraction();
-
 	// calculate val to scale lengths with
 	scaleFactor	= pow(val/phi,1.0/NDIM);
 
@@ -1084,7 +1066,7 @@ void cellPacking2D::setPackingFraction(double val){
 	scaleLengths(scaleFactor);
 
 	// update new phi
-	phi = packingFraction();
+	// phi = packingFraction();
 }
 
 
@@ -1092,10 +1074,6 @@ void cellPacking2D::setPackingFraction(double val){
 void cellPacking2D::scaleLengths(double scaleFactor){
 	// local variables
 	int i;
-
-	// // scale time based on dim analysis of MD time scale
-	// dt *= pow(scaleFactor,0.5*NDIM);
-	// dt0 *= pow(scaleFactor,0.5*NDIM);
 
 	// loop over cells, use scale to change lengths
 	for (i=0; i<NCELLS; i++)
@@ -1278,13 +1256,12 @@ void cellPacking2D::gelationForces(){
 	// get number of attractive contacts
 	// loop over cell pairs
 	for (ci=0; ci<NCELLS; ci++){
-		for (cj=ci+1; cj<NCELLS; cj++){
+		for (cj=0; cj<NCELLS; cj++){
 
 			// find number of pairwise attractive contacts between vertices
 			// on ci and cj
 			numACtmp = cell(ci).pwAttractiveContacts(cell(cj));
 			nac.at(ci) += numACtmp;
-			nac.at(cj) += numACtmp;
 
 		}
 	}
@@ -1300,11 +1277,18 @@ void cellPacking2D::gelationForces(){
 				rij.at(d) = 0.0;
 			}
 
-			// get effective attractions
-			aij = 0.25*(cell(ci).geta()/nac.at(ci) + cell(cj).geta()/nac.at(cj));
+			// if attractive contact engaged
+			if (nac.at(ci) > 0 && nac.at(cj) > 0){
+				// get effective attraction scale (max is 0.5*a)
+				aij = 0.25*(cell(ci).geta()/nac.at(ci) + cell(cj).geta()/nac.at(cj));
 
-			// calculate forces
-			inContact = cell(ci).vertexForce(cell(cj),fij,rij,aij);
+				// calculate forces
+				inContact = cell(ci).vertexForce(cell(cj),fij,rij,aij);
+			}
+			// else, use normal force routine
+			else
+				inContact = cell(ci).vertexForce(cell(cj),fij,rij);
+			
 			if (inContact == 1)
 				addContact(ci,cj);
 
@@ -2497,6 +2481,8 @@ void cellPacking2D::twoParticleContact(int NV){
 		cout << "	* Printing cell contacts to file" << endl;
 		printSystemContacts();
 	}
+
+	cout << "		-- Initial packing fraction = " << phi << endl;
 }
 
 // initialize plant cell particles as disks at input packing fraction
@@ -2772,13 +2758,43 @@ void cellPacking2D::gelRateExtension(double phiGel, double gelRate, double timeS
 
 	// loop time until packing fraction below threshold
 	while (phitmp > phiGel){
-		// update phi
+		// // DEBUG: PRINT OUT EVERY TIME WHEN NAN POPS UP
+		// if (k > 10000){
+		// 	cout << "Printing everything, nan coming up soon!" << endl;
+
+		// 	// print config and energy
+		// 	if (packingPrintObject.is_open()){
+		// 		cout << "	* Printing vetex positions to file" << endl;
+		// 		printSystemPositions();
+		// 	}
+			
+		// 	if (energyPrintObject.is_open()){
+		// 		cout << "	* Printing cell energy to file" << endl;
+		// 		printSystemEnergy();
+		// 	}
+
+		// 	if (k > 10500){
+		// 		cout << "should have found a nan by now, ending" << endl;
+		// 		exit(1);
+		// 	}
+
+		// 	cout << endl;
+		// 	cout << "k = " << k << endl;
+		// 	cout << "phi = " << phi << endl;
+		// 	for (ci=0; ci<NCELLS; ci++){
+		// 		cout << cell(ci).cpos(0) << "; " << cell(ci).cpos(1) << "; ";
+		// 		cout << cell(ci).cvel(0) << "; " << cell(ci).cvel(1) << "; ";
+		// 		cout << cell(ci).cforce(0) << "; " << cell(ci).cforce(1);
+		// 		cout << endl;
+		// 	}
+		// }
+
+		// NOTE: IF PARTICLES ARE OVERLY CONCAVE, THEN ERROR OCCURS IN PF UPDATE, ONLY 
+		// SCALE BY APPARENT PHI
+
+		// set new target phi
 		phi = phitmp;
 		phitmp = phi0/(gelRate*t + 1.0);
-		setPackingFraction(phitmp);
-
-		// NOTE: BUG THAT CAUSES RANDOM NANS IS IN THE PACKING FRACTION CALC FUNCTION, WOULD
-		// ONLY ACTIVATE IN THIS WHILE LOOP. 
 
 		// update iterator
 		k++;
@@ -2805,35 +2821,17 @@ void cellPacking2D::gelRateExtension(double phiGel, double gelRate, double timeS
 				printSystemContacts();
 			}
 			
-			cout << "	* phitmp 	= " << phitmp << endl;
-			cout << "	* phi 		= " << phi << endl;
+			cout << "	* old phi 	= " << phi << endl;
+			cout << "	* new phi 	= " << phitmp << endl;
+			cout << "	* del phi 	= " << phitmp - phi << endl;
 			cout << "	* K 		= " << totalKineticEnergy() << endl;
 			cout << "	* U 		= " << totalPotentialEnergy() << endl;
 			cout << "	* nc 		= " << totalNumberOfContacts() << endl;
 			cout << endl << endl;
 		}
 
-		// // DEBUG: PRINT OUT EVERY TIME FOR k > 78000
-		// if (k > 78000){
-		// 	cout << "Printing everything, nan coming up soon!" << endl;
-
-		// 	// print config and energy
-		// 	if (packingPrintObject.is_open()){
-		// 		cout << "	* Printing vetex positions to file" << endl;
-		// 		printSystemPositions();
-		// 	}
-			
-		// 	if (energyPrintObject.is_open()){
-		// 		cout << "	* Printing cell energy to file" << endl;
-		// 		printSystemEnergy();
-		// 	}
-
-		// 	if (k > 79000){
-		// 		cout << "should have found a nan by now, ending" << endl;
-		// 		exit(1);
-		// 	}
-
-		// }
+		// scale system to decrease packing fraction
+		setPackingFraction(phitmp);
 
 		// do verlet update
 		for (ci=0; ci<NCELLS; ci++){

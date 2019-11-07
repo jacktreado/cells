@@ -145,8 +145,11 @@ public:
 	void scale(double val);
 
 	// calculations
-	double area(int vertex);
+	double area(int vertex);						// area of singular triangle
 	double area();									// area of cell
+	double vertexArea();							// area of cell + area of uncovered vertices
+	double freeVertexArea(int i);					// uncovered vertex area for vertex i
+	int localConvexity(int i);						// local convexity at vertex i
 	double perimeter();								// perimeter of cell
 	double asphericity();							// instantaneous asphericity parameter
 	double calA0();									// preferred asphericity
