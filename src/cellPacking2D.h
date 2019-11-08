@@ -229,6 +229,12 @@ public:
 	void spVelVerlet(std::vector<double>& lenscales);
 	void spNVE(std::vector<double>& lenscales, int nt);
 
+	// active pipeflow functions
+	void initializeActiveStickySP(std::vector<double>& radii, int NV, double phiDisk, double sizeDispersion, double Lscale);
+	void spActivePipeForces(std::vector<double>& radii);
+	void spActivePipeWallForces(std::vector<double>& radii);
+	void spActivePipeNVE(std::vector<double>& radii, double T0);
+
 	// non-equilibrium MD functions
 	void isoExtensionQS(int plotIt, int& frameCount, double phiTarget, double dphi);
 

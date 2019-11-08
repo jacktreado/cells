@@ -325,13 +325,8 @@ void deformableParticles2D::regularPolygon(){
 		setVRel(i,0,-polyRad*sin(angleArg));
 		setVRel(i,1,polyRad*cos(angleArg));
 	}
-
-	// set a0 to be new area
-	// a0 = area();
-
 	// output
-	cout << " 	-- creating regular polygon with a0 = " << a0 << ", and area = " << area() << " and perimeter = " << perimeter() << endl;
-	cout << "	-- first segment length = " << segmentLength(0) << " and first area = " << area(0) << endl;
+	cout << " 	-- creating regular polygon with a0 = " << a0 << ", area = " << area() << " and perimeter = " << perimeter() << ", so init calA0 = " << pow(perimeter(),2.0)/(4.0*PI*area()) << ", compare to " << NV*tan(PI/NV)/PI << endl;
 }
 
 // initialize vertex positions so cell begins as regular polygon
@@ -835,8 +830,6 @@ void deformableParticles2D::scale(double val){
 	// scale force-related dimensional parameters
 	l0 *= val;
 	a0 *= pow(val,NDIM);
-	// del *= val;				
-	// kint *= pow(val,2);	// to keep time invariant, scale by 2'
 }
 
 
@@ -903,7 +896,7 @@ double deformableParticles2D::vertexArea(){
 }
 
 
-// calculate free vertex area of a given vertex by measuring local convecity
+// calculate free vertex area of a given vertex by measuring local convexity
 double deformableParticles2D::freeVertexArea(int i){
 	// local variables
 	double bondAngle, vertexRad;

@@ -1064,9 +1064,6 @@ void cellPacking2D::setPackingFraction(double val){
 
 	// scale all lengths by scale factor
 	scaleLengths(scaleFactor);
-
-	// update new phi
-	// phi = packingFraction();
 }
 
 
@@ -2610,7 +2607,7 @@ void cellPacking2D::gelForceVals(double calA0, double kl, double ka, double gam,
 	// loop over cells, add values
 	for (ci=0; ci<NCELLS; ci++){
 		// set calA0 by altering a0
-		cell(ci).setAsphericity(calA0);
+		cell(ci).setAsphericityConstA(calA0);
 
 		// set shape force scales
 		cell(ci).setkl(kl);
@@ -2629,12 +2626,15 @@ void cellPacking2D::gelForceVals(double calA0, double kl, double ka, double gam,
 // compress isostatically
 void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi){
 	// local variables
-	double phi, phi0, phiNew, dphi;
+	double phi0, phiNew, dphi;
 	int NSTEPS, k;
 
 	// tolerances
 	const double Ktol = 1e-12;
 	const double Ptol = 1e-6;
+
+	// calculate phi before initial minimization
+	phi = packingFraction();
 
 	// relax shapes (energies calculated in relax function)
 	cout << "	** IN qsIsoCompression, performing initial relaxation" << endl;
@@ -2672,6 +2672,9 @@ void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi){
 		// increase packing fraction to new phi value
 		phiNew = phi0 + k*dphi;
 		setPackingFraction(phiNew);
+
+		// calculate phi after minimization
+		phi = packingFraction();
 
 		// relax shapes (energies calculated in relax function)
 		fireMinimizeP(Ptol, Ktol);
@@ -2750,7 +2753,8 @@ void cellPacking2D::gelRateExtension(double phiGel, double gelRate, double timeS
 	dt0 = dt;
 
 	// get initial packing fraction
-	phi0 = packingFraction();
+	phi = packingFraction();
+	phi0 = phi;
 	phitmp = phi0;
 
 	// iterator

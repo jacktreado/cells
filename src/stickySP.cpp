@@ -406,7 +406,7 @@ void cellPacking2D::fireMinimizeSP(vector<double>& lenscales, double attractiveP
 		// reset contacts before force calculation
 		resetContacts();
 
-		// calculate forces between disks (with door closed)
+		// calculate forces between disks
 		spAttractiveForces(lenscales,attractiveParam);
 
 		// verlet velocity update
