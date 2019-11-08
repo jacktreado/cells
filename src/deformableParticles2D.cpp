@@ -1105,37 +1105,6 @@ void deformableParticles2D::shapeForces(){
 }
 
 void deformableParticles2D::perimeterForce(){
-	
-	/*
-	// local variables
-	int d,i,im1;
-	double dperim;
-	double Cim1,Ci,ftmp;
-
-	// get perimeter deviation
-	dperim = perimeter() - NV*l0;
-
-	
-	// loop over vertices, calculate forces
-	for (i=0; i<NV; i++){
-		// wrap vertices
-		im1 = (i-1+NV) % NV;
-
-		// segment lengths
-		Cim1 = segmentLength(im1);
-		Ci = segmentLength(i);
-
-		// loop over dimensions, add to force
-		for (d=0; d<NDIM; d++){
-			ftmp = (segment(i,d)/Ci) - (segment(im1,d)/Cim1);
-			ftmp *= kl*dperim;
-			setVForce(i,d,vforce(i,d)+ftmp);
-		}
-	}
-	*/
-	
-
-	
 	// local variables                                                                                                                                                                                                                 
 	int d,i,im1;
 	double Cim1,Ci,ftmp;

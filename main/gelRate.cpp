@@ -122,8 +122,8 @@ int main(int argc, char const *argv[])
 	packingObject.qsIsoCompression(phiTarget,deltaPhi);
 
 	// -- ramp attraction
-	cout << "	** Ramping attraction to a = " << a << endl;
-	packingObject.attractionRamp(a,deltaA);
+	cout << "	** Setting attraction to a = " << a << endl;
+	packingObject.gelForceVals(asphericity,kl,ka,gam,kb,kint,del,a);
 
 	// open position output file
 	packingObject.openPackingObject(positionFile);

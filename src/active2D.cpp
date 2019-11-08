@@ -141,6 +141,194 @@ void cellPacking2D::initializeActiveStickySP(vector<double>& radii, int NV, doub
 	fireMinimizeSP(radii,0.0);
 }
 
+
+
+// FUNCTION FOR SINGLE ACTIVE PARTICLE WITH BOTH CENTRAL AND VERTEX ACTIVITIES
+void cellPacking2D::singleActiveCell(int NV, double phiInit, double calA0, double Dc, double Dv, double tv, double v0){
+	// local variables
+	int vi, d, t;
+	double rtmp, l0tmp, a0tmp, veltmp, postmp;
+	double r1, r2, g1, g2, rvtmp, da;
+
+	// set diameter of initial polygonal shapes to be 1
+	rtmp = 0.5;
+
+	// get boundary sizes (set to 1)
+	for (d=0; d<NDIM; d++){
+		L.at(d) = sqrt(PI*rtmp*rtmp/phiInit);
+		cell(0).setL(d,L.at(d));
+		cell(0).setpbc(d,1);
+	}
+
+	// number of vertices
+	cell(0).setNV(NV);
+
+	// array information
+	cell(0).initializeVertices();
+	cell(0).initializeCell();
+
+	// initial length of polygon side
+	l0tmp = 2.0*rtmp*sin(PI/NV);
+	a0tmp = 0.5*NV*pow(rtmp,2.0)*sin(2.0*PI/NV);
+
+	// set preferred area and length 
+	cell(0).seta0(a0tmp);
+	cell(0).setl0(l0tmp);
+	cell(0).setdel(1.0);
+
+	// set com in box center
+	for (d=0; d<NDIM; d++)
+		cell(0).setCPos(d,0.5*L.at(d));
+
+	// initialize vertices as a regular polygon
+	cell(0).regularPolygon();
+
+	// set asphericity
+	cell(0).setAsphericityConstA(calA0);
+
+	// director for cell center
+	double psi = 0.0;
+
+	// directors for each individual vertex
+	vector<double> alpha(NV,0.0);
+
+	// get initial directors for each
+	// for (vi=0; vi<NV; vi++)
+		// alpha.at(vi) = acos(cell(0).vrel(vi,0)/rtmp);
+
+	// set time step
+	dt = 0.01*sqrt(PI*cell(0).area());
+	dt0 = dt;
+
+	// loop over time, integrate overdamped eqn of motion with active motility
+	for (t=0; t<NT; t++){
+
+		// output some information to console
+		if (t % NPRINT == 0){
+			cout << "===================================================" << endl << endl;
+			cout << " 		Single cell motility, t = " << t << endl << endl;
+			cout << "===================================================" << endl;
+
+			// print if object has been opened already
+			if (packingPrintObject.is_open()){
+				cout << "	* Printing single cell vertex positions to file" << endl;
+				printSystemPositions();
+			}
+			
+			if (energyPrintObject.is_open()){
+				cout << "	* Printing single cell vertex energy to file" << endl;
+				printSystemEnergy();
+			}
+			
+			cout << "	* Run data:" << endl;
+			cout << "	* K 		= " << totalKineticEnergy() << endl;
+			cout << "	* dt 		= " << dt << endl;
+			cout << endl << endl;
+		}
+
+		// update positions based on forces (EULER)
+		for (vi=0; vi<NV; vi++){
+			// loop over dimensions, update positions and reset forces for next time
+			for (d=0; d<NDIM; d++){
+				// component of random vel director (0 = x, 1 = y)
+				rvtmp = (1-d)*cos(alpha.at(vi)) + d*sin(alpha.at(vi));
+
+				// get velocities (= forces in overdamped regime)
+				veltmp = cell(0).vvel(vi,d) + v0*rvtmp;
+
+				// if new position in outflow region, place back in hopper
+				postmp = cell(0).vpos(vi,d) + dt*veltmp;
+
+				// update positions (EULER STEP)
+				cell(0).setVPos(vi,d,postmp);
+
+				// update velocities
+				cell(0).setVVel(vi,d,veltmp);
+
+				// reset forces and energies
+				cell(0).setVForce(vi,d,0.0);
+				cell(0).setUInt(vi,0.0);
+			}
+
+			// UPDATE ACTIVE DIRECTORS
+
+			// draw uniform random variables
+			r1 = drand48();
+			r2 = drand48();
+
+			// use Box-Muller trnsfrm to get GRVs for active variable
+			g1 = sqrt(-2.0*log(r1))*cos(2*PI*r2);
+			g2 = sqrt(-2.0*log(r1))*sin(2*PI*r2);
+
+			// update alpha based on euler scheme (relax back towards psi)
+			da = (1.0/tv)*(alpha.at(vi) - psi) + 2.0*Dv*g1;
+			alpha.at(vi) += dt*da;
+		}
+
+		// draw uniform random variables
+		r1 = drand48();
+		r2 = drand48();
+
+		// use Box-Muller trnsfrm to get GRVs for active variable
+		g1 = sqrt(-2.0*log(r1))*cos(2*PI*r2);
+
+		// update psi
+		psi += dt*2.0*Dc*g1;
+
+		/*
+		// DEBUG: PRINT OUT EVERY TIME WHEN NAN POPS UP
+		if (t > 700){
+			cout << "Printing everything, nan coming up soon!" << endl;
+
+			// print config and energy
+			if (packingPrintObject.is_open()){
+				cout << "	* Printing vetex positions to file" << endl;
+				printSystemPositions();
+			}
+			
+			if (energyPrintObject.is_open()){
+				cout << "	* Printing cell energy to file" << endl;
+				printSystemEnergy();
+			}
+
+			if (t > 800){
+				cout << "should have found a nan by now, ending" << endl;
+				exit(1);
+			}
+
+			cout << endl;
+			cout << "t = " << t << endl;
+			cout << "phi = " << phi << endl;
+			for (vi=0; vi<NV; vi++){
+				cout << cell(0).vpos(vi,0) << "; " << cell(0).vpos(vi,1) << "; ";
+				cout << cell(0).vvel(vi,0) << "; " << cell(0).vvel(vi,1) << "; ";
+				cout << cell(0).vforce(vi,0) << "; " << cell(0).vforce(vi,1);
+				cout << endl;
+			}
+		}
+		*/
+
+		// update cpos
+		cell(0).updateCPos();
+
+		// calculate forces between vertices
+		cell(0).shapeForces();
+
+		// update velocities based on forces
+		for (vi=0; vi<NV; vi++){
+			for (d=0; d<NDIM; d++)
+				cell(0).setVVel(vi,d,cell(0).vforce(vi,d));
+		}
+	}
+}
+
+
+
+
+
+
+
+
 void cellPacking2D::spActivePipeForces(vector<double>& radii){
 	// local variables
 	int ci, cj, vi, d;
@@ -464,10 +652,16 @@ void cellPacking2D::spActivePipeNVE(vector<double>& radii, double T0){
 		spVelVerlet(radii);
 	}
 }
-/*
-void cellPacking2D::spActivePipeFlow(vector<double>& radii, double v0){
+
+
+void cellPacking2D::spActivePipeFlow(vector<double>& radii, double attractiveParam, double v0, double Dr){
 	// local variables
-	int t, ci, vi;
+	int t, ci, vi, d;
+	double Pvirial, K, veltmp, postmp;
+	double r1, r2, grv, dpsi, rvtmp;
+
+	// angular directors (all point to the right initially)
+	vector<double> psi(NCELLS,0.0);
 
 	// loop over time, integrate overdamped eqn of motion with active motility
 	for (t=0; t<NT; t++){
@@ -482,18 +676,23 @@ void cellPacking2D::spActivePipeFlow(vector<double>& radii, double v0){
 		// output some information to console
 		if (t % NPRINT == 0){
 			cout << "===================================================" << endl << endl;
-			cout << " 		Soft Particle FLOW, g = " << g << ", t = " << t << endl << endl;
+			cout << " 		Soft Particle FLOW, t = " << t << endl << endl;
 			cout << "===================================================" << endl;
 
 			// print if object has been opened already
 			if (packingPrintObject.is_open()){
 				cout << "	* Printing SP center positions to file" << endl;
-				printHopperSP(radii,w0,w,th,0.0);
+				printPositionsStickySP(radii);
 			}
 			
 			if (energyPrintObject.is_open()){
 				cout << "	* Printing SP energy to file" << endl;
-				printSystemEnergy(t,Pvirial,K);
+				printEnergyStickySP();
+			}
+
+			if (statPrintObject.is_open()){
+				cout << "	* Printing SP energy to file" << endl;
+				printSystemContacts();
 			}
 			
 			cout << "	* Run data:" << endl;
@@ -501,7 +700,6 @@ void cellPacking2D::spActivePipeFlow(vector<double>& radii, double v0){
 			cout << "	* virial P 	= " << Pvirial << endl;
 			cout << "	* phi 		= " << phi << endl;
 			cout << "	* dt 		= " << dt << endl;
-			cout << "	* g 		= " << g << endl;
 			cout << endl << endl;
 		}
 
@@ -509,8 +707,11 @@ void cellPacking2D::spActivePipeFlow(vector<double>& radii, double v0){
 		for (ci=0; ci<NCELLS; ci++){
 			// loop over dimensions, update positions and reset forces for next time
 			for (d=0; d<NDIM; d++){
+				// component of random vel director (0 = x, 1 = y)
+				rvtmp = (1-d)*cos(psi.at(ci)) + d*sin(psi.at(ci));
+
 				// get velocities (= forces in overdamped regime)
-				veltmp = cell(ci).cvel(d);
+				veltmp = cell(ci).cvel(d) + v0*rvtmp;
 
 				// if new position in outflow region, place back in hopper
 				postmp = cell(ci).cpos(d) + dt*veltmp;
@@ -528,6 +729,20 @@ void cellPacking2D::spActivePipeFlow(vector<double>& radii, double v0){
 			// set interaction energy to 0
 			for (vi=0; vi<cell(ci).getNV(); vi++)
 				cell(ci).setUInt(vi,0.0);
+
+			/*
+				UPDATE ACTIVE DIRECTOR
+			*/
+
+			// draw uniform random variables
+			r1 = drand48();
+			r2 = drand48();
+
+			// use Box-Muller trnsfrm to get GRV for active variable
+			grv = sqrt(-2.0*log(r1))*cos(2*PI*r2);
+
+			// update psi based on euler scheme
+			psi.at(ci) += dt*2.0*Dr*grv;
 		}
 
 		// reset contacts before force calculation
@@ -535,7 +750,7 @@ void cellPacking2D::spActivePipeFlow(vector<double>& radii, double v0){
 
 		// calculate forces between disks
 		// spActivePipeForces(radii);
-		spAttractiveForces(radii,0.1);
+		spAttractiveForces(radii,attractiveParam);
 		spActivePipeWallForces(radii);
 
 		// update velocities based on forces
@@ -545,7 +760,7 @@ void cellPacking2D::spActivePipeFlow(vector<double>& radii, double v0){
 		}
 	}
 }
-*/
+
 
 
 
