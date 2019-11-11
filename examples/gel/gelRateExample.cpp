@@ -23,14 +23,14 @@ const int NT 					= 1e7;
 const int NPRINT				= 500;
 
 // simulation constants
-const double sizeDispersion 	= 0.0;			// size dispersion (std dev of cell sizes)
-const double timeStepMag 		= 0.001;		// time step in MD units (zeta * lenscale / forcescale)
+const double sizeDispersion 	= 0.2;			// size dispersion (std dev of cell sizes)
+const double timeStepMag 		= 0.005;		// time step in MD units (zeta * lenscale / forcescale)
 
 // disk constants
-const double phiDisk	 		= 0.71;			// initial packing fraction of disks (sets boundary)
+const double phiDisk	 		= 0.6;			// initial packing fraction of disks (sets boundary)
 
 // compression constants
-const double phiTarget			= 0.98;			// cell packing fraction (regardless of final pressure)
+const double phiTarget			= 1.0;			// cell packing fraction (regardless of final pressure)
 const double deltaPhi			= 0.002;		// compression step size
 
 // gelation constants
@@ -40,16 +40,16 @@ const double aGelation			= 0.05;			// attraction parameter during gelation sim
 
 // force parameters
 const double kl 			= 0.5;				// perimeter force constant
-const double ka 			= 1.0;				// area force constant
+const double ka 			= 0.5;				// area force constant
 const double gam 			= 0.0;				// surface tension force constant
-const double kb 			= 0.0;				// bending energy constant
+const double kb 			= 0.1;				// bending energy constant
 const double kint 			= 1.0;				// interaction energy constant
 const double del 			= 1.0;				// width of vertices in units of l0, vertex sep on regular polygon
 const double aInitial 		= 0.0;				// attraction parameter to start
 const double da 			= 0.001;			// attraction increment
 
 // deformability
-const double calA0 			= 1.1;				// ratio of preferred perimeter^2 to preferred area
+const double calA0 			= 1.05;				// ratio of preferred perimeter^2 to preferred area
 
 // main function
 int main()
@@ -62,7 +62,7 @@ int main()
 
 	// system details
 	int NCELLS 		= 8;
-	int NV			= 12;
+	int NV			= 24;
 	int seed 		= 1;
 	double Ltmp 	= 1.0;
 
@@ -79,7 +79,7 @@ int main()
 	packingObject.gelForceVals(calA0,kl,ka,gam,kb,kint,del,aInitial);
 
 	// update time scale
-	packingObject.setdt(2.0*timeStepMag);
+	packingObject.setdt(timeStepMag);
 
 		// open position output file
 	packingObject.openPackingObject(posFile);
@@ -90,12 +90,12 @@ int main()
 	packingObject.qsIsoCompression(phiTarget,deltaPhi);
 
 	// -- ramp attraction
-	cout << "	** Ramping attraction to a = " << aGelation << endl;
-	packingObject.attractionRamp(aGelation,da);
+	// cout << "	** Ramping attraction to a = " << aGelation << endl;
+	// packingObject.attractionRamp(aGelation,da);
 
 	// -- decrease phi as if boundary was growing: phi(t) = phi(0)/(1 + a*t)
-	cout << "	** Running gel extension simulation with gelRate = " << gelRate << ", phiGel = " << phiGel << endl;
-	packingObject.gelRateExtension(phiGel,gelRate,timeStepMag);
+	// cout << "	** Running gel extension simulation with gelRate = " << gelRate << ", phiGel = " << phiGel << endl;
+	// packingObject.gelRateExtension(phiGel,gelRate,timeStepMag);
 
 	return 0;
 }

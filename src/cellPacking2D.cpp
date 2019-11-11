@@ -1079,11 +1079,20 @@ void cellPacking2D::scaleLengths(double scaleFactor){
 
 void cellPacking2D::setAsphericity(double val){
 	// local variables
-	int ci;
+	int ci, nvtmp;
+	double calAMin = 0.0;
 
-	// set all cells to specified asphericity values
-	for (ci=0; ci<NCELLS; ci++)
-		cell(ci).setAsphericityConstA(val);
+	// set all cells to specified asphericity values (in units of calAMin)
+	for (ci=0; ci<NCELLS; ci++){
+		// number of vertices for cell ci
+		nvtmp = cell(ci).getNV();
+
+		// determine calAmin for given cell
+		calAMin = nvtmp*tan(PI/nvtmp)/nvtmp;
+
+		// set asphericity in units of calAMin
+		cell(ci).setAsphericityConstA(val/calAMin);
+	}
 }
 
 // change asphericity on cell ci
@@ -2115,8 +2124,8 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 		Pvirial = 0.5*(sigmaXX + sigmaYY);
 
 		// scale P and K for convergence checking
-		Pcheck = Pvirial/(energyScale*NCELLS*cell(0).getNV());
-		Kcheck = Knew/(energyScale*NCELLS*cell(0).getNV());
+		Pcheck = Pvirial/(energyScale*NCELLS);
+		Kcheck = Knew/(energyScale*NCELLS);
 
 		// update if Pvirial under tol
 		if (abs(Pcheck) < Ptol)
@@ -2135,7 +2144,7 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 			cout << "	** k = " << k << ", t = " << t << endl;
 			cout << "	** Breaking out of FIRE protocol." << endl;
 
-			// print config and energy
+			// print minimized config, energy and contact network
 			if (packingPrintObject.is_open()){
 				cout << "	* Printing vetex positions to file" << endl;
 				printSystemPositions();
@@ -2143,7 +2152,7 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 			
 			if (energyPrintObject.is_open()){
 				cout << "	* Printing cell energy to file" << endl;
-				printSystemEnergy();
+				printSystemEnergy(k);
 			}
 
 			if (statPrintObject.is_open()){
@@ -3631,6 +3640,29 @@ void cellPacking2D::printSystemEnergy(){
 	energyPrintObject << endl;
 
 	// NOTE: HOW TO ADD ENERGIES OF INDIVIDUAL CELLS?
+}
+
+void cellPacking2D::printSystemEnergy(int intVal){
+
+	// check to see if file is open
+	if (!energyPrintObject.is_open()) {
+		cout << "	ERROR: energyPrintObject is not open in printSystemEnergy(), ending." << endl;
+		exit(1);
+	}
+
+	// loop over particles, print cell energy
+	energyPrintObject << setw(30) << setprecision(16) << right << interactionPotentialEnergy();
+	energyPrintObject << setw(30) << setprecision(16) << right << totalPotentialEnergy();
+	energyPrintObject << setw(30) << setprecision(16) << right << totalKineticEnergy();
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaXX;
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaXY;
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaYX;
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaYY;
+	energyPrintObject << setw(30) << setprecision(16) << right << packingFraction();
+	energyPrintObject << setw(30) << setprecision(16) << right << intVal;
+	energyPrintObject << endl;
+
+	// NOTE: LAST COLUMN WILL BE NUMBER OF MINIMIZATION STEPS IN fireMinimizeP
 }
 
 void cellPacking2D::printSystemContacts(){

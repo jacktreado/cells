@@ -272,6 +272,7 @@ public:
 	// printers
 	void printSystemPositions();
 	void printSystemEnergy();
+	void printSystemEnergy(int kmin);
 	void printSystemContacts();
 	void printSystemPositions(int frame);
 	void printSystemEnergy(int frame, double Uval, double Kval);
