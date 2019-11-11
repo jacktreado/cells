@@ -160,8 +160,8 @@ sbatch -t $time $slurmf
 # 2. NV
 # 3. asphericity
 # 4. delta phi
-# 5. target phi
-# 6. attraction parameter
+# 5. kl
+# 6. ka
 # 7. partition
 # 8. time
 # 9. num seeds per run (for each entry in array)
