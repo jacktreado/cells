@@ -107,7 +107,7 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         contactf=$specificdir/$filestr.cm
 
         # append to runString
-        runString="$runString ; ./$binf $NCELLS $NV $sizeDisp $phiTarget $dphi $kl $ka $kb $del $asphericity $aGelation $runseed $posf $enf $contactf"
+        runString="$runString ; ./$binf $NCELLS $NV $sizeDisp $phiTarget $dphi $kl $ka $kb $del $asphericity $a $runseed $posf $enf $contactf"
     done
 
     # finish off run string
@@ -150,7 +150,7 @@ cat $slurmf
 
 # run sbatch file
 echo -- running on slurm in partition $partition
-sbatch -t $time $slurmf
+echo sbatch -t $time $slurmf
 
 
 # ====================
