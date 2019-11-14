@@ -48,7 +48,6 @@ echo -- running time = $time for $partition
 echo -- PRINTING SLURM FILE...
 echo \#\!/bin/bash >> $slurmf
 echo \#SBATCH --cpus-per-task=1 >> $slurmf
-echo \#SBATCH --array=1 >> $slurmf
 echo \#SBATCH -n 1 >> $slurmf
 echo \#SBATCH -p $partition >> $slurmf
 echo \#SBATCH -J $job_name >> $slurmf
