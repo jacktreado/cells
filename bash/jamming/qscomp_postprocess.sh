@@ -4,7 +4,7 @@
 projectdir=~/project/cells
 
 # directory for simulations specific to quasi-static compression protocols
-simtypedir=$projectdir/qscomp
+simtypedir=$projectdir/jamming
 
 # matfile directory
 matfiledir=$simtypedir/matfiles
