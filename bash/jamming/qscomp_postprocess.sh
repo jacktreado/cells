@@ -6,9 +6,13 @@ projectdir=~/project/cells
 # directory for simulations specific to quasi-static compression protocols
 simtypedir=$projectdir/qscomp
 
+# matfile directory
+matfiledir=$simtypedir/matfiles
+
 # make directories, unless they already exist
 mkdir -p slurm
 mkdir -p out
+mkdir -p "$matfiledir"
 
 # inputs
 NCELLS=$1
