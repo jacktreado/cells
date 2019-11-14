@@ -27,7 +27,7 @@ runstr="$basestr"_PROCESS
 simdatadir=$simtypedir/$basestr
 
 # create output files
-savef=$basestr_pp.mat
+savef="$basestr"_pp.mat
 
 # create matlab code string
 MCODE="qscompPostProcess('$simdatadir','$savef'); quit;"
