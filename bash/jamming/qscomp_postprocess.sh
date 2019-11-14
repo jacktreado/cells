@@ -39,7 +39,7 @@ MCODE="qscompPostProcess('$simdatadir','$savef'); quit;"
 # setup slurm files
 slurmf=slurm/"$runstr".slurm
 job_name="$runstr"
-runout=out/"$runstr"-%a.out
+runout=out/"$runstr".out
 rm -f $slurmf
 
 # echo about time
