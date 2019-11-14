@@ -144,7 +144,7 @@ void cellPacking2D::initializeActiveStickySP(vector<double>& radii, int NV, doub
 
 
 // FUNCTION FOR SINGLE ACTIVE PARTICLE WITH BOTH CENTRAL AND VERTEX ACTIVITIES
-void cellPacking2D::singleActiveCell(int NV, double phiInit, double calA0, double Dc, double Dv, double tv, double v0){
+void cellPacking2D::singleActiveCell(int NV, double phiInit, double calA0, double Dc, double vari, double v0){
 	// local variables
 	int vi, d, t;
 	double rtmp, l0tmp, a0tmp, veltmp, postmp;
@@ -188,13 +188,27 @@ void cellPacking2D::singleActiveCell(int NV, double phiInit, double calA0, doubl
 
 	// director for cell center
 	double psi = 0.0;
+	double dpsi = 0.0;
+
+	// angular position of given site
+	double psiVi = 0.0;
+
+	// normal w.r.t. cell center
+	double ntmp = 0.0;
+
+	// self-propulsion mag
+	double v0tmp = 0.0;
 
 	// directors for each individual vertex
-	vector<double> alpha(NV,0.0);
+	// vector<double> alpha(NV,0.0);
+	// vector<double> theta(NV,0.0);
+	// int vip1, vim1;
 
 	// get initial directors for each
-	// for (vi=0; vi<NV; vi++)
-		// alpha.at(vi) = acos(cell(0).vrel(vi,0)/rtmp);
+	// for (vi=0; vi<NV; vi++){
+	// 	r1 = drand48();
+	// 	alpha.at(vi) = 2.0*PI*(2.0*r1 - 1.0);
+	// }
 
 	// set time step
 	dt = 0.01*sqrt(PI*cell(0).area());
@@ -228,13 +242,32 @@ void cellPacking2D::singleActiveCell(int NV, double phiInit, double calA0, doubl
 
 		// update positions based on forces (EULER)
 		for (vi=0; vi<NV; vi++){
+			// angular position of site
+			psiVi = atan2(cell(0).vrel(vi,1),cell(0).vrel(vi,0));
+
+			// get angular distance
+			dpsi = psiVi - psi;
+			dpsi -= 2.0*PI*round(dpsi/(2.0*PI));
+
+			// get magnitude of self-propulsion
+			v0tmp = v0*exp(-pow(dpsi,2.0)/(2.0*vari));
+
 			// loop over dimensions, update positions and reset forces for next time
 			for (d=0; d<NDIM; d++){
 				// component of random vel director (0 = x, 1 = y)
-				rvtmp = (1-d)*cos(alpha.at(vi)) + d*sin(alpha.at(vi));
+				// rvtmp = (1-d)*cos(alpha.at(vi)) + d*sin(alpha.at(vi));
 
 				// get velocities (= forces in overdamped regime)
-				veltmp = cell(0).vvel(vi,d) + v0*rvtmp;
+				// veltmp = cell(0).vvel(vi,d) + v0*rvtmp;
+
+				// get normal component (point in opposite direction if psi pointed away from site)
+				ntmp = cell(0).vrel(vi,d)/sqrt(cell(0).vrel(vi,0)*cell(0).vrel(vi,0) + cell(0).vrel(vi,1)*cell(0).vrel(vi,1));
+				if (abs(dpsi) > 0.5*PI)
+					ntmp *= -1;
+
+
+				// add activity to velocity
+				veltmp = cell(0).vvel(vi,d) + v0tmp*ntmp;
 
 				// if new position in outflow region, place back in hopper
 				postmp = cell(0).vpos(vi,d) + dt*veltmp;
@@ -250,20 +283,34 @@ void cellPacking2D::singleActiveCell(int NV, double phiInit, double calA0, doubl
 				cell(0).setUInt(vi,0.0);
 			}
 
-			// UPDATE ACTIVE DIRECTORS
+			// determine angle for the current velocity
+			// theta.at(vi) = atan2(cell(0).vvel(vi,1),cell(0).vvel(vi,0));
+		}
 
+
+		/*
+		// UPDATE ACTIVE DIRECTORS
+		for (vi=0; vi<NV; vi++){
 			// draw uniform random variables
 			r1 = drand48();
 			r2 = drand48();
 
 			// use Box-Muller trnsfrm to get GRVs for active variable
 			g1 = sqrt(-2.0*log(r1))*cos(2*PI*r2);
-			g2 = sqrt(-2.0*log(r1))*sin(2*PI*r2);
 
-			// update alpha based on euler scheme (relax back towards psi)
-			da = (1.0/tv)*(alpha.at(vi) - psi) + 2.0*Dv*g1;
+			// determine vip1, vim1
+			vip1 = (vi+1) % NV;
+			vim1 = (vi-1+NV) % NV;
+
+			// update alpha based on euler scheme and velocity alignment
+			da = sin(theta.at(vip1) - alpha.at(vi)) + ep*sin(psi - alpha.at(vi)) + 2.0*Dv*g1;
 			alpha.at(vi) += dt*da;
+			if (alpha.at(vi) > 2.0*PI)
+				alpha.at(vi) -= 2.0*PI;
+			else if (alpha.at(vi) < -2.0*PI)
+				alpha.at(vi) += 2.0*PI;
 		}
+		*/
 
 		// draw uniform random variables
 		r1 = drand48();
@@ -275,9 +322,9 @@ void cellPacking2D::singleActiveCell(int NV, double phiInit, double calA0, doubl
 		// update psi
 		psi += dt*2.0*Dc*g1;
 
-		/*
 		// DEBUG: PRINT OUT EVERY TIME WHEN NAN POPS UP
-		if (t > 700){
+		/*
+		if (t > 18000){
 			cout << "Printing everything, nan coming up soon!" << endl;
 
 			// print config and energy
@@ -291,7 +338,7 @@ void cellPacking2D::singleActiveCell(int NV, double phiInit, double calA0, doubl
 				printSystemEnergy();
 			}
 
-			if (t > 800){
+			if (t > 18500){
 				cout << "should have found a nan by now, ending" << endl;
 				exit(1);
 			}
@@ -300,6 +347,7 @@ void cellPacking2D::singleActiveCell(int NV, double phiInit, double calA0, doubl
 			cout << "t = " << t << endl;
 			cout << "phi = " << phi << endl;
 			for (vi=0; vi<NV; vi++){
+				cout << alpha.at(vi) << "; ";
 				cout << cell(0).vpos(vi,0) << "; " << cell(0).vpos(vi,1) << "; ";
 				cout << cell(0).vvel(vi,0) << "; " << cell(0).vvel(vi,1) << "; ";
 				cout << cell(0).vforce(vi,0) << "; " << cell(0).vforce(vi,1);

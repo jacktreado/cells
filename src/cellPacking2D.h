@@ -231,7 +231,7 @@ public:
 
 	// active pipeflow functions
 	void initializeActiveStickySP(std::vector<double>& radii, int NV, double phiDisk, double sizeDispersion, double Lscale);
-	void singleActiveCell(int NV, double phiInit, double calA0, double Dc, double Dv, double tv, double v0);
+	void singleActiveCell(int NV, double phiInit, double calA0, double Dc, double vari, double v0);
 	void spActivePipeForces(std::vector<double>& radii);
 	void spActivePipeWallForces(std::vector<double>& radii);
 	void spActivePipeNVE(std::vector<double>& radii, double T0);

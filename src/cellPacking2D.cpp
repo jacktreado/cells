@@ -3600,8 +3600,8 @@ void cellPacking2D::printSystemPositions(){
 
 	// print hopper information
 	packingPrintObject << setw(w1) << left << "BOXSZ";
-	packingPrintObject << setw(w2) << right << L.at(0);
-	packingPrintObject << setw(w2) << right << L.at(1);
+	packingPrintObject << setw(w3) << right << L.at(0);
+	packingPrintObject << setw(w3) << right << L.at(1);
 	packingPrintObject << endl;
 
 	// print stress information
