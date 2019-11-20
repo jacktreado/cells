@@ -9,7 +9,7 @@ maindir=$cellsdir/main
 outputdir=~/project/cells
 
 # directory for simulations specific to jamming
-simtypedir=$outputdir/gelRate
+simtypedir=$outputdir/gelVarPerimRate
 
 # make directories, unless they already exist
 mkdir -p $outputdir
