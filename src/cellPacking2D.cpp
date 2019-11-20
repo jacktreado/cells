@@ -587,7 +587,7 @@ void cellPacking2D::initializeInteractionParams(double del, double a){
 
 	// loop over cells
 	for (i=0; i<NCELLS; i++){
-		cell(i).setdel(del*cell(i).getl0());
+		cell(i).setdel(del);
 		cell(i).seta(a);
 	}
 }
@@ -625,7 +625,7 @@ void cellPacking2D::squareLattice(){
 
 		// output cell asphericities
 		cout << "initializing cell " << ci << " on square lattice, initial asphericity = " << cell(ci).asphericity();
-		cout << " and calA0 = " << ((double)cell(ci).getNV()*cell(ci).getNV()*cell(ci).getl0()*cell(ci).getl0())/(4.0*PI*cell(ci).geta0()) << endl;
+		cout << " and calA0 = " << cell(ci).calA0() << endl;
 	}
 
 	// calculate packing fraction
@@ -1088,7 +1088,7 @@ void cellPacking2D::setAsphericity(double val){
 		nvtmp = cell(ci).getNV();
 
 		// determine calAmin for given cell
-		calAMin = nvtmp*tan(PI/nvtmp)/nvtmp;
+		calAMin = nvtmp*tan(PI/nvtmp)/PI;
 
 		// set asphericity in units of calAMin
 		cell(ci).setAsphericityConstA(val/calAMin);
@@ -2613,11 +2613,11 @@ void cellPacking2D::gelForceVals(double calA0, double kl, double ka, double gam,
 	// local variables
 	int ci;
 
+	// set asphericity for all particles in sim
+	setAsphericity(calA0);
+
 	// loop over cells, add values
 	for (ci=0; ci<NCELLS; ci++){
-		// set calA0 by altering a0
-		cell(ci).setAsphericityConstA(calA0);
-
 		// set shape force scales
 		cell(ci).setkl(kl);
 		cell(ci).setka(ka);
@@ -2746,7 +2746,7 @@ void cellPacking2D::attractionRamp(double attractionTarget, double dAttraction){
 	}
 }
 
-// decrease packing fraction at rate
+// decrease packing fraction at fixed rate
 void cellPacking2D::gelRateExtension(double phiGel, double gelRate, double timeStepMag){
 	// local variables
 	int ci, vi, d, k;
@@ -2894,6 +2894,123 @@ void cellPacking2D::gelRateExtension(double phiGel, double gelRate, double timeS
 		// calculateForces();
 		gelRK4();
 		*/
+
+		// increment
+		t += dt;
+	}
+}
+
+// NOTE: MAKE A MAIN FILE FOR THIS PROTOCOL
+
+// decrease packing fraction at fixed rate
+void cellPacking2D::gelVarPerimRate(double phiGel, double gelRate, double varPerimRate, double timeStepMag){
+	// local variables
+	int ci, vi, d, k;
+	double t = 0.0;
+	double phi0, postmp, phitmp, veltmp;
+
+	// damping
+	const double b = 0.5;
+
+	// update time step
+	dt = timeStepMag*sqrt(PI);
+	dt0 = dt;
+
+	// get initial packing fraction
+	phi = packingFraction();
+	phi0 = phi;
+	phitmp = phi0;
+
+	// iterator
+	k = 0;
+
+	// loop time until packing fraction below threshold
+	while (phitmp > phiGel){
+		// set new target phi
+		phi = phitmp;
+		phitmp = phi0/(gelRate*t + 1.0);
+
+		// update iterator
+		k++;
+
+		// print to console/file
+		if (k % NPRINT == 0){
+			cout << "===================================================" << endl << endl;
+			cout << " 		gel rate sim, k = " << k << ", t = " << t << endl << endl;
+			cout << "===================================================" << endl;
+
+			// print config and energy
+			if (packingPrintObject.is_open()){
+				cout << "	* Printing vetex positions to file" << endl;
+				printSystemPositions();
+			}
+			
+			if (energyPrintObject.is_open()){
+				cout << "	* Printing cell energy to file" << endl;
+				printSystemEnergy();
+			}
+
+			if (statPrintObject.is_open()){
+				cout << "	* Printing cell contacts to file" << endl;
+				printSystemContacts();
+			}
+			
+			cout << "	* old phi 	= " << phi << endl;
+			cout << "	* new phi 	= " << phitmp << endl;
+			cout << "	* del phi 	= " << phitmp - phi << endl;
+			cout << "	* K 		= " << totalKineticEnergy() << endl;
+			cout << "	* U 		= " << totalPotentialEnergy() << endl;
+			cout << "	* nc 		= " << totalNumberOfContacts() << endl;
+			cout << endl << endl;
+		}
+
+		// scale system to decrease packing fraction
+		setPackingFraction(phitmp);
+
+		// update positions based on forces (EULER)
+		for (ci=0; ci<NCELLS; ci++){
+			for (vi=0; vi<cell(ci).getNV(); vi++){
+				for (d=0; d<NDIM; d++){
+					// updated velocity from forces
+					veltmp = cell(ci).vvel(vi,d);
+
+					// update positions (EULER STEP)
+					postmp = cell(ci).vpos(vi,d) + dt*veltmp;
+
+					// update positions 
+					cell(ci).setVPos(vi,d,postmp);
+
+					// update velocities
+					cell(ci).setVVel(vi,d,veltmp);
+
+					// reset forces and energies
+					cell(ci).setVForce(vi,d,0.0);
+					cell(ci).setUInt(vi,0.0);
+				}
+			}
+
+			// update cpos
+			cell(ci).updateCPos();
+		}
+
+		// update preferred perimeter
+		for (ci=0; ci<NCELLS; ci++)
+			cell(ci).setl0(cell(ci).getl0() + dt*varPerimRate*(cell(ci).getl0() - (cell(ci).perimeter()/cell(ci).getNV())));
+
+		// reset contacts before force calculation
+		resetContacts();
+
+		// calculate forces
+		gelationForces();
+
+		// update velocities based on forces
+		for (ci=0; ci<NCELLS; ci++){
+			for (vi=0; vi<cell(ci).getNV(); vi++){
+				for (d=0; d<NDIM; d++)
+					cell(ci).setVVel(vi,d,cell(ci).vforce(vi,d));
+			}
+		}
+		
 
 		// increment
 		t += dt;

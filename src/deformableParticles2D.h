@@ -63,7 +63,7 @@ private:
 	double kint;		// interaction energy scale
 
 	// rest parameters
-	double l0;			// rest length for edges
+	double l0;			// rest length for each perimeter spring
 	double a0;			// rest area for particles
 	double del;			// contact distance for two edge segments
 	double a;			// only attraction parameter (distance and strength, good for DM)
@@ -100,6 +100,7 @@ public:
 	int getpbc(int d) { return pbc.at(d); };
 	double getL(int d) { return L.at(d); };
 
+	// getters (defined in .cpp file)
 	double vpos(int vertex, int dim);
 	double vrel(int vertex, int dim);
 	double vvel(int vertex, int dim);
@@ -126,6 +127,7 @@ public:
 	void setpbc(int d, int val) { pbc.at(d) = val; };
 	void setL(int d, double val) { L.at(d) = val; };
 
+	// setters (defined in .cpp file)
 	void setVPos(int vertex, int dim, double val);
 	void setVRel(int vertex, int dim, double val);
 	void setVVel(int vertex, int dim, double val);
@@ -162,7 +164,6 @@ public:
 	// force functions
 	void shapeForces();
 	void perimeterForce();
-	void segmentOverlapForce();
 	void areaForce();
 	void surfaceTensionForce();
 	void bendForce();

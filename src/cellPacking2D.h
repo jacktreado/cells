@@ -210,6 +210,7 @@ public:
 	void qsIsoCompression(double phiTarget, double deltaPhi);
 	void attractionRamp(double attractionTarget, double dAttraction);
 	void gelRateExtension(double phiGel, double gelRate, double timeStepMag);
+	void gelVarPerimRate(double phiGel, double gelRate, double varPerimRate, double timeStepMag);
 	void gelRK4();
 
 	// Sticky SP particle functions

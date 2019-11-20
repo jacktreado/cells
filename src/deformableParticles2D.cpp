@@ -42,7 +42,7 @@ deformableParticles2D::deformableParticles2D(){
 	gam 	= 0.0;
 	kb 		= 0.0;
 	kint 	= 0.0;
-	l0 		= 1.0;
+	l0 		= 0.0;
 	a0 		= 0.0;
 	del 	= 0.0;
 	a 		= 0.0;
@@ -78,7 +78,7 @@ deformableParticles2D::deformableParticles2D(int n){
 	gam 	= 0.0;
 	kb 		= 0.0;
 	kint 	= 0.0;
-	l0 		= 1.0;
+	l0 		= 0.0;
 	a0 		= 0.0;
 	del 	= 0.0;
 	a 		= 0.0;
@@ -163,7 +163,7 @@ void deformableParticles2D::operator=(deformableParticles2D& onTheRight){
 	gam 	= 0.0;
 	kb 		= 0.0;
 	kint 	= 0.0;
-	l0 		= 1.0;
+	l0 		= 0.0;
 	a0 		= 0.0;
 	del 	= 0.0;
 	a 		= 0.0;
@@ -188,7 +188,6 @@ void deformableParticles2D::operator=(deformableParticles2D& onTheRight){
 	gam 	= onTheRight.gam;
 	kb 		= onTheRight.kb;
 	kint 	= onTheRight.kint;
-	l0 		= onTheRight.l0;
 	a0 		= onTheRight.a0;
 	del 	= onTheRight.del;
 	a 		= onTheRight.a;
@@ -767,9 +766,11 @@ void deformableParticles2D::setAsphericity(double val){
 		exit(1);
 	}
 
-	a0 = (NV*NV*l0*l0)/(4*PI*val);
+	// set area based on asphericity
+	a0 = pow(NV*l0,2.0)/(4.0*PI*val);
 }
 
+// set asphericity by changing l0
 void deformableParticles2D::setAsphericityConstA(double val){
 	if (val < 1.0){
 		cout << "	ERROR: trying to set asphericity to be < 1, ending." << endl;
@@ -778,7 +779,6 @@ void deformableParticles2D::setAsphericityConstA(double val){
 
 	l0 = (1.0/NV)*sqrt(4*PI*a0*val);
 }
-
 
 
 // update cpos based on vpos
@@ -983,7 +983,7 @@ double deformableParticles2D::asphericity(){
 
 // calculate preferred asphericity
 double deformableParticles2D::calA0(){
-	return pow(NV*l0,2.0)/(4*PI*a0);
+	return pow(NV*l0,2.0)/(4.0*PI*a0);
 }
 
 
@@ -1127,47 +1127,6 @@ void deformableParticles2D::perimeterForce(){
     }
 }
 
-void deformableParticles2D::segmentOverlapForce(){
-	// local variables
-	int d,i,j,jCut;
-	int seqCutOff = 0;										// cutoff for distance away in sequence
-	double distTmp;											// tmp variable for distances between vertices
-	double distComp;										// tmp variable for component of distance vector
-	double segRepForceDist = del;							// overlap distance
-	double segRepForceScale = 100.0*kl/segRepForceDist;		// scale of segment repulsion force
-	vector<double> distVec(NDIM,0.0);						// vector between two vertices
-	double ftmp;
-
-	// loop over pairs of vertices that are farther away than seqCutOff
-	for (i=0; i<NV; i++){
-		for (j=i+1; j<NV; j++){
-			// check that j is farther away that seqCutOff
-			if ((j - i) > seqCutOff && (i - (j-NV)) > seqCutOff){
-				// get distance
-				distTmp = 0.0;
-				for (d=0; d<NDIM; d++){
-					distComp = vrel(j,d)-vrel(i,d);
-					distTmp += pow(distComp,2);
-					distVec.at(d) = distComp;
-				}
-
-				// get distance
-				distTmp = sqrt(distTmp);
-
-				// check overlap
-				if (distTmp < segRepForceDist){
-					// loop over dimensions, add to force
-					for (d=0; d<NDIM; d++){
-						ftmp = -segRepForceScale*(1-(distTmp/segRepForceDist))*(distVec.at(d)/distTmp);
-						setVForce(i,d,vforce(i,d)+ftmp);
-						setVForce(j,d,vforce(j,d)-ftmp);
-					}
-				}	
-			}
-		}
-	}
-}
-
 void deformableParticles2D::areaForce(){
 	// local variables
 	int i,ip1,im1,d;
@@ -1302,7 +1261,6 @@ void deformableParticles2D::bendForce(){
 // 		* need to pass in box length to properly check image distances
 // 		* !! NOTE POSSIBLE BUG: if L in this and L' in onTheRight are NOT equal, 
 // 			then PBCs are meaningless and errors will 
-
 int deformableParticles2D::segmentForce(deformableParticles2D &onTheRight){
 	// return variable
 	int inContact = 0;
@@ -1342,7 +1300,7 @@ int deformableParticles2D::segmentForce(deformableParticles2D &onTheRight){
 	buffer = 0.1*perimeter();
 
 	// if not close enough, return 0
-	if ((muREff + nuREff + del + buffer) < centerDistance)
+	if ((muREff + nuREff + 0.5*(del*l0 + onTheRight.del*onTheRight.l0) + buffer) < centerDistance)
 		return 0;
 
 	// -------------------------
@@ -1469,7 +1427,7 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 	buffer = 0.1*perimeter();
 
 	// if not close enough, return 0
-	if ((muREff + nuREff + del + buffer) < centerDistance)
+	if ((muREff + nuREff + 0.5*(del*l0 + onTheRight.del*onTheRight.l0) + buffer) < centerDistance)
 		return 0;
 
 
@@ -1623,7 +1581,7 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 	buffer = 0.1*perimeter();
 
 	// if not close enough, return 0
-	if ((muREff + nuREff + del + buffer) < centerDistance)
+	if ((muREff + nuREff + 0.5*(del*l0 + onTheRight.del*onTheRight.l0) + buffer) < centerDistance)
 		return 0;
 
 
@@ -1778,7 +1736,7 @@ int deformableParticles2D::pwAttractiveContacts(deformableParticles2D &onTheRigh
 	buffer = 0.1*perimeter();
 
 	// if not close enough, return 0
-	if ((muREff + nuREff + del + buffer) < centerDistance)
+	if ((muREff + nuREff + 0.5*(del*l0 + onTheRight.del*onTheRight.l0) + buffer) < centerDistance)
 		return 0;
 
 
