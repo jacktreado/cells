@@ -35,22 +35,22 @@ const double deltaPhi			= 0.002;		// compression step size
 
 // gelation constants
 const double phiGel 			= 0.3;			// final packing fraction
-const double gelRate 			= 1e-3;			// rate of size decrease (i.e. area loss relative to initial box area)
-const double varPerimRate 		= 0.005;			// rate of relaxation to deformed perimeter
-const double aGelation			= 0.05;			// attraction parameter during gelation sim
+const double gelRate 			= 1e-4;			// rate of size decrease (i.e. area loss relative to initial box area)
+const double varPerimRate 		= 0.01;			// rate of relaxation to deformed perimeter
+const double aGelation			= 0.75;			// attraction parameter during gelation sim
 
 // force parameters
 const double kl 			= 1.0;				// perimeter force constant
 const double ka 			= 1.0;				// area force constant
 const double gam 			= 0.0;				// surface tension force constant
-const double kb 			= 0.1;				// bending energy constant
+const double kb 			= 0.01;				// bending energy constant
 const double kint 			= 1.0;				// interaction energy constant
 const double del 			= 1.0;				// width of vertices in units of l0, vertex sep on regular polygon
 const double aInitial 		= 0.0;				// attraction parameter to start
 const double da 			= 0.001;			// attraction increment
 
 // deformability
-const double calA0 			= 1.05;				// ratio of preferred perimeter^2 to preferred area
+const double calA0 			= 1.1;				// ratio of preferred perimeter^2 to preferred area
 
 // main function
 int main()
@@ -63,7 +63,7 @@ int main()
 
 	// system details
 	int NCELLS 		= 8;
-	int NV			= 20;
+	int NV			= 24;
 	int seed 		= 1;
 	double Ltmp 	= 1.0;
 

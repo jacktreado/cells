@@ -2909,8 +2909,10 @@ void cellPacking2D::gelVarPerimRate(double phiGel, double gelRate, double varPer
 	double t = 0.0;
 	double phi0, postmp, phitmp, veltmp;
 
-	// damping
-	const double b = 0.5;
+	// max deformation
+	const double calA0max = 1.4;
+	double l0max = 0.0;
+	double l0tmp, currperim;
 
 	// update time step
 	dt = timeStepMag*sqrt(PI);
@@ -2994,8 +2996,21 @@ void cellPacking2D::gelVarPerimRate(double phiGel, double gelRate, double varPer
 		}
 
 		// update preferred perimeter
-		for (ci=0; ci<NCELLS; ci++)
-			cell(ci).setl0(cell(ci).getl0() + dt*varPerimRate*(cell(ci).getl0() - (cell(ci).perimeter()/cell(ci).getNV())));
+		for (ci=0; ci<NCELLS; ci++){
+			// determine l0 max for this cell
+			l0max = sqrt(4.0*PI*cell(ci).geta0()*calA0max)/cell(ci).getNV();
+
+			// current and target l0
+			l0tmp = cell(ci).getl0();
+			currperim = cell(ci).perimeter()/cell(ci).getNV();
+
+			// set new l0
+			l0tmp += dt*varPerimRate*(currperim - l0tmp);
+
+			// check to see whether or not perimeter is extended by too much
+			if (l0tmp < l0max && currperim > l0tmp)
+				cell(ci).setl0(l0tmp);
+		}
 
 		// reset contacts before force calculation
 		resetContacts();
