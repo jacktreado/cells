@@ -35,12 +35,12 @@ const double PI = 4.0*atan(1);
 
 // simulation constants
 const int NT 					= 5e7; 			// number of time steps
-const int NPRINT 				= 5e2;			// number of time steps between prints
-const double timeStepMag 		= 0.0025;		// time step in MD unit
+const int NPRINT 				= 2e3;			// number of time steps between prints
+const double timeStepMag 		= 0.001;		// time step in MD unit
 const double deltaPhi 			= 0.002;		// packing fraction step
 const double phiDisk 			= 0.75;			// initial phi of SP disks
 const double phiGel 			= 0.3;			// final phi of gel phase
-const double initialCalA 		= 1.05;			// initial cal A parameter (before extension sim)
+const double initialCalA 		= 1.075;		// initial cal A parameter (before extension sim)
 
 // force parameters
 const double gam 			= 0.0;			// surface tension force constant
