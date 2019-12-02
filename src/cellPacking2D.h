@@ -230,10 +230,19 @@ public:
 	void spVelVerlet(std::vector<double>& lenscales);
 	void spNVE(std::vector<double>& lenscales, int nt);
 
+	// Zebrafish active flow functions
+	void initializeActiveZebrafish(std::vector<double>& radii, int NV, double phiDisk, double sizeDispersion, double R0);
+	void fireMinimizeZebrafishSP(std::vector<double>& radii, double attractiveParam);
+	void spActiveZebrafishWallForces(std::vector<double>& radii, double& wallPressure);
+	void spActiveZebrafishNVE(std::vector<double>& radii, double v0);
+	void spAciveZebrafishABPs(std::vector<double>& radii, double attractionParam, double v0, double Dr, double Pthresh, double dh);
+	void printPositionsZebrafishSP(std::vector<double>& radii);
+	void printEnergyZebrafishSP(double K);
+
 	// active pipeflow functions
 	void initializeActiveStickySP(std::vector<double>& radii, int NV, double phiDisk, double sizeDispersion, double Lscale);
 	void singleActiveCell(int NV, double phiInit, double calA0, double Dc, double vari, double v0);
-	void spActivePipeForces(std::vector<double>& radii);
+	void spActiveForces(std::vector<double>& radii);
 	void spActivePipeWallForces(std::vector<double>& radii);
 	void spActivePipeNVE(std::vector<double>& radii, double T0);
 	void spActivePipeFlow(std::vector<double>& radii, double a, double v0, double Dr);

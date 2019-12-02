@@ -281,23 +281,6 @@ void cellPacking2D::fireMinimizeSP(vector<double>& lenscales, double attractiveP
 			cout << "===================================================" << endl << endl;
 			cout << " 	FIRE MINIMIZATION, itr = " << itr << endl << endl;
 			cout << "===================================================" << endl;
-
-			// print if object has been opened already
-			if (packingPrintObject.is_open()){
-				cout << "	* Printing SP center positions to file" << endl;
-				printPositionsStickySP(lenscales);
-			}
-			
-			if (energyPrintObject.is_open()){
-				cout << "	* Printing SP energy to file" << endl;
-				printEnergyStickySP();
-			}
-
-			if (statPrintObject.is_open()){
-				cout << "	* Printing SP energy to file" << endl;
-				printSystemContacts();
-			}
-			
 			cout << "	* Run data:" << endl;
 			cout << "	* K 		= " << Kcheck << endl;
 			cout << "	* Pvirial 	= " << Pcheck << endl;
@@ -438,6 +421,22 @@ void cellPacking2D::fireMinimizeSP(vector<double>& lenscales, double attractiveP
 		converged = (converged || (abs(Pcheck) > Ptol && Kcheck < Ktol));
 
 		if (converged){
+			// print if objects have been opened already
+			if (packingPrintObject.is_open()){
+				cout << "	* Printing SP center positions to file" << endl;
+				printPositionsStickySP(lenscales);
+			}
+			
+			if (energyPrintObject.is_open()){
+				cout << "	* Printing SP energy to file" << endl;
+				printEnergyStickySP();
+			}
+
+			if (statPrintObject.is_open()){
+				cout << "	* Printing SP energy to file" << endl;
+				printSystemContacts();
+			}
+
 			cout << "	** FIRE has converged!" << endl;
 			cout << "	** Kcheck = " << Kcheck << endl;
 			cout << "	** Pcheck = " << Pcheck << endl;
@@ -508,9 +507,9 @@ void cellPacking2D::spAttractiveForces(vector<double>& lenscales, double attract
 					// add to potential energy (energy should increase because particles are growing)
 					utmp = 0.5 * energyScale * pow(1 - overlap,2) - (energyScale*attractiveParam*attractiveParam)/6.0;
 					for (vi=0; vi<cell(ci).getNV(); vi++)
-						cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
+						cell(ci).setUInt(vi,cell(ci).uInt(vi) + 0.5*utmp/cell(ci).getNV());
 					for (vi=0; vi<cell(cj).getNV(); vi++)
-						cell(cj).setUInt(vi,cell(cj).uInt(vi) + utmp/cell(cj).getNV());
+						cell(cj).setUInt(vi,cell(cj).uInt(vi) + 0.5*utmp/cell(cj).getNV());
 
 					// add to forces
 					ftmp = 1.0 - overlap;
@@ -571,6 +570,13 @@ void cellPacking2D::spAttractiveForces(vector<double>& lenscales, double attract
 }
 
 
+// create jammed packings of sticky SP particles 
+
+
+
+
+
+// Create gels of sticky SP particles
 void cellPacking2D::stickySPGelationQS(vector<double>& radii, double phiGel, double dphiGel, double attractiveParam){
 	// local variables
 	int ci;

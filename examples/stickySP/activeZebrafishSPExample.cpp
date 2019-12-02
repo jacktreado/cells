@@ -1,9 +1,8 @@
 /*
 
-	Example file to generate a gel of cells
-	from an initial bidisperse sphere packing,
-	and to decompress at a fixed rate
-	rather than QS
+	Example file for active
+	particles in zebrafish
+	boundary condition
 
 */
 
@@ -20,7 +19,7 @@ const double PI = 4.0*atan(1);
 
 // length paramaters
 const int NT 					= 5e4;
-const int NPRINT				= 75;
+const int NPRINT				= 200;
 
 // simulation constants
 const double sizeDispersion 	= 0.125;		// size dispersion (std dev of cell sizes)
@@ -30,7 +29,7 @@ const double timeStepMag		= 0.05;			// time step scale
 const double phiDisk	 		= 0.9;			// initial packing fraction of disks (sets boundary)
 
 // force constants
-const double a 					= 0.05;			// attractive parameter
+const double a 					= 0.0;			// attractive parameter
 
 // main function
 int main()
@@ -40,16 +39,17 @@ int main()
 	// output files
 	string posFile = "pos.test";
 	string enFile = "en.test";
-	string cmFile = "cm.test";
 
 	// system details
-	int NCELLS 		= 48; 
+	int NCELLS 		= 512; 
 	int seed 		= 3;
-	int NV 			= 16;
+	int NV 			= 24;
 	double Ltmp 	= 10.0;
-	double Lscale 	= 2.0;
-	double v0 		= 0.01;
-	double Dr 		= 0.05;
+	double R0 		= 10.0;
+	double v0 		= 0.05;
+	double dh 		= 0.01;
+	double Pthresh	= 1e2;
+	double Dr 		= 0.5;
 
 	// vector of radii
 	vector<double> radii(NCELLS,0.0);
@@ -59,22 +59,22 @@ int main()
 	cout << "	** NCELLS = " << NCELLS << endl;
 	cellPacking2D packingObject(NCELLS,NT,NPRINT,Ltmp,seed); 	// NOTE: NEED TO MAKE NEW CONSTRUCTOR, EVERYTHING ELSE DONE IN initializeGel AND regularPolygon FUNCTIONS
 
-	// set initial conditions as if disks in box with given packing fraction (sets boundary size)
-	cout << "	** Initializing gel at phiDisk = " << phiDisk << " using SP model" << endl;
-	packingObject.initializeActiveStickySP(radii,NV,phiDisk,sizeDispersion,Lscale);
-
-	// set attraction of each particle
-	for (int ci=0; ci<NCELLS; ci++)
-		packingObject.cell(ci).seta(a);
-
-	// open position output file
+	// open print objects
 	packingObject.openPackingObject(posFile);
 	packingObject.openEnergyObject(enFile);
-	packingObject.openStatObject(cmFile);
+
+	// set initial conditions as if disks in box with given packing fraction (sets boundary size)
+	cout << "	** Initializing particles at phiDisk = " << phiDisk << " using SP model in zebrafish boundary with R0 = " << R0 << endl;
+	packingObject.initializeActiveZebrafish(radii,NV,phiDisk,sizeDispersion,R0);
+
+	// // set attraction of each particle
+	// for (int ci=0; ci<NCELLS; ci++)
+	// 	packingObject.cell(ci).seta(a);
 
 	// run sticky SP NVE
-	cout << "	** Running active pipe flow using sticky SP model" << endl;
-	packingObject.spActivePipeFlow(radii, a, v0, Dr);
+	// cout << "	** Running active pipe flow using sticky SP model" << endl;
+	// packingObject.spActivePipeFlow(radii, a, v0, Dr);
+	packingObject.spAciveZebrafishABPs(radii, a, v0, Dr, Pthresh, dh);
 
 	return 0;
 }

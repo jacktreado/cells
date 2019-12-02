@@ -1687,6 +1687,7 @@ void cellPacking2D::cellOverDamped(){
 	cout << "t = NT, which = " << t << ", so ending NVE run!" << endl;
 }
 
+
 // LOOPING FUNCTIONS
 
 // prepare jammed packing by ramping asphericity
@@ -2406,6 +2407,10 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, int plotIt, int& fra
 	if (k == kmax)
 		cout << "	** FIRE not converged in kmax = " << kmax << " force evaluations" << endl;
 }
+
+
+
+
 
 
 // GELATION FUNCTIONS
