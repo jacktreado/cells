@@ -1239,6 +1239,7 @@ void cellPacking2D::spAciveZebrafishABPs(vector<double>& radii, double attractio
 	double wallPressure = 0.0;
 	double veltmp, postmp;
 	double r1, r2, grv, dpsi, rvtmp;
+	double ymin = 0.0;
 
 	// wall values
 	double R0 = L.at(0);
@@ -1290,12 +1291,19 @@ void cellPacking2D::spAciveZebrafishABPs(vector<double>& radii, double attractio
 			}
 		}
 
+		// mimimum y value
+		ymin = 2*R0 + h;
+
 		// update positions based on forces (EULER)
 		for (ci=0; ci<NCELLS; ci++){
 
 			// set psi to be pointed up if particles are in main channel
 			if (cell(ci).cpos(1) < h && (cell(ci).cpos(0) < 0.5*w && cell(ci).cpos(0) > -0.5*w))
 				psi.at(ci) = 0.5*PI;
+
+			// check for minimum y value
+			if (cell(ci).cpos(1) < ymin)
+				ymin = cell(ci).cpos(1);
 
 			// loop over dimensions, update positions and reset forces for next time
 			for (d=0; d<NDIM; d++){
@@ -1337,8 +1345,9 @@ void cellPacking2D::spAciveZebrafishABPs(vector<double>& radii, double attractio
 			psi.at(ci) += dt*2.0*Dr*grv;
 
 			// replace cells that go down side channels
-			if (cell(ci).cpos(1) < -2.0*R0 && (cell(ci).cpos(0) < -0.5*(w + w0) || cell(ci).cpos(0) > 0.5*(w + w0))){
-				cell(ci).setCPos(0,0.0);
+			if (cell(ci).cpos(1) < h - 2.5*R0 && (cell(ci).cpos(0) < -0.5*(w + w0) || cell(ci).cpos(0) > 0.5*(w + w0))){
+				cell(ci).setCPos(0,w*(r1 - 0.5));
+				cell(ci).setCPos(1,ymin);
 				psi.at(ci) = 0.5*PI;
 			}
 		}
