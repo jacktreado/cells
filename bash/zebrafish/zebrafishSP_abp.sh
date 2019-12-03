@@ -22,18 +22,18 @@ mkdir -p out
 # inputs
 NCELLS=$1
 Dr=$2
-a=$3
-partition=$4
-time=$5
-numSeedsPerRun=$6
-numRuns=$7
-startSeed=$8
+Pthresh=$3
+a=$4
+partition=$5
+time=$6
+numSeedsPerRun=$7
+numRuns=$8
+startSeed=$9
 
 # other parameters
 NT=5e5
 NPRINT=2e2
 v0=1e-2
-Pthresh=1e2
 sizeDisp=0
 
 
@@ -41,7 +41,7 @@ let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=zebrafishSP_abp_N"$NCELLS"_Dr"$Dr"_a"$a"
+basestr=zebrafishSP_abp_N"$NCELLS"_Dr"$Dr"_pt"$Pthresh"_a"$a"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation
@@ -51,7 +51,7 @@ mkdir -p $simdatadir
 # compile into binary using packing.h
 binf=bin/"$runstr".o
 mainf=$maindir/zebrafishSP_abp.cpp
-echo Running $numSeeds sims of $NCELLS particles in zebrafish boundary condition, with Dr = $Dr, a = $a
+echo Running $numSeeds sims of $NCELLS particles in zebrafish boundary condition, with Dr = $Dr, Pthresh = $Pthresh, a = $a
 
 # run compiler
 rm -f $binf
@@ -153,12 +153,13 @@ sbatch -t $time $slurmf
 # ====================
 # 1. NCELLS
 # 2. Dr
-# 3. a
-# 4. partition
-# 5. time
-# 6. num seeds per run (for each entry in array)
-# 7. number of runs (number of array entries, i.e. arraynum)
-# 8. start seed (end seed determined by number of runs)
+# 3. Pthresh
+# 4. a
+# 5. partition
+# 6. time
+# 7. num seeds per run (for each entry in array)
+# 8. number of runs (number of array entries, i.e. arraynum)
+# 9. start seed (end seed determined by number of runs)
 
 
 

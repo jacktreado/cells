@@ -1134,9 +1134,9 @@ void cellPacking2D::spActiveZebrafishWallForces(vector<double>& radii, double& w
 			// get distance to horseshoe edge
 			edgeDist = R0 - centerDist;
 
-			// get vector from particle center to horseshoe edge
-			distVec.at(0) = x - (x/centerDist)*R0;
-			distVec.at(1) = y - ((y-h)/centerDist)*R0;
+			// get unit vector from horshoe to particle
+			distVec.at(0) = -x/centerDist;
+			distVec.at(1) = (h-y)/centerDist;
 
 			// if interacting with horseshoe edge, add forces
 			if (edgeDist < 0.5*sigma){
@@ -1148,11 +1148,8 @@ void cellPacking2D::spActiveZebrafishWallForces(vector<double>& radii, double& w
 
 				// vectorial parts of force
 				for (d=0; d<NDIM; d++){
-					// get vectorial part of force with unit vector direction
-					uv = distVec.at(d)/edgeDist;
-
 					// add to force depending on position
-					cell(ci).setCForce(d,cell(ci).cforce(d) + ftmp*uv);
+					cell(ci).setCForce(d,cell(ci).cforce(d) + ftmp*distVec.at(d));
 
 					// // add to stress (NOTE: MAY NOT NEED TO FOR WALL FORCES)
 					// if (d == 0){
@@ -1163,7 +1160,6 @@ void cellPacking2D::spActiveZebrafishWallForces(vector<double>& radii, double& w
 					// 	sigmaYX += ftmp*uv*distVec.at(0);
 					// 	sigmaYY += ftmp*uv*distVec.at(1);
 					// }
-
 				}
 
 				// add to wall pressure
@@ -1257,7 +1253,8 @@ void cellPacking2D::spAciveZebrafishABPs(vector<double>& radii, double attractio
 
 	// wall values
 	double R0 = L.at(0);
-	double h = L.at(1);
+	double h = 0.5;
+	L.at(1) = h;
 	double w = R0 - w0;
 
 	// angular directors (all point to the right initially)
@@ -1307,8 +1304,14 @@ void cellPacking2D::spAciveZebrafishABPs(vector<double>& radii, double attractio
 			}
 		}
 
+		// update wall position based on forces
+		if (wallPressure > Pthresh){
+			h += dh;
+			L.at(1) = h;
+		}
+
 		// mimimum y value
-		ymin = 2*R0 + h;
+		ymin = 10.0*R0 + h;
 
 		// update positions based on forces (EULER)
 		for (ci=0; ci<NCELLS; ci++){
@@ -1362,17 +1365,11 @@ void cellPacking2D::spAciveZebrafishABPs(vector<double>& radii, double attractio
 			psi.at(ci) += dt*4.0*Dr*PI*(r1 - 0.5);
 
 			// replace cells that go down side channels
-			if (cell(ci).cpos(1) < h - 2.5*R0 && (cell(ci).cpos(0) < -0.5*(w + w0) || cell(ci).cpos(0) > 0.5*(w + w0))){
-				cell(ci).setCPos(0,w*(r1 - 0.5));
+			if ( cell(ci).cpos(1) < -2.5*R0 && (cell(ci).cpos(0) < -0.5*(w + w0) || cell(ci).cpos(0) > 0.5*(w + w0)) ){
+				cell(ci).setCPos(0,(w - 2.0*radii.at(ci))*r1 - 0.5*w + radii.at(ci));
 				cell(ci).setCPos(1,ymin);
 				psi.at(ci) = 0.5*PI;
 			}
-		}
-
-		// update wall position based on forces
-		if (wallPressure > Pthresh){
-			h += dh;
-			L.at(1) = h;
 		}
 
 		// reset contacts before force calculation
