@@ -541,7 +541,7 @@ void cellPacking2D::initializeActiveZebrafish(vector<double>& radii, int NV, dou
 	double r1, r2, g1, radsum;
 	double w, ltmp;
 	double xpos, ypos;
-	double xmin, xmax, ymin, ymax;
+	double xmin, xmax, ymin, ymax, ypackmax, ydiff;
 	double calA;
 	double rtmp, l0tmp, a0tmp;
 	double delval = 1.0;
@@ -657,6 +657,20 @@ void cellPacking2D::initializeActiveZebrafish(vector<double>& radii, int NV, dou
 	// use FIRE in zebrafish horseshow geometry to relax overlaps
 	cout << "		-- Using FIRE to relax overlaps..." << endl;
 	fireMinimizeZebrafishSP(radii,0.0);
+
+	// find maximum y position
+	cout << "		-- Finding maximum y position..." << endl;
+	ypackmax = -1e6;
+	for (ci=0; ci<NCELLS; ci++){
+		if (cell(ci).cpos(1) > ypackmax)
+			ypackmax = cell(ci).cpos(1);
+	}
+
+	// // translate all particles to edge of ADM
+	ydiff = -ypackmax;
+	cout << "		-- Translating all particles, max y position now = " << ypackmax + ydiff << endl;
+	for (ci=0; ci<NCELLS; ci++)
+		cell(ci).setCPos(1,cell(ci).cpos(1) + ydiff);
 }
 
 
@@ -1277,6 +1291,8 @@ void cellPacking2D::spAciveZebrafishABPs(vector<double>& radii, double attractio
 			cout << endl;
 			cout << "	* zebrafish data:" << endl;
 			cout << "	* wallPressure = " << wallPressure << endl;
+			cout << "	* h = " << h << endl;
+			cout << " 	* dh = " << dh << endl;
 			cout << endl << endl;
 
 			// print if objects have been opened already
@@ -1298,7 +1314,7 @@ void cellPacking2D::spAciveZebrafishABPs(vector<double>& radii, double attractio
 		for (ci=0; ci<NCELLS; ci++){
 
 			// set psi to be pointed up if particles are in main channel
-			if (cell(ci).cpos(1) < h && (cell(ci).cpos(0) < 0.5*w && cell(ci).cpos(0) > -0.5*w))
+			if ((cell(ci).cpos(1) < h - R0) && (cell(ci).cpos(0) < 0.5*w && cell(ci).cpos(0) > -0.5*w))
 				psi.at(ci) = 0.5*PI;
 
 			// check for minimum y value
@@ -1336,13 +1352,14 @@ void cellPacking2D::spAciveZebrafishABPs(vector<double>& radii, double attractio
 
 			// draw uniform random variables
 			r1 = drand48();
-			r2 = drand48();
+			// r2 = drand48();
 
 			// use Box-Muller trnsfrm to get GRV for active variable
-			grv = sqrt(-2.0*log(r1))*cos(2*PI*r2);
+			// grv = sqrt(-2.0*log(r1))*cos(2*PI*r2);
 
 			// update psi based on euler scheme
-			psi.at(ci) += dt*2.0*Dr*grv;
+			// psi.at(ci) += dt*2.0*Dr*grv;
+			psi.at(ci) += dt*4.0*Dr*PI*(r1 - 0.5);
 
 			// replace cells that go down side channels
 			if (cell(ci).cpos(1) < h - 2.5*R0 && (cell(ci).cpos(0) < -0.5*(w + w0) || cell(ci).cpos(0) > 0.5*(w + w0))){
@@ -1374,6 +1391,150 @@ void cellPacking2D::spAciveZebrafishABPs(vector<double>& radii, double attractio
 }
 
 
+void cellPacking2D::spAciveZebrafishVicsek(vector<double>& radii, double attractionParam, double v0, double Dr, double vtau, double Pthresh, double dh){
+	// local variables
+	int t, d, ci, vi;
+	double K = 0;
+	double Pvirial = 0.0;
+	double wallPressure = 0.0;
+	double veltmp, postmp;
+	double r1, r2, grv, dpsi, rvtmp;
+	double ymin = 0.0;
+
+	// wall values
+	double R0 = L.at(0);
+	double h = L.at(1);
+	double w = R0 - w0;
+
+	// angular directors (all point to the right initially)
+	vector<double> psi(NCELLS,0.5*PI);
+
+	// initialize particles in main channel
+	for (ci=0; ci<NCELLS; ci++){
+		cell(ci).setCVel(1,v0);
+	}
+
+	// loop over time, run brownian dynamics with 
+	for (t=0; t<NT; t++){
+		// update virial pressure
+		Pvirial = 0.5*(sigmaXX + sigmaYY);
+
+		// update kinetic energy based on com velocity
+		K = 0.0;
+		for (ci=0; ci<NCELLS; ci++)
+			K += 0.5*(PI*pow(radii.at(ci),2))*(pow(cell(ci).cvel(0),2) + pow(cell(ci).cvel(1),2));
+
+		// output some information to console
+		if (t % NPRINT == 0){
+			cout << "===================================================" << endl << endl;
+			cout << " 	ZEBRAFISH Active brownian particles, t = " << t << endl << endl;
+			cout << "===================================================" << endl;
+			cout << "	* Run data:" << endl;
+			cout << "	* K 		= " << K << endl;
+			cout << "	* Pvirial 	= " << Pvirial << endl;
+			cout << "	* phi 		= " << phi << endl;
+			cout << "	* dt 		= " << dt << endl;
+			cout << endl;
+			cout << "	* zebrafish data:" << endl;
+			cout << "	* wallPressure = " << wallPressure << endl;
+			cout << "	* h = " << h << endl;
+			cout << " 	* dh = " << dh << endl;
+			cout << endl << endl;
+
+			// print if objects have been opened already
+			if (packingPrintObject.is_open()){
+				cout << "	* Printing zebrafish SP center positions to file" << endl;
+				printPositionsZebrafishSP(radii);
+			}
+			
+			if (energyPrintObject.is_open()){
+				cout << "	* Printing zebrafish SP energy to file" << endl;
+				printEnergyZebrafishSP(K);
+			}
+		}
+
+		// mimimum y value
+		ymin = 2*R0 + h;
+
+		// update positions based on forces (EULER)
+		for (ci=0; ci<NCELLS; ci++){
+
+			// set psi to be pointed up if particles are in main channel
+			if ((cell(ci).cpos(1) < h - R0) && (cell(ci).cpos(0) < 0.5*w && cell(ci).cpos(0) > -0.5*w))
+				psi.at(ci) = 0.5*PI;
+
+			// check for minimum y value
+			if (cell(ci).cpos(1) < ymin)
+				ymin = cell(ci).cpos(1);
+
+			// loop over dimensions, update positions and reset forces for next time
+			for (d=0; d<NDIM; d++){
+				// component of random vel director (0 = x, 1 = y)
+				rvtmp = (1-d)*cos(psi.at(ci)) + d*sin(psi.at(ci));
+
+				// get velocities (= forces in overdamped regime)
+				veltmp = cell(ci).cvel(d) + v0*rvtmp;
+
+				// if new position in outflow region, place back in hopper
+				postmp = cell(ci).cpos(d) + dt*veltmp;
+
+				// update positions (EULER STEP)
+				cell(ci).setCPos(d,postmp);
+
+				// update velocities
+				cell(ci).setCVel(d,veltmp);
+
+				// reset forces
+				cell(ci).setCForce(d,0.0);
+			}
+
+			// set interaction energy to 0
+			for (vi=0; vi<cell(ci).getNV(); vi++)
+				cell(ci).setUInt(vi,0.0);
+
+			/*
+				UPDATE ACTIVE DIRECTOR
+			*/
+
+			// draw uniform random variables
+			r1 = drand48();
+			// r2 = drand48();
+
+			// use Box-Muller trnsfrm to get GRV for active variable
+			// grv = sqrt(-2.0*log(r1))*cos(2*PI*r2);
+
+			// update psi based on euler scheme
+			// psi.at(ci) += dt*2.0*Dr*grv;
+			psi.at(ci) += dt*4.0*Dr*PI*(r1 - 0.5);
+
+			// replace cells that go down side channels
+			if (cell(ci).cpos(1) < h - 2.5*R0 && (cell(ci).cpos(0) < -0.5*(w + w0) || cell(ci).cpos(0) > 0.5*(w + w0))){
+				cell(ci).setCPos(0,w*(r1 - 0.5));
+				cell(ci).setCPos(1,ymin);
+				psi.at(ci) = 0.5*PI;
+			}
+		}
+
+		// update wall position based on forces
+		if (wallPressure > Pthresh){
+			h += dh;
+			L.at(1) = h;
+		}
+
+		// reset contacts before force calculation
+		resetContacts();
+
+		// calculate forces between disks
+		spAttractiveForces(radii,attractionParam);
+		spActiveZebrafishWallForces(radii,wallPressure);
+
+		// update velocities based on forces
+		for (ci=0; ci<NCELLS; ci++){
+			for (d=0; d<NDIM; d++)
+				cell(ci).setCVel(d,cell(ci).cforce(d));
+		}
+	}
+}
 
 
 

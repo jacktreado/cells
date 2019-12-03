@@ -34,7 +34,7 @@ int main(int argc, char const *argv[])
 {
 	// variables for main
 	int NCELLS, NT, NPRINT, seed;
-	double NTtmp, NPRINTtmp, sizeDispersion, a, v0, Dr, Pthresh, dh; 
+	double NTtmp, NPRINTtmp, sizeDispersion, a, v0, Dr, Pthresh; 
 
 	// inputs from command line
 	string NCELLS_str 			= argv[1];

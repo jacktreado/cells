@@ -31,10 +31,10 @@ startSeed=$8
 
 # other parameters
 NT=5e5
-NPRINT=5e2
+NPRINT=2e2
 v0=1e-2
 Pthresh=1e2
-sizeDisp=0.125
+sizeDisp=0
 
 
 let numSeeds=$numSeedsPerRun*$numRuns
