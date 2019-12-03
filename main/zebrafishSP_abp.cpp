@@ -24,7 +24,7 @@ const double phiDisk	 		= 0.9;			// initial packing fraction of disks (sets boun
 
 // boundary constants
 const double R0 				= 10.0;			// radius of horseshoe
-const double dh					= 1e-4;			// step size for horseshoe increase
+const double dh					= 1e-3;			// step size for horseshoe increase
 const double LINIT 				= 1.0;			// throwaway variable for initial box size
 
 // cell constants
