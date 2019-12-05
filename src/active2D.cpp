@@ -1274,7 +1274,7 @@ void cellPacking2D::spActiveZebrafishNVE(vector<double>& radii, double v0){
 }
 
 // Active particles: can be active brownian particles if vtau is large enough
-void cellPacking2D::spActiveZebrafishVicsek(vector<double>& radii, double attractionParam, double v0, double Dr, double vtau, double dh){
+void cellPacking2D::spActiveZebrafishVicsek(vector<double>& radii, double attractionParam, double v0, double Dr, double vtau, double Pthresh, double dh){
 	// local variables
 	int t, d, ci, vi, Ncurr, Ntmp;
 	double K = 0;
@@ -1332,6 +1332,7 @@ void cellPacking2D::spActiveZebrafishVicsek(vector<double>& radii, double attrac
 			cout << "	* wallPressure = " << wallPressure << endl;
 			cout << "	* h = " << h << endl;
 			cout << " 	* dh = " << dh << endl;
+			cout << "	* Pthresh = " << Pthresh << endl;
 			cout << endl << endl;
 
 			// print if objects have been opened already
@@ -1383,45 +1384,45 @@ void cellPacking2D::spActiveZebrafishVicsek(vector<double>& radii, double attrac
 		}
 
 		// update wall position based on forces
-		// if (wallPressure > Pthresh){
-		// 	// update size
-		// 	h += dh;
-		// 	L.at(1) = h;
-		// 	hcum += dh;
+		if (wallPressure > Pthresh){
+			// update size
+			h += dh;
+			L.at(1) = h;
+			hcum += dh;
 
-		// 	// if cumulative gain is large enough, then add a reserve particle
-		// 	if (2.0*hcum*R0 > 0.25*PI && Ncurr < NCELLS){
-		// 		// increment number
-		// 		Ncurr++;
+			// if cumulative gain is large enough, then add a reserve particle
+			if (2.0*hcum*R0 > 0.25*PI && Ncurr < NCELLS){
+				// increment number
+				Ncurr++;
 
-		// 		// reset cumulative h
-		// 		hcum = 0.0;
+				// reset cumulative h
+				hcum = 0.0;
 
-		// 		// set new position, velocity of particle
-		// 		cell(Ncurr-1).setCPos(0,(w - 2.0*radii.at(Ncurr-1))*r1 - 0.5*w + radii.at(Ncurr-1));
-		// 		cell(Ncurr-1).setCPos(1,-R0 + radii.at(Ncurr-1));
-		// 		psi.at(Ncurr-1) = 0.5*PI;
-		// 	}
-		// }
+				// set new position, velocity of particle
+				cell(Ncurr-1).setCPos(0,(w - 2.0*radii.at(Ncurr-1))*r1 - 0.5*w + radii.at(Ncurr-1));
+				cell(Ncurr-1).setCPos(1,-R0 + radii.at(Ncurr-1));
+				psi.at(Ncurr-1) = 0.5*PI;
+			}
+		}
 
 		// update boundary
-		h += dh;
-		L.at(1) = h;
-		hcum += dh;
+		// h += dh;
+		// L.at(1) = h;
+		// hcum += dh;
 
-		// if cumulative gain is large enough, then add a reserve particle
-		if (2.0*hcum*R0 > 0.25*PI && Ncurr < NCELLS){
-			// increment number
-			Ncurr++;
+		// // if cumulative gain is large enough, then add a reserve particle
+		// if (2.0*hcum*R0 > 0.25*PI && Ncurr < NCELLS){
+		// 	// increment number
+		// 	Ncurr++;
 
-			// reset cumulative h
-			hcum = 0.0;
+		// 	// reset cumulative h
+		// 	hcum = 0.0;
 
-			// set new position, velocity of particle
-			cell(Ncurr-1).setCPos(0,(w - 2.0*radii.at(Ncurr-1))*r1 - 0.5*w + radii.at(Ncurr-1));
-			cell(Ncurr-1).setCPos(1,-R0 + radii.at(Ncurr-1));
-			psi.at(Ncurr-1) = 0.5*PI;
-		}
+		// 	// set new position, velocity of particle
+		// 	cell(Ncurr-1).setCPos(0,(w - 2.0*radii.at(Ncurr-1))*r1 - 0.5*w + radii.at(Ncurr-1));
+		// 	cell(Ncurr-1).setCPos(1,-R0 + radii.at(Ncurr-1));
+		// 	psi.at(Ncurr-1) = 0.5*PI;
+		// }
 
 		// reset contacts before force calculation
 		resetContacts();

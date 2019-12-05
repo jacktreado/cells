@@ -34,7 +34,7 @@ int main(int argc, char const *argv[])
 {
 	// variables for main
 	int NCELLS, NT, NPRINT, seed;
-	double NTtmp, NPRINTtmp, sizeDispersion, a, v0, Dr, vtau; 
+	double NTtmp, NPRINTtmp, sizeDispersion, a, v0, Dr, vtau, Pthresh; 
 
 	// inputs from command line
 	string NCELLS_str 			= argv[1];
@@ -44,6 +44,7 @@ int main(int argc, char const *argv[])
 	string v0_str 				= argv[5];
 	string Dr_str 				= argv[6];
 	string vtau_str 			= argv[7];
+	string Pthresh_str 			= argv[7]; 
 	string a_str 				= argv[8];
 	string seed_str				= argv[9];
 	string positionFile			= argv[10];
@@ -57,6 +58,7 @@ int main(int argc, char const *argv[])
 	stringstream v0ss(v0_str);
 	stringstream Drss(Dr_str);
 	stringstream vtauss(vtau_str);
+	stringstream Pthreshss(Pthresh_str);
 	stringstream ass(a_str);
 	stringstream seedss(seed_str);
 
@@ -68,6 +70,7 @@ int main(int argc, char const *argv[])
 	v0ss 			>> v0;
 	Drss 			>> Dr;
 	vtauss 			>> vtau;
+	Pthreshss 		>> Pthresh;
 	ass	 			>> a;
 	seedss 			>> seed;
 
@@ -93,7 +96,7 @@ int main(int argc, char const *argv[])
 
 	// run active brownian particle simulation
 	cout << "	** Running particles at v0 = " << v0 << ", Dr = " << Dr << ", and a = " << a << endl;
-	packingObject.spActiveZebrafishVicsek(radii, a, v0, Dr, vtau, dh);
+	packingObject.spActiveZebrafishVicsek(radii, a, v0, Dr, vtau, Pthresh, dh);
 
 	// end program
 	cout << endl << "	** Finishing program in main." << endl;

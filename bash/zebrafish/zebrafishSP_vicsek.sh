@@ -23,12 +23,13 @@ mkdir -p out
 NCELLS=$1
 Dr=$2
 vtau=$3
-a=$4
-partition=$5
-time=$6
-numSeedsPerRun=$7
-numRuns=$8
-startSeed=$9
+Pthresh=$4
+a=$5
+partition=$6
+time=$7
+numSeedsPerRun=$8
+numRuns=$9
+startSeed="${10}"
 
 # other parameters
 NT=1e5
@@ -51,7 +52,7 @@ mkdir -p $simdatadir
 # compile into binary using packing.h
 binf=bin/"$runstr".o
 mainf=$maindir/zebrafishSP_vicsek.cpp
-echo Running $numSeeds sims of $NCELLS particles in zebrafish boundary condition, with Dr = $Dr, vtau = $vtau, a = $a
+echo Running $numSeeds sims of $NCELLS particles in zebrafish boundary condition, with Dr = $Dr, vtau = $vtau, Pthresh = $Pthresh, a = $a
 
 # run compiler
 rm -f $binf
@@ -102,7 +103,7 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         enf=$specificdir/$filestr.en
 
         # append to runString
-        runString="$runString ; ./$binf $NCELLS $NT $NPRINT $sizeDisp $v0 $Dr $vtau $a $runseed $posf $enf"
+        runString="$runString ; ./$binf $NCELLS $NT $NPRINT $sizeDisp $v0 $Dr $vtau $Pthresh $a $runseed $posf $enf"
     done
 
     # finish off run string
