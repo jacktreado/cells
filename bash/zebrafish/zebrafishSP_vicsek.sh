@@ -146,7 +146,7 @@ cat $slurmf
 
 # run sbatch file
 echo -- running on slurm in partition $partition
-echo sbatch -t $time $slurmf
+sbatch -t $time $slurmf
 
 
 # ====================
@@ -155,12 +155,13 @@ echo sbatch -t $time $slurmf
 # 1. NCELLS
 # 2. Dr
 # 3. vtau
-# 4. a
-# 5. partition
-# 6. time
-# 7. num seeds per run (for each entry in array)
-# 8. number of runs (number of array entries, i.e. arraynum)
-# 9. start seed (end seed determined by number of runs)
+# 4. Pthresh
+# 5. a
+# 6. partition
+# 7. time
+# 8. num seeds per run (for each entry in array)
+# 9. number of runs (number of array entries, i.e. arraynum)
+# 10. start seed (end seed determined by number of runs)
 
 
 
