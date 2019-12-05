@@ -44,11 +44,11 @@ int main(int argc, char const *argv[])
 	string v0_str 				= argv[5];
 	string Dr_str 				= argv[6];
 	string vtau_str 			= argv[7];
-	string Pthresh_str 			= argv[7]; 
-	string a_str 				= argv[8];
-	string seed_str				= argv[9];
-	string positionFile			= argv[10];
-	string energyFile 			= argv[11];
+	string Pthresh_str 			= argv[8]; 
+	string a_str 				= argv[9];
+	string seed_str				= argv[10];
+	string positionFile			= argv[11];
+	string energyFile 			= argv[12];
 
 	// load strings into sstream
 	stringstream NCELLSss(NCELLS_str);
