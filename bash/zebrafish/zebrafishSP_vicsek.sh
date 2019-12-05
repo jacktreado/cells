@@ -50,7 +50,7 @@ mkdir -p $simdatadir
 
 # compile into binary using packing.h
 binf=bin/"$runstr".o
-mainf=$maindir/zebrafishSP_abp.cpp
+mainf=$maindir/zebrafishSP_vicsek.cpp
 echo Running $numSeeds sims of $NCELLS particles in zebrafish boundary condition, with Dr = $Dr, vtau = $vtau, a = $a
 
 # run compiler
