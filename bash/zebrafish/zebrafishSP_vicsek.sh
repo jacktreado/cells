@@ -42,7 +42,7 @@ let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=zfishSP_N"$NCELLS"_Dr"$Dr"_vt"$vtau"_a"$a"
+basestr=zfishSP_N"$NCELLS"_Dr"$Dr"_vt"$vtau"_pt"$Pthresh"_a"$a"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation
