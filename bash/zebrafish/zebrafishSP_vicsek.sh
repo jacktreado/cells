@@ -145,7 +145,7 @@ cat $slurmf
 
 # run sbatch file
 echo -- running on slurm in partition $partition
-sbatch -t $time $slurmf
+echo sbatch -t $time $slurmf
 
 
 # ====================
@@ -153,7 +153,7 @@ sbatch -t $time $slurmf
 # ====================
 # 1. NCELLS
 # 2. Dr
-# 3. Pthresh
+# 3. vtau
 # 4. a
 # 5. partition
 # 6. time
