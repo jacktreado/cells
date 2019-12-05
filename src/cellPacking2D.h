@@ -235,9 +235,8 @@ public:
 	void fireMinimizeZebrafishSP(std::vector<double>& radii, double attractiveParam);
 	void spActiveZebrafishWallForces(std::vector<double>& radii, double& wallPressure);
 	void spActiveZebrafishNVE(std::vector<double>& radii, double v0);
-	void spAciveZebrafishABPs(std::vector<double>& radii, double attractionParam, double v0, double Dr, double Pthresh, double dh);
-	void spAciveZebrafishVicsek(std::vector<double>& radii, double attractionParam, double v0, double Dr, double vtau, double Pthresh, double dh);
-	void printPositionsZebrafishSP(std::vector<double>& radii);
+	void spActiveZebrafishVicsek(std::vector<double>& radii, double attractionParam, double v0, double Dr, double vtau, double dh);
+	void printPositionsZebrafishSP(std::vector<double>& radii, std::vector<double>& psi);
 	void printEnergyZebrafishSP(double K);
 
 	// active pipeflow functions

@@ -20,11 +20,11 @@ const double PI = 4.0*atan(1);
 const double timeStepMag		= 0.05;			// time step scale
 
 // disk constants
-const double phiDisk	 		= 0.9;			// initial packing fraction of disks (sets boundary)
+const double phiDisk	 		= 0.95;			// initial packing fraction of disks (sets boundary)
 
 // boundary constants
 const double R0 				= 10.0;			// radius of horseshoe
-const double dh					= 1e-4;			// step size for horseshoe increase
+const double dh					= 1e-3;			// step size for horseshoe increase
 const double LINIT 				= 1.0;			// throwaway variable for initial box size
 
 // cell constants
@@ -34,7 +34,7 @@ int main(int argc, char const *argv[])
 {
 	// variables for main
 	int NCELLS, NT, NPRINT, seed;
-	double NTtmp, NPRINTtmp, sizeDispersion, a, v0, Dr, Pthresh; 
+	double NTtmp, NPRINTtmp, sizeDispersion, a, v0, Dr, vtau; 
 
 	// inputs from command line
 	string NCELLS_str 			= argv[1];
@@ -43,7 +43,7 @@ int main(int argc, char const *argv[])
 	string sizeDisp_str 		= argv[4];
 	string v0_str 				= argv[5];
 	string Dr_str 				= argv[6];
-	string Pthresh_str 			= argv[7];
+	string vtau_str 			= argv[7];
 	string a_str 				= argv[8];
 	string seed_str				= argv[9];
 	string positionFile			= argv[10];
@@ -56,7 +56,7 @@ int main(int argc, char const *argv[])
 	stringstream sizeDispss(sizeDisp_str);
 	stringstream v0ss(v0_str);
 	stringstream Drss(Dr_str);
-	stringstream Pthreshss(Pthresh_str);
+	stringstream vtauss(vtau_str);
 	stringstream ass(a_str);
 	stringstream seedss(seed_str);
 
@@ -67,7 +67,7 @@ int main(int argc, char const *argv[])
 	sizeDispss 		>> sizeDispersion;
 	v0ss 			>> v0;
 	Drss 			>> Dr;
-	Pthreshss 		>> Pthresh;
+	vtauss 			>> vtau;
 	ass	 			>> a;
 	seedss 			>> seed;
 
@@ -93,7 +93,7 @@ int main(int argc, char const *argv[])
 
 	// run active brownian particle simulation
 	cout << "	** Running particles at v0 = " << v0 << ", Dr = " << Dr << ", and a = " << a << endl;
-	packingObject.spAciveZebrafishABPs(radii, a, v0, Dr, Pthresh, dh);
+	packingObject.spActiveZebrafishVicsek(radii, a, v0, Dr, vtau, dh);
 
 	// end program
 	cout << endl << "	** Finishing program in main." << endl;

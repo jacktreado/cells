@@ -22,14 +22,14 @@ const int NT 					= 5e4;
 const int NPRINT				= 200;
 
 // simulation constants
-const double sizeDispersion 	= 0.125;		// size dispersion (std dev of cell sizes)
+const double sizeDispersion 	= 0.1;		// size dispersion (std dev of cell sizes)
 const double timeStepMag		= 0.05;			// time step scale
 
 // disk constants
 const double phiDisk	 		= 0.9;			// initial packing fraction of disks (sets boundary)
 
 // force constants
-const double a 					= 0.0;			// attractive parameter
+const double a 					= 0.1;			// attractive parameter
 
 // main function
 int main()
@@ -41,14 +41,15 @@ int main()
 	string enFile = "en.test";
 
 	// system details
-	int NCELLS 		= 512; 
+	int NCELLS 		= 256; 
 	int seed 		= 3;
 	int NV 			= 24;
 	double Ltmp 	= 10.0;
 	double R0 		= 10.0;
 	double v0 		= 0.05;
-	double dh 		= 0.01;
-	double Pthresh	= 1e2;
+	double vtau 	= 0.1;
+	double dh 		= 0.0005;
+	double Pthresh	= 0.01;
 	double Dr 		= 0.5;
 
 	// vector of radii
@@ -74,7 +75,7 @@ int main()
 	// run sticky SP NVE
 	// cout << "	** Running active pipe flow using sticky SP model" << endl;
 	// packingObject.spActivePipeFlow(radii, a, v0, Dr);
-	packingObject.spAciveZebrafishABPs(radii, a, v0, Dr, Pthresh, dh);
+	packingObject.spActiveZebrafishVicsek(radii, a, v0, Dr, vtau, Pthresh, dh);
 
 	return 0;
 }
