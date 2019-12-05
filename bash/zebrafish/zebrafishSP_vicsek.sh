@@ -146,7 +146,7 @@ cat $slurmf
 
 # run sbatch file
 echo -- running on slurm in partition $partition
-echo sbatch -t $time $slurmf
+sbatch -t $time $slurmf
 
 
 # ====================
