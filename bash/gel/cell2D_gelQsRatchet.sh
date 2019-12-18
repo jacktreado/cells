@@ -31,7 +31,7 @@ numRuns=$8
 startSeed=$9
 
 # other parameters
-sizeDisp=0
+sizeDisp=0.1
 plThresh=1e-6
 dl0=1e-3
 kl=0.1

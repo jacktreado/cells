@@ -2753,8 +2753,8 @@ void cellPacking2D::qsIsoGelRatchet(double phiGel, double deltaPhi, double plThr
 	int NSTEPS, k, ci;
 
 	// tolerances
-	const double Ktol = 1e-12;
-	const double Ptol = 1e-6;
+	const double Ktol = 1e-14;
+	const double Ptol = 1e-5;
 
 	// calculate phi before initial minimization
 	phi = packingFraction();
