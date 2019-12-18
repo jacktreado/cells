@@ -31,10 +31,10 @@ numRuns=$8
 startSeed=$9
 
 # other parameters
-sizeDisp=0.1
+sizeDisp=0
 phiTarget=0.3
 dl0=1e-3
-kl=1.0
+kl=0.1
 ka=1.0
 kb=0.01
 del=1.0
@@ -53,7 +53,7 @@ mkdir -p $simdatadir
 # compile into binary using packing.h
 binf=bin/"$runstr".o
 mainf=$maindir/gelQsRatchet.cpp
-echo Running $numSeeds QS gelation sims of $NCELLS cells with $NV verts using ratchet springs on perimeters and adhesion = $a
+echo Running $numSeeds QS gelation sims of $NCELLS cells with $NV verts using ratchet springs on perimeters and adhesion = $aGelation
 
 # run compiler
 rm -f $binf
