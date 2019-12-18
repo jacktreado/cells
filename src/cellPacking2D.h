@@ -203,6 +203,7 @@ public:
 	// FIRE 2.0 relaxation functions
 	void fireMinimizeP(double Ptol, double Ktol);
 	void fireMinimizeF(double Ftol, double Ktol, int plotIt, int& frameCount);
+	void fireMinimizeGel(double Ptol, double Ktol);
 
 	// Gelation functions
 	void twoParticleContact(int NV);
