@@ -23,27 +23,27 @@ const int NT 					= 1e7;
 const int NPRINT				= 500;
 
 // simulation constants
-const double sizeDispersion 	= 0.0;			// size dispersion (std dev of cell sizes)
+const double sizeDispersion 	= 0.1;			// size dispersion (std dev of cell sizes)
 const double timeStepMag 		= 0.005;		// time step in MD units (zeta * lenscale / forcescale)
 
 // disk constants
 const double phiDisk	 		= 0.7;			// initial packing fraction of disks (sets boundary)
 
 // compression constants
-const double phiTarget			= 1.1;			// cell packing fraction (regardless of final pressure)
+const double phiTarget			= 0.95;			// cell packing fraction (regardless of final pressure)
 const double deltaPhi			= 0.001;		// compression step size
 
 // gelation constants
 const double phiGel 			= 0.3;			// final packing fraction
 const double gelRate 			= 1e-4;			// rate of size decrease (i.e. area loss relative to initial box area)
 const double varPerimRate 		= 0.01;			// rate of relaxation to deformed perimeter
-const double aGelation			= 0.75;			// attraction parameter during gelation sim
+const double aGelation			= 0.05;			// attraction parameter during gelation sim
 
 // force parameters
 const double kl 			= 0.1;				// perimeter force constant
 const double ka 			= 1.0;				// area force constant
 const double gam 			= 0.0;				// surface tension force constant
-const double kb 			= 0.0;				// bending energy constant
+const double kb 			= 0.01;				// bending energy constant
 const double kint 			= 1.0;				// interaction energy constant
 const double del 			= 1.0;				// width of vertices in units of l0, vertex sep on regular polygon
 const double aInitial 		= 0.0;				// attraction parameter to start
@@ -62,10 +62,13 @@ int main()
 	string enFile = "en.test";
 
 	// system details
-	int NCELLS 		= 12;
+	int NCELLS 		= 10;
 	int NV			= 24;
 	int seed 		= 1;
 	double Ltmp 	= 1.0;
+	double plThresh = 1e-2;
+	double dl0		= 1e-3;
+	double calA0max = 1.8;
 
 	// instantiate object
 	cout << "	** Instantiating object for initial disk packing to be turned into a cell packing" << endl;
@@ -94,8 +97,8 @@ int main()
 	packingObject.gelForceVals(calA0,kl,ka,gam,kb,kint,del,aGelation);
 
 	// -- decrease phi as if boundary was growing: phi(t) = phi(0)/(1 + a*t)
-	cout << "	** Running gel extension simulation with gelRate = " << gelRate << ", phiGel = " << phiGel << endl;
-	packingObject.gelVarPerimRate(phiGel,gelRate,varPerimRate,timeStepMag);
+	cout << "	** Running qs gel extension simulation with deltaPhi = " << deltaPhi << ", calA0max = " << calA0max << endl;
+	packingObject.qsIsoGelRatchet(phiGel,deltaPhi,plThresh,dl0,calA0max,timeStepMag);
 
 	return 0;
 }

@@ -1227,12 +1227,6 @@ void cellPacking2D::calculateForces(){
 		// forces on vertices due to shape
 		cell(ci).shapeForces();
 	}
-
-	// normalize virial stresses by the area
-	sigmaXX /= L.at(0)*L.at(1);
-	sigmaXY /= L.at(0)*L.at(1);
-	sigmaYX /= L.at(0)*L.at(1);
-	sigmaYY /= L.at(0)*L.at(1);
 }
 
 void cellPacking2D::gelationForces(){
@@ -1773,7 +1767,7 @@ void cellPacking2D::jammingFireRamp(double dphi, double dCalA, double asphericit
 		// potentialRelaxFire(Ktol,Utol,plotIt,k);
 		fireMinimizeP(Ptol, Ktol);
 		Knew = totalKineticEnergy();
-		Pvirial = 0.5*(sigmaXX + sigmaYY);
+		Pvirial = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
 		energyScale = cell(0).getkint();
 
 		// remove rattlers
@@ -1964,7 +1958,7 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 	calculateForces();
 
 	// initialize virial pressure from pressure from last time
-	Pvirial = 0.5*(sigmaXX + sigmaYY);
+	Pvirial = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
 
 	// initialize energy and force tracking, pressure
 	Knew = totalKineticEnergy();
@@ -2122,7 +2116,7 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 
 		// track energy and forces
 		Knew = totalKineticEnergy();
-		Pvirial = 0.5*(sigmaXX + sigmaYY);
+		Pvirial = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
 
 		// scale P and K for convergence checking
 		Pcheck = Pvirial/(energyScale*NCELLS);
@@ -2751,6 +2745,114 @@ void cellPacking2D::attractionRamp(double attractionTarget, double dAttraction){
 	}
 }
 
+
+// decrease packing fraction quasistatically (ratchet perimeter based on applied forces)
+void cellPacking2D::qsIsoGelRatchet(double phiGel, double deltaPhi, double plThresh, double dl0, double calA0max, double timeStepMag){
+	// local variables
+	double phi0, phiNew, dphi, lenScale;
+	int NSTEPS, k, ci;
+
+	// tolerances
+	const double Ktol = 1e-12;
+	const double Ptol = 1e-6;
+
+	// calculate phi before initial minimization
+	phi = packingFraction();
+
+	// relax shapes (energies calculated in relax function)
+	cout << "	** IN qsIsoCompression, performing initial relaxation" << endl;
+	fireMinimizeP(Ptol, Ktol);
+
+	// get initial packing fraction
+	phi = packingFraction();
+	phi0 = phi;
+
+	// determine number of steps to target
+	NSTEPS = ceil((phi0 - phiGel)/deltaPhi) + 1;
+
+	// update new dphi to make steps even
+	dphi = (phi0 - phiGel)/NSTEPS;
+
+	// update time step
+	lenScale = sqrt(4.0*L.at(0)*L.at(1)*phi0/(NCELLS*PI));
+	dt = timeStepMag*lenScale;
+	dt0 = dt;
+
+	// iterator
+	k = 0;
+
+	// loop until phi is the correct value
+	while (k < NSTEPS){
+		// update iterator
+		k++;
+
+		// output to console
+		cout << "===================================================" << endl << endl << endl;
+		cout << " 	quasistatic isotropic compression to target phi = " << phiGel << endl << endl;
+		cout << "===================================================" << endl;
+		cout << "	* k 			= " << k << endl;
+		cout << "	* NSTEPS 		= " << NSTEPS << endl;		
+		cout << "	* dphi 			= " << dphi << endl << endl;
+		cout << "	AFTER LAST MINIMIZATION:" << endl;
+		cout << "	* phi 			= " << phi << endl;
+		cout << "	CELL calA0 VALUES:" << endl;
+		for (ci=0; ci<NCELLS; ci++){
+			if (ci % 5 == 0) 
+				cout << endl;
+			cout << setw(12) << cell(ci).calA0();			
+		}
+		cout << endl << endl;
+
+		// increase packing fraction to new phi value
+		phiNew = phi0 - k*dphi;
+		setPackingFraction(phiNew);
+
+		// calculate phi after minimization
+		phi = packingFraction();
+
+		// relax shapes (energies calculated in relax function)
+		fireMinimizeP(Ptol, Ktol);
+
+		// calculate phi after minimization
+		phi = packingFraction();
+
+		// update l0 based on segment forces
+		ratchetPerimeter(plThresh, dl0, calA0max);
+	}
+}
+
+
+// ratchet perimeter based on force
+void cellPacking2D::ratchetPerimeter(double plThresh, double dl0, double calA0max){
+	// local variables
+	int ci, vi;
+	double kltmp, l0tmp, pl;
+	double fltmp = 0.0;
+
+	// calculate current forces on perimeter 
+	for (ci=0; ci<NCELLS; ci++){
+		// spring constant
+		kltmp = cell(ci).getkl();
+		l0tmp = cell(ci).getl0();
+
+		// loop over vertices
+		fltmp = 0.0;
+		for (vi=0; vi<cell(ci).getNV(); vi++)
+			fltmp += kltmp*(cell(ci).segmentLength(vi) - l0tmp);
+
+		// calculate line pressure
+		pl = fltmp/cell(ci).perimeter();
+
+		// increment l0 if pl is above threshold and calA0 is below max
+		if (pl > plThresh && cell(ci).calA0() < calA0max)
+			cell(ci).setl0(l0tmp + dl0);
+	}
+}
+
+
+
+
+
 // decrease packing fraction at fixed rate
 void cellPacking2D::gelRateExtension(double phiGel, double gelRate, double timeStepMag){
 	// local variables
@@ -2904,8 +3006,6 @@ void cellPacking2D::gelRateExtension(double phiGel, double gelRate, double timeS
 		t += dt;
 	}
 }
-
-// NOTE: MAKE A MAIN FILE FOR THIS PROTOCOL
 
 // decrease packing fraction at fixed rate
 void cellPacking2D::gelVarPerimRate(double phiGel, double gelRate, double varPerimRate, double timeStepMag){
@@ -3140,7 +3240,7 @@ void cellPacking2D::fireMinimizeSP(vector<double>& lenscales){
 	spForces(lenscales);
 
 	// initialize virial pressure from pressure from last time
-	Pvirial = 0.5*(sigmaXX + sigmaYY);
+	Pvirial = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
 
 	// update kinetic energy based on com velocity
 	Knew = 0.0;
@@ -3286,7 +3386,7 @@ void cellPacking2D::fireMinimizeSP(vector<double>& lenscales){
 		t += dt;
 
 		// update virial pressure
-		Pvirial = 0.5*(sigmaXX + sigmaYY);
+		Pvirial = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
 
 		// update kinetic energy based on com velocity
 		Knew = 0.0;
@@ -3304,8 +3404,8 @@ void cellPacking2D::fireMinimizeSP(vector<double>& lenscales){
 		Pcheck = Pvirial/(NDIM*NCELLS);
 
 		// check for convergence
-		converged = (abs(Pvirial) < Pvirial && npPMIN > NMIN);
-		converged = (converged || (abs(Pvirial) > 2*Ptol && Kcheck < Ktol));
+		converged = (abs(Pcheck) < Ptol && npPMIN > NMIN);
+		converged = (converged || (abs(Pcheck) > 2*Ptol && Kcheck < Ktol));
 
 		if (converged){
 			cout << "	** FIRE has converged!" << endl;

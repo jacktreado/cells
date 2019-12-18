@@ -790,8 +790,6 @@ void deformableParticles2D::updateCPos(){
 
 	// loop over vertices
 	for (i=0; i<NV; i++){
-		// cposx += vpos(i,0);
-		// cposy += vpos(i,1);
 		cposx += vrel(i,0) + cpos(0);
 		cposy += vrel(i,1) + cpos(1);
 	}
@@ -801,15 +799,19 @@ void deformableParticles2D::updateCPos(){
 	cposy /= NV;
 
 	// check PBCs
-	if (cposx > L.at(0))
-		cposx -= L.at(0);
-	else if (cposx < 0)
-		cposx += L.at(0);
-
-	if (cposy > L.at(1))
-		cposy -= L.at(1);
-	else if (cposy < 0)
-		cposy += L.at(1);
+	if (pbc.at(0) == 1){
+		if (cposx > L.at(0))
+			cposx -= L.at(0);
+		else if (cposx < 0)
+			cposx += L.at(0);
+	}
+	
+	if (pbc.at(1) == 1){
+		if (cposy > L.at(1))
+			cposy -= L.at(1);
+		else if (cposy < 0)
+			cposy += L.at(1);
+	}
 
 	// divide cpos by NV to get centroid
 	setCPos(0,cposx);
@@ -888,8 +890,11 @@ double deformableParticles2D::vertexArea(){
 	double totalArea = 0.0;
 
 	// loop over vertices, get area of each triangle and relevant vertex area
-	for (i=0; i<NV; i++)
-		totalArea += area(i) + freeVertexArea(i);
+	for (i=0; i<NV; i++){
+		totalArea += area(i) + 0.5*del*l0*segmentLength(i);
+		// totalArea += area(i) + freeVertexArea(i);
+	}
+	totalArea += + PI*pow(0.5*del*l0,2.0);
 
 	// return area
 	return totalArea;

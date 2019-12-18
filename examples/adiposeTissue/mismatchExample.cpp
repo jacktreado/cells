@@ -40,7 +40,7 @@ const double varPerimRate 		= 0.01;			// rate of relaxation to deformed perimete
 const double aGelation			= 0.75;			// attraction parameter during gelation sim
 
 // force parameters
-const double kl 			= 0.1;				// perimeter force constant
+const double kl 			= 1.0;				// perimeter force constant
 const double ka 			= 1.0;				// area force constant
 const double gam 			= 0.0;				// surface tension force constant
 const double kb 			= 0.0;				// bending energy constant
@@ -63,9 +63,12 @@ int main()
 
 	// system details
 	int NCELLS 		= 12;
-	int NV			= 24;
+	int NV			= 32;
 	int seed 		= 1;
 	double Ltmp 	= 1.0;
+
+	// calA0 of highly deformable cell
+	double calAMismatch = 1.7;
 
 	// instantiate object
 	cout << "	** Instantiating object for initial disk packing to be turned into a cell packing" << endl;
@@ -86,16 +89,12 @@ int main()
 	packingObject.openPackingObject(posFile);
 	packingObject.openEnergyObject(enFile);
 
+	// give particle 1 a very high calA
+	packingObject.setAsphericity(0, calAMismatch);
+
 	// compress to set packing fraction using FIRE, pressure relaxation
 	cout << "	** QS compresison protocol to phiTarget = " << phiTarget << endl;
 	packingObject.qsIsoCompression(phiTarget,deltaPhi);
-
-	// set new attraction
-	packingObject.gelForceVals(calA0,kl,ka,gam,kb,kint,del,aGelation);
-
-	// -- decrease phi as if boundary was growing: phi(t) = phi(0)/(1 + a*t)
-	cout << "	** Running gel extension simulation with gelRate = " << gelRate << ", phiGel = " << phiGel << endl;
-	packingObject.gelVarPerimRate(phiGel,gelRate,varPerimRate,timeStepMag);
 
 	return 0;
 }

@@ -159,7 +159,8 @@ public:
 	void setL(int d, double val) { L.at(d) = val; };
 
 	// set dt: NOTE, IN NON-DIMENSIONAL FORM, so mass = rho pi r^2 = pi
-	void setdt(double val) { dt0 = val*sqrt(4*atan(1)); dt = dt0; };
+	// void setdt(double val) { dt0 = val*sqrt(4*atan(1)); dt = dt0; };
+	void setdt(double val) { dt0 = val; dt = dt0; };
 	void addContact(int ci, int cj);
 	void deleteContact(int ci, int cj);
 	void resetContacts();
@@ -208,6 +209,8 @@ public:
 	void initializeGel(int NV, double phiDisk, double sizeDispersion, double delval);
 	void gelForceVals(double calA0, double kl, double ka, double gam, double kb, double kint, double del, double a);
 	void qsIsoCompression(double phiTarget, double deltaPhi);
+	void qsIsoGelRatchet(double phiGel, double deltaPhi, double plThresh, double dl0, double calA0max, double timeStepMag);
+	void ratchetPerimeter(double plThresh, double dl0, double calA0max);
 	void attractionRamp(double attractionTarget, double dAttraction);
 	void gelRateExtension(double phiGel, double gelRate, double timeStepMag);
 	void gelVarPerimRate(double phiGel, double gelRate, double varPerimRate, double timeStepMag);
@@ -231,16 +234,35 @@ public:
 	void spNVE(std::vector<double>& lenscales, int nt);
 
 	// Zebrafish active flow functions
+	void dpInitializeActiveZebrafish(int NV, double phiDisk, double sizeDispersion, double R0);
+	void dpActiveZebrafishNVE(double v0);
+	void dpPntNVE(double v0);
+	void dpZebrafishFireMinP(double Ptol, double Ktol);
+	void dpPntFireMinP(double Ptol, double Ktol);
+	void dpActiveZebrafishIsoCompression(double Ptol, double phiTarget, double deltaPhi);
+	void dpPntIsoCompression(double Ptol, double phiTarget, double deltaPhi);
+	void dpActiveZebrafishWallForces(double& wallPressure);
+	void dpPNTWallForces();
+	double zfishArea();
+	double dpZfishPackingFraction();
+	void dpZebrafishPositions();
+	void dpPntPositions();
+	void dpZebrafishEnergy();
+	void dpPntEnergy();
+
 	void initializeActiveZebrafish(std::vector<double>& radii, int NV, double phiDisk, double sizeDispersion, double R0);
 	void fireMinimizeZebrafishSP(std::vector<double>& radii, double attractiveParam);
 	void spActiveZebrafishWallForces(std::vector<double>& radii, double& wallPressure);
 	void spActiveZebrafishNVE(std::vector<double>& radii, double v0);
 	void spActiveZebrafishVicsek(std::vector<double>& radii, double attractionParam, double v0, double Dr, double vtau, double Pthresh, double dh);
 	void printPositionsZebrafishSP(std::vector<double>& radii, std::vector<double>& psi);
+	void printPositionsZebrafishSP(std::vector<double>& radii, std::vector<double>& psi, int Ncurr);
 	void printEnergyZebrafishSP(double K);
+	void printEnergyZebrafishSP(double K, int Ncurr);
 
 	// active pipeflow functions
 	void initializeActiveStickySP(std::vector<double>& radii, int NV, double phiDisk, double sizeDispersion, double Lscale);
+	void pipeFireMinP(std::vector<double>& radii, double attractiveParam);
 	void singleActiveCell(int NV, double phiInit, double calA0, double Dc, double vari, double v0);
 	void spActiveForces(std::vector<double>& radii);
 	void spActivePipeWallForces(std::vector<double>& radii);

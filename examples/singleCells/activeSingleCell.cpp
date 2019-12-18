@@ -47,14 +47,14 @@ int main()
 	int seed 		= 1;
 	int NV 			= 50;
 	double Ltmp 	= 10.0;
-	double v0 		= 1e-2;
+	double v0 		= 5e-3;
 	double stddev 	= 0.1*(2.0*PI);
 	double vari		= pow(stddev,2.0);
 	double Dc 		= 0.5;
 	double Dv 		= 0.1;
 
 	// force constants
-	double calA0 	= 1.25;
+	double calA0 	= 1.1;
 	double kl		= 1.0;
 	double ka 		= 1.0;
 	double gam 		= 0.0;

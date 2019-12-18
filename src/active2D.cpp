@@ -141,9 +141,8 @@ void cellPacking2D::initializeActiveStickySP(vector<double>& radii, int NV, doub
 
 	// use FIRE in hopper geometry to relax overlaps
 	cout << "		-- Using FIRE to relax overlaps..." << endl;
-	fireMinimizeSP(radii,0.0);
+	pipeFireMinP(radii,0.0);
 }
-
 
 
 // FUNCTION FOR SINGLE ACTIVE PARTICLE WITH BOTH CENTRAL AND VERTEX ACTIVITIES
@@ -374,8 +373,6 @@ void cellPacking2D::singleActiveCell(int NV, double phiInit, double calA0, doubl
 }
 
 
-
-
 // FUNCTION TO CALCULATE FORCES BETWEEN STICKY, ACTIVE SP PARTICLES
 void cellPacking2D::spActiveForces(vector<double>& radii){
 	// local variables
@@ -528,6 +525,7 @@ void cellPacking2D::spActiveForces(vector<double>& radii){
 	sigmaYX /= L.at(0)*L.at(1);
 	sigmaYY /= L.at(0)*L.at(1);
 }
+
 
 
 
@@ -714,7 +712,835 @@ void cellPacking2D::initializeActiveZebrafish(vector<double>& radii, int NV, dou
 	NCELLS = Ntmp;
 }
 
+void cellPacking2D::dpInitializeActiveZebrafish(int NV, double phiDisk, double sizeDispersion, double R0){
+	// local variables
+	int ci, vi, d, nvtmp, areaint, Ntmp;
+	double rscale;
+	double r1, r2, g1, radsum;
+	double w, ltmp;
+	double xpos, ypos;
+	double xmin, xmax, ymin, ymax, ypackmax, ydiff;
+	double calA;
+	double rtmp, l0tmp, a0tmp;
+	double delval = 1.0;
+	vector<double> radii(NCELLS,0.0);
 
+	// minimum number of vertices
+	const int nvmin = 12;
+
+	// check inputs to stick SP initialization
+	if (radii.size() < NCELLS){
+		cout << "	** ERROR: in initializing sticky SP, input radii vector size = " << radii.size() << ", which is != NCELLS (= " << NCELLS << "). ending." << endl;
+		exit(1);
+	}
+
+	// output to console
+	cout << "		-- In active stickySP initialization, initializing active SP particles" << endl;
+
+	// get scale for radii based on input phi
+	rscale = sqrt(zfishArea()*phiDisk/(NCELLS*PI));
+	cout << "rscale = " << rscale << endl;
+
+	// initialize length scales as gaussian random variables (will becomes area square roots)
+	radsum = 0.0;
+	for (ci=0; ci<NCELLS; ci++){
+		// generate random numbers
+		r1 = drand48();
+		r2 = drand48();
+
+		// calculate gaussian random variable using Box-Muller transform
+		g1 = sqrt(-2.0*log(r1))*cos(2*PI*r2);
+
+		// get radius
+		radii.at(ci) = rscale*0.5*(g1*sizeDispersion + 1.0);
+
+		// add to lenscales sum for boundary size
+		radsum += radii.at(ci)*radii.at(ci);
+	}
+
+	// determine horseshow radius from particle sizes and input packing fraction
+	L.at(0) = R0;
+	L.at(1) = 0.0;
+
+	// determine main channel width
+	w = R0 - w0;
+
+	// set phi of initial particles
+	phi = PI*radsum/zfishArea();
+	cout << "		-- Initial phi for " << NCELLS << " particles = " << phi << endl;
+
+	// reseed rng
+	srand48(56835698*seed);
+
+	// initialize cell information
+	cout << "		-- Ininitializing cell objects" << endl;
+	for (ci=0; ci<NCELLS; ci++){
+		// boundary information
+		for (d=0; d<NDIM; d++)
+			cell(ci).setL(d,L.at(d));
+
+		// x- and y-directions are not periodic
+		cell(ci).setpbc(0,0);
+		cell(ci).setpbc(1,0);
+
+		// number of vertices ( SIGMA SETS # OF VERTS )
+		nvtmp = round(2.0*radii.at(ci)*NV);
+		if (nvtmp > nvmin)
+ 			cell(ci).setNV(nvtmp);
+		else
+			cell(ci).setNV(nvmin);
+
+		// array information
+		cell(ci).initializeVertices();
+		cell(ci).initializeCell();
+
+		// initial length of polygon side
+		l0tmp = 2.0*radii.at(ci)*sin(PI/nvtmp);
+
+		// use rtmp slightly smaller than lenscale, so no overlaps at end
+		rtmp = radii.at(ci) - 0.25*delval*l0tmp;
+
+		// calculate a0 and l0 based on fact that they are regular polygons
+		a0tmp = 0.5*nvtmp*pow(rtmp,2.0)*sin(2.0*PI/nvtmp);
+		l0tmp = 2.0*rtmp*sin(PI/nvtmp);
+
+		// set preferred area and length 
+		cell(ci).seta0(a0tmp);
+		cell(ci).setl0(l0tmp);
+		cell(ci).setdel(delval);
+	}
+
+	// initialize particle positions
+	cout << "		-- Ininitializing cell positions" << endl;
+	for (ci=0; ci<NCELLS; ci++){
+		// draw random integer between 0 and 4, to decide where
+		// to place particle
+		areaint = round(4*drand48());
+
+		// main channel
+		if (areaint <= 1){
+			xmin = -0.5*w;
+			xmax = 0.5*w;
+			ymin = -R0;
+			ymax = 0.0;
+		}
+		// left side channel
+		else if (areaint == 2){
+			xmin = -R0;
+			xmax = -0.5*(w + 2.0*w0);
+			ymin = -R0;
+			ymax = 0.0;
+		}
+		// right side channel
+		else if (areaint == 3){
+			xmin = 0.5*(w + 2.0*w0);
+			xmax = R0;
+			ymin = -R0;
+			ymax = 0.0;
+		}
+		// horseshoe chamber
+		else if (areaint == 4){
+			xmin = -0.5*R0;
+			xmax = 0.5*R0;
+			ymin = 0;
+			ymax = 2.0*w0 + 0.75*R0;
+		}
+
+			
+		// get random location in pipe
+		xpos = (xmax-xmin)*drand48() + xmin;
+		ypos = (ymax-ymin)*drand48() + ymin;
+
+		// set as initial position of com
+		cell(ci).setCPos(0,xpos);
+		cell(ci).setCPos(1,ypos);
+
+		// initialize vertices as a regular polygon
+		cell(ci).regularPolygon();
+	}
+
+	// initial time scales (t_0^2 = mass*sigma/f_0, mass = 0.25*PI*sigma^2)
+	cout << "		-- Ininitializing time scale" << endl;
+	dt = 0.05*sqrt(0.25*PI);
+	dt0 = dt;
+
+	// minimize energy only for first Ncurr particles
+	fireMinimizeZebrafishSP(radii,0.0);
+}
+
+
+// DEFORMABLE PARTICLE FUNCTIONS
+
+// DPM NVE simulation in tailbud boundary
+void cellPacking2D::dpActiveZebrafishNVE(double v0){
+	// local variables
+	int t, d;
+	int ci = 0;
+	double r1, U, K;
+	double Pvirial = 0.0;
+	double wallPressure = 0.0;
+
+	// initialize velocities for particles in main channel
+	for (ci=0; ci<NCELLS; ci++){
+		for (d=0; d<NDIM; d++){
+			r1 = drand48();
+			cell(ci).setCVel(d, v0*(1-d)*cos(2.0*PI*(r1 - 0.5)) + v0*d*sin(2.0*PI*(r1 - 0.5)) );
+		}
+	}
+
+	// run NVE for allotted time
+	for (t=0; t<NT; t++){
+		// calculate energies
+		U = totalPotentialEnergy();
+		K = totalKineticEnergy();
+
+		// update packing fraction
+		phi = dpZfishPackingFraction();
+
+		// print data first to get the initial condition
+		if (t % NPRINT == 0){
+			cout << "===================================================" << endl << endl;
+			cout << " 	CELL NVE, t = " << t << endl << endl;
+			cout << "===================================================" << endl;
+
+			if (packingPrintObject.is_open()){
+				cout << "	* Printing vetex positions to file" << endl;
+				dpZebrafishPositions();
+			}
+			
+			if (energyPrintObject.is_open()){
+				cout << "	* Printing cell energy to file" << endl;
+				dpZebrafishEnergy();
+			}
+			
+			cout << "	* Run data:" << endl;
+			cout << "	* U 		= " << U << endl;
+			cout << "	* K 		= " << K << endl;
+			cout << "	* E 		= " << U + K << endl;
+			cout << "	* dt 		= " << dt << endl;
+			cout << "	* wallPressure = " << wallPressure << endl;
+			cout << endl << endl;
+		}
+
+		// use velocity verlet to advance time
+
+		// update positions
+		for (ci=0; ci<NCELLS; ci++){
+			cell(ci).verletPositionUpdate(dt);
+			cell(ci).updateCPos();
+		}
+
+		// reset contacts before force calculation
+		resetContacts();
+
+		// calculate forces
+		calculateForces();
+		dpActiveZebrafishWallForces(wallPressure);
+
+		// update velocities
+		for (ci=0; ci<NCELLS; ci++)
+			cell(ci).verletVelocityUpdate(dt);
+	}
+
+	// print something to conclude
+	cout << "t = NT = " << t << ", so ending NVE run!" << endl;
+}
+
+// FIRE 2.0 energy minimzation with backstepping if P < 0
+void cellPacking2D::dpZebrafishFireMinP(double Ptol, double Ktol){
+	// HARD CODE IN FIRE PARAMETERS
+	const double alpha0 	= 0.25;
+	const double finc 		= 1.05;
+	const double fdec 		= 0.5;
+	const double falpha 	= 0.99;
+	const double dtmax 		= 10*dt0;
+	const double dtmin 		= 0.05*dt0;
+	const int NMIN 			= 20;
+	const int NNEGMAX 		= 2000;
+	const int NDELAY 		= 1000;
+	int npPos				= 0;
+	int npNeg 				= 0;
+	int npPMIN				= 0;
+	double alpha 			= alpha0;
+	double alphat 			= alpha;
+	double t 				= 0.0;
+	double forceScale 		= cell(0).getkint();
+	double energyScale		= forceScale;
+	double P 				= 0;
+	double wallPressure 	= 0;
+
+	// local variables
+	int ci,vi,d,k,kmax;
+	double vstarnrm,fstarnrm,vtmp,ftmp;
+	double Knew, Pvirial, Kcheck, Pcheck;
+
+	// variable to test for potential energy minimization
+	bool converged = false;
+
+	// reset time step
+	dt = dt0;
+
+	// initialize forces
+	resetContacts();
+	calculateForces();
+	dpActiveZebrafishWallForces(wallPressure);
+
+	// initialize virial pressure from pressure from last time
+	Pvirial = 0.5*(sigmaXX + sigmaYY)/zfishArea();
+
+	// initialize energy and force tracking, pressure
+	Knew = totalKineticEnergy();
+
+	// scale P and K for convergence checking
+	Pcheck = Pvirial/(energyScale*NCELLS);
+	Kcheck = Knew/(energyScale*NCELLS);
+
+	// reset velocities to 0
+	for (ci=0; ci<NCELLS; ci++){
+		for (vi=0; vi<cell(ci).getNV(); vi++){
+			for (d=0; d<NDIM; d++)
+				cell(ci).setVVel(vi,d,0.0);
+		}
+	}
+
+	// iterate through MD time until system converged
+	kmax = 5e5;
+	for (k=0; k<kmax; k++){
+
+		// output some information to console
+		if (k % NPRINT == 0){
+			cout << "===================================================" << endl << endl;
+			cout << " 	FIRE MINIMIZATION in zebrafish boundary, k = " << k << endl << endl;
+			cout << "===================================================" << endl;			
+			cout << "	* Run data:" << endl;
+			cout << "	* K 		= " << Kcheck << endl;
+			cout << "	* Pvirial 	= " << Pcheck << endl;
+			cout << "	* phi 		= " << phi << endl;
+			cout << "	* dt 		= " << dt << endl;
+			cout << "	* alpha 	= " << alpha << endl;
+			cout << "	* alphat 	= " << alphat << endl;
+			cout << "	* P 		= " << P << endl;
+			cout << "	* wallPressure = " << wallPressure << endl;
+			cout << endl << endl;
+		}
+
+		// Step 1. calculate P and norms
+		P = 0.0;
+		vstarnrm = 0.0;
+		fstarnrm = 0.0;
+		for (ci=0; ci<NCELLS; ci++){
+			for (vi=0; vi<cell(ci).getNV(); vi++){
+				for (d=0; d<NDIM; d++){
+					// get tmp variables
+					ftmp = cell(ci).vforce(vi,d);
+					vtmp = cell(ci).vvel(vi,d);
+
+					// calculate based on all vertices on all cells
+					P += ftmp*vtmp;
+					vstarnrm += vtmp*vtmp;
+					fstarnrm += ftmp*ftmp;
+				}
+			}
+		}
+
+		// get norms
+		vstarnrm = sqrt(vstarnrm);
+		fstarnrm = sqrt(fstarnrm);
+
+
+		// Step 2. Adjust simulation based on net motion of system
+		if (P > 0){
+			// increment pos counter
+			npPos++;
+
+			// reset neg counter
+			npNeg = 0;
+
+			// update alpha_t for next time
+			alphat = alpha;
+
+			// alter sim if enough positive steps taken
+			if (npPos > NMIN){
+				// change time step
+				if (dt*finc < dtmax)
+					dt *= finc;
+				else
+					dt = dtmax;
+
+				// decrease alpha
+				alpha *= falpha;
+			}
+		}
+		else{
+			// reset pos counter
+			npPos = 0;
+
+			// rest neg counter
+			npNeg++;
+
+			// check for stuck sim
+			if (npNeg > NNEGMAX)
+				break;
+
+			// decrease time step if past initial delay
+			if (k > NMIN){
+				// decrease time step 
+				if (dt*fdec > dtmin)
+					dt *= fdec;
+				else
+					dt = dtmin;
+
+				// change alpha
+				alpha = alpha0;
+				alphat = alpha;
+			}
+
+			// take half step backwards
+			for (ci=0; ci<NCELLS; ci++){
+				for (vi=0; vi<cell(ci).getNV(); vi++){
+					for (d=0; d<NDIM; d++)
+						cell(ci).setVPos(vi,d,cell(ci).vpos(vi,d) - 0.5*dt*cell(ci).vvel(vi,d));
+				}
+			}
+
+			// reset velocities to 0
+			for (ci=0; ci<NCELLS; ci++){
+				for (vi=0; vi<cell(ci).getNV(); vi++){
+					for (d=0; d<NDIM; d++)
+						cell(ci).setVVel(vi,d,0.0);
+				}
+			}
+		}
+
+		// update velocities if forces are acting
+		if (fstarnrm > 0){
+			for (ci=0; ci<NCELLS; ci++){
+				for (vi=0; vi<cell(ci).getNV(); vi++){
+					for (d=0; d<NDIM; d++){
+						vtmp = (1 - alphat)*cell(ci).vvel(vi,d) + alphat*(cell(ci).vforce(vi,d)/fstarnrm)*vstarnrm;
+						cell(ci).setVVel(vi,d,vtmp);
+					}
+				}
+			}
+		}
+
+		// do verlet update
+		for (ci=0; ci<NCELLS; ci++){
+			cell(ci).verletPositionUpdate(dt);
+			cell(ci).updateCPos();
+		}
+
+		// reset contacts before force calculation
+		resetContacts();
+
+		// calculate forces
+		calculateForces();
+		dpActiveZebrafishWallForces(wallPressure);
+
+		// update velocities
+		for (ci=0; ci<NCELLS; ci++)
+			cell(ci).verletVelocityUpdate(dt);
+
+		// update t
+		t += dt;
+
+		// track energy and forces
+		Knew = totalKineticEnergy();
+		Pvirial = 0.5*(sigmaXX + sigmaYY)/zfishArea();
+
+		// scale P and K for convergence checking
+		Pcheck = Pvirial/(energyScale*NCELLS);
+		Kcheck = Knew/(energyScale*NCELLS);
+
+		// update if Pvirial under tol
+		if (abs(Pcheck) < Ptol)
+			npPMIN++;
+		else
+			npPMIN = 0;
+
+		// check for convergence
+		converged = (abs(Pcheck) < Ptol && npPMIN > NMIN);
+		converged = (converged || (abs(Pcheck) > Ptol && Kcheck < Ktol));
+
+		if (converged){
+			cout << "	** FIRE has converged!" << endl;
+			cout << "	** Kcheck = " << Kcheck << endl;
+			cout << "	** Pcheck = " << Pcheck << endl;
+			cout << "	** k = " << k << ", t = " << t << endl;
+			cout << "	** Breaking out of FIRE protocol." << endl;
+
+			if (packingPrintObject.is_open()){
+				cout << "	* Printing vetex positions to file" << endl;
+				dpZebrafishPositions();
+			}
+			
+			if (energyPrintObject.is_open()){
+				cout << "	* Printing cell energy to file" << endl;
+				dpZebrafishEnergy();
+			}
+			break;
+		}
+	}
+
+	// reset dt to be original value before ending function
+	dt = dt0;
+
+	// if no convergence, just stop
+	if (k == kmax)
+		cout << "	** FIRE not converged in kmax = " << kmax << " force evaluations" << endl;
+}
+
+// DPM compression simulation
+void cellPacking2D::dpActiveZebrafishIsoCompression(double Ptol, double phiTarget, double deltaPhi){
+	// local variables
+	double phi0, phiNew, dphi, Pvirial, Pcheck;
+	int NSTEPS, k;
+
+	// tolerances
+	const double Ktol = 1e-10;
+
+	// calculate phi before initial minimization
+	phi = dpZfishPackingFraction();
+
+	// relax shapes (energies calculated in relax function)
+	cout << "	** IN qsIsoCompression, performing initial relaxation" << endl;
+	dpZebrafishFireMinP(Ptol, Ktol);
+
+	// get initial packing fraction
+	phi = dpZfishPackingFraction();
+	phi0 = phi;
+
+	// determine number of steps to target
+	NSTEPS = ceil((phiTarget - phi0)/deltaPhi) + 1;
+
+	// update new dphi to make steps even
+	dphi = (phiTarget - phi)/NSTEPS;
+
+	// iterator
+	k = 0;
+
+	// loop until phi is the correct value
+	while (k < NSTEPS){
+		// update iterator
+		k++;
+
+		// output to console
+		cout << "===================================================" << endl << endl << endl;
+		cout << " 	quasistatic isotropic compression to target phi = " << phiTarget << endl << endl;
+		cout << "===================================================" << endl;
+		cout << "	* k 			= " << k << endl;
+		cout << "	* NSTEPS 		= " << NSTEPS << endl;		
+		cout << "	* dphi 			= " << dphi << endl << endl;
+		cout << "	AFTER LAST MINIMIZATION:" << endl;
+		cout << "	* phi 			= " << phi << endl;
+		cout << endl << endl;
+
+		// increase packing fraction to new phi value
+		phiNew = phi0 + k*dphi;
+		setPackingFraction(phiNew);
+
+		// calculate phi after system scale
+		phi = dpZfishPackingFraction();
+
+		// relax shapes (energies calculated in relax function)
+		dpZebrafishFireMinP(Ptol, Ktol);
+
+		// calculate phi after minimization
+		phi = dpZfishPackingFraction();
+	}
+}
+
+// calculate wall forces due to horseshoe for DP particles
+void cellPacking2D::dpActiveZebrafishWallForces(double& wallPressure){
+	// local variables
+	int ci, vi, d; 							// indices
+	int intwall, wall;						// wall check variables
+	double R0, w, h;						// zebrafish boundary variables
+	double x, y;							// particle positions (IN UNITS OF SIGMA)
+	double sigma; 							// particle diameter
+	double lw, lwx, lwy;					// elements of vector pointing from wall to particle
+	double overlap;							// overlap of particle with wall
+	double ftmp, utmp, uv;					// force/energy of particle overlap with walls
+	double capDist;							// distance of particles to spherical caps
+	double edgeDist;						// distance of particles to horseshoe edge
+	double centerDist; 						// distance of particles to horseshoe center
+	vector<double> distVec(NDIM,0.0);		// vector for distances between particles and wall
+
+	// reset wall pressure to 0
+	wallPressure = 0.0;
+
+	// head radius and tail height
+	R0 = L.at(0);
+	h = L.at(1);
+
+	// main channel width
+	w = R0 - w0;
+
+	// loop over cells
+	for (ci=0; ci<NCELLS; ci++){
+		// loop over vertices
+		for (vi=0; vi<cell(ci).getNV(); vi++){
+			// get vertex radius
+			sigma = cell(ci).getl0()*cell(ci).getdel();
+
+			// get vertex positions
+			x = cell(ci).vpos(vi,0);
+			y = cell(ci).vpos(vi,1);
+
+			// check horseshoe side walls
+			if (y < h){
+				// if particle in main channel
+				if (x < 0.5*(w + w0) && x > -0.5*(w + w0)){
+					// check variable for wall force
+					wall = 0;
+
+					// particle touching left wall, force vector points in +x dir
+					if (x < 0.5*(sigma - w)){
+						lwx = x + 0.5*w;
+						wall = -1;
+					}
+					// particle touching right wall, force vector points in -x dir
+					else if (x > 0.5*(w - sigma)){
+						lwx = 0.5*w - x;
+						wall = 1;
+					}
+					else 
+						wall = 0;
+
+					if (wall != 0){
+						// overlap with wall
+						overlap = 2.0*lwx/sigma;
+
+						// add to x force ONLY
+						ftmp = 1 - overlap;
+						cell(ci).setVForce(vi,0,cell(ci).vforce(vi,0) - wall*ftmp);
+
+						// add to energies
+						utmp = 0.25*sigma*pow(1 - overlap,2);
+						cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp);
+					}				
+				}
+				// if particle is in a side channel
+				else{
+					// first check interior channel walls
+					if ( (x > -0.5*(w + 2.0*w0 + sigma) && x < 0) || (x < 0.5*(w + 2.0*w0 + sigma) && x > 0) ){
+						// check variable for interior wall force
+						intwall = 0;
+
+						// particle touching left interior wall
+						if (x > -0.5*(w + 2.0*w0 + sigma) && x < 0){
+							lwx = -0.5*(w + 2.0*w0) - x;
+							intwall = -1;
+						}
+						// particle touching right interior wall
+						else if (x < 0.5*(w + 2.0*w0 + sigma) && x > 0){
+							lwx = x - 0.5*(w + 2.0*w0);
+							intwall = 1;
+						}
+
+						// overlap with wall
+						overlap = 2.0*lwx/sigma;
+
+						// add to x force ONLY
+						ftmp = 1 - overlap;
+						cell(ci).setVForce(vi,0,cell(ci).vforce(vi,0) + intwall*ftmp);
+
+						// add to energies
+						utmp = 0.25*sigma*pow(1 - overlap,2);
+						cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp);
+					}
+					// next check exterior walls
+					if ( (x < -R0 + 0.5*sigma && x < 0) || (x > R0 - 0.5*sigma && x > 0) ) {
+						// check variable for exterior wall force
+						wall = 0;
+
+						// particle touching left exterior wall
+						if (x < -R0 + 0.5*sigma && x < 0){
+							lwx = x + R0;
+							wall = -1;
+						}
+						else if (x > R0 - 0.5*sigma && x > 0){
+							lwx = R0 - x;
+							wall = 1;
+						}
+
+						// overlap with wall
+						overlap = 2.0*lwx/sigma;
+
+						// add to x force ONLY
+						ftmp = 1 - overlap;
+						cell(ci).setVForce(vi,0,cell(ci).vforce(vi,0) - wall*ftmp);
+
+						// add to energies
+						utmp = 0.25*sigma*pow(1 - overlap,2);
+						cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp);
+					}
+				}
+
+				// bottom walls
+				if (y < -R0 + 0.5*sigma){
+					// get wall overlap
+					lwy = y + R0;
+
+					// overlap with wall
+					overlap = 2.0*lwy/sigma;
+
+					// add to y force ONLY
+					ftmp = 1 - overlap;
+					cell(ci).setVForce(vi,1,cell(ci).vforce(vi,1) + ftmp);
+
+					// add to energies
+					utmp = 0.25*sigma*pow(1 - overlap,2);
+					cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp);
+				}
+			}
+			// otherwise, in the horseshoe section
+			else{
+				// first check disk caps where channels end
+				if (x < 0){
+					// check left cap
+					capDist = pow(x + 0.5*(w + w0),2.0) + pow(y - h,2.0);
+					capDist = sqrt(capDist);
+
+					// get distance from particle center to cap edge
+					centerDist = capDist - 0.5*w0;
+
+					// save normal of spherical cap to vector
+					distVec.at(0) = (x + 0.5*(w + w0))/capDist;
+					distVec.at(1) = (y - h)/capDist;
+				}
+				else{
+					// check right cap
+					capDist = pow(x - 0.5*(w + w0),2.0) + pow(y - h,2.0);
+					capDist = sqrt(capDist);
+
+					// get distance from particle center to cap edge
+					centerDist = capDist - 0.5*w0;
+
+					// save distances to vector
+					distVec.at(0) = (x - 0.5*(w + w0))/capDist;
+					distVec.at(1) = (y - h)/capDist;
+				}
+
+				// if overlap with cap, calculate ghost particle force
+				if (centerDist < 0.5*sigma){
+					// calculate overlap
+					overlap = 2.0*centerDist/sigma;
+
+					// scalar part of force
+					ftmp = 1 - overlap;
+
+					// vectorial parts of force
+					for (d=0; d<NDIM; d++)
+						cell(ci).setVForce(vi,d,cell(ci).vforce(vi,d) + ftmp*distVec.at(d));
+
+					// add to energies
+					utmp = 0.25*sigma*pow(1 - overlap,2);
+					cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp);
+				}
+
+				
+				// check reservoir before horseshoe side walls
+				if ( ((x < -R0 + 0.5*sigma && x < 0) || (x > R0 - 0.5*sigma && x > 0)) && y < h + 2.0*w0) {
+					// check variable for exterior wall force
+					wall = 0;
+
+					// particle touching left exterior wall
+					if (x < -R0 + 0.5*sigma && x < 0){
+						lwx = x + R0;
+						wall = -1;
+					}
+					else if (x > R0 - 0.5*sigma && x > 0){
+						lwx = R0 - x;
+						wall = 1;
+					}
+
+					// overlap with wall
+					overlap = 2.0*lwx/sigma;
+
+					// add to x force ONLY
+					ftmp = 1 - overlap;
+					cell(ci).setVForce(vi,0,cell(ci).vforce(vi,0) - wall*ftmp);
+
+					// add to energies
+					utmp = 0.25*sigma*pow(1 - overlap,2);
+					cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp);
+
+				}
+				
+
+				// then check overlap with horseshoe edge: get radial distance from horseshoe center
+				centerDist = sqrt(x*x + (y-h-2.0*w0)*(y-h-2.0*w0));
+
+				// get distance to horseshoe edge
+				edgeDist = R0 - centerDist;
+
+				// get unit vector from horshoe to particle
+				distVec.at(0) = -x/centerDist;
+				distVec.at(1) = (h+2.0*w0-y)/centerDist;
+
+
+				// if interacting with horseshoe edge, add forces
+				if (edgeDist < 0.5*sigma && y > h + 2*w0){
+					// calculate overlap
+					overlap = 2.0*edgeDist/sigma;
+
+					// scalar part of force
+					ftmp = 1 - overlap;
+
+					// vectorial parts of force
+					for (d=0; d<NDIM; d++)
+						cell(ci).setVForce(vi,d,cell(ci).vforce(vi,d) + ftmp*distVec.at(d));
+
+					// add to wall pressure
+					wallPressure += ftmp/(PI*R0);
+
+					// add to energies
+					utmp = 0.25*sigma*pow(1 - overlap,2);
+					cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp);
+				}
+			}
+		}
+	}
+}
+
+// zebrafish area calculator
+double cellPacking2D::zfishArea(){
+	// local variables
+	double R0, h;
+	double channelArea, resArea, horseshoeArea;
+
+	// boundary values
+	R0 = L.at(0);
+	h = L.at(1);
+
+	// various region areas
+	channelArea 	= 2.0*(R0 - w0)*(R0 + h);
+	resArea 		= 4.0*R0*w0;
+	horseshoeArea 	= 0.5*PI*R0*R0;
+
+	// return total area
+	return channelArea + resArea + horseshoeArea;
+}
+
+// dp zebrafish packing fraction calculator
+double cellPacking2D::dpZfishPackingFraction(){
+	// local variables
+	int ci;
+	double particleArea;
+
+	// particle area
+	particleArea = 0.0;
+	for (ci=0; ci<NCELLS; ci++)
+		particleArea += cell(ci).vertexArea();
+
+	// packing fraction
+	return particleArea/zfishArea();
+}
+
+// Soft particle test functions
+
+// Minimize overlaps of sp particles that represent cell positions
 void cellPacking2D::fireMinimizeZebrafishSP(vector<double>& radii, double attractiveParam){
 	// HARD CODE IN FIRE PARAMETERS
 	const double alpha0 	= 0.25;
@@ -733,7 +1559,7 @@ void cellPacking2D::fireMinimizeZebrafishSP(vector<double>& radii, double attrac
 	double alpha 			= alpha0;
 	double alphat 			= alpha;
 	double t 				= 0.0;
-	double Ptol 			= 1e-8;
+	double Ptol 			= 1e-6;
 	double Ktol 			= 1e-12;
 	bool converged 			= false;
 
@@ -765,7 +1591,7 @@ void cellPacking2D::fireMinimizeZebrafishSP(vector<double>& radii, double attrac
 	spActiveZebrafishWallForces(radii,wallPressure);
 
 	// initialize virial pressure from pressure from last time
-	Pvirial = 0.5*(sigmaXX + sigmaYY);
+	Pvirial = 0.5*(sigmaXX + sigmaYY)/zfishArea();
 
 	// update kinetic energy based on com velocity
 	Knew = 0.0;
@@ -926,7 +1752,7 @@ void cellPacking2D::fireMinimizeZebrafishSP(vector<double>& radii, double attrac
 		t += dt;
 
 		// update virial pressure
-		Pvirial = 0.5*(sigmaXX + sigmaYY);
+		Pvirial = 0.5*(sigmaXX + sigmaYY)/zfishArea();
 
 		// update kinetic energy based on com velocity
 		Knew = 0.0;
@@ -975,7 +1801,6 @@ void cellPacking2D::fireMinimizeZebrafishSP(vector<double>& radii, double attrac
 	if (itr == itrMax)
 		cout << "	** FIRE not converged in itrMax = " << itr << " force evaluations" << endl;
 }
-
 
 // calculate wall forces due to horseshoe
 void cellPacking2D::spActiveZebrafishWallForces(vector<double>& radii, double& wallPressure){
@@ -1170,6 +1995,35 @@ void cellPacking2D::spActiveZebrafishWallForces(vector<double>& radii, double& w
 					cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
 			}
 
+			// check reservoir before horseshoe side walls
+			if ( ((x < -R0 + 0.5*sigma && x < 0) || (x > R0 - 0.5*sigma && x > 0)) && y < h + 2.0*w0) {
+				// check variable for exterior wall force
+				wall = 0;
+
+				// particle touching left exterior wall
+				if (x < -R0 + 0.5*sigma && x < 0){
+					lwx = x + R0;
+					wall = -1;
+				}
+				else if (x > R0 - 0.5*sigma && x > 0){
+					lwx = R0 - x;
+					wall = 1;
+				}
+
+				// overlap with wall
+				overlap = 2.0*lwx/sigma;
+
+				// add to x force ONLY
+				ftmp = 1 - overlap;
+				cell(ci).setCForce(0,cell(ci).cforce(0) - wall*ftmp);
+
+				// add to energies
+				utmp = 0.25*sigma*pow(1 - overlap,2);
+				for (vi=0; vi<cell(ci).getNV(); vi++)
+					cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
+
+			}
+
 			// then check overlap with horseshoe edge: get radial distance from horseshoe center
 			centerDist = sqrt(x*x + (y-h-2.0*w0)*(y-h-2.0*w0));
 
@@ -1204,7 +2058,7 @@ void cellPacking2D::spActiveZebrafishWallForces(vector<double>& radii, double& w
 	}
 }
 
-
+// energy-conservation test
 void cellPacking2D::spActiveZebrafishNVE(vector<double>& radii, double v0){
 	// local variables
 	int t;
@@ -1224,7 +2078,7 @@ void cellPacking2D::spActiveZebrafishNVE(vector<double>& radii, double v0){
 	// loop over time, run NVE dynamics
 	for (t=0; t<NT; t++){
 		// update virial pressure
-		Pvirial = 0.5*(sigmaXX + sigmaYY);
+		Pvirial = 0.5*(sigmaXX + sigmaYY)/zfishArea();
 
 		// update kinetic energy based on com velocity
 		K = 0.0;
@@ -1303,13 +2157,13 @@ void cellPacking2D::spActiveZebrafishVicsek(vector<double>& radii, double attrac
 	// initialize particles in main channel
 	for (ci=0; ci<Ncurr; ci++){
 		cell(ci).setCVel(1,v0);
-		psi.at(ci) = 2.0*PI*drand48() - PI;
+		psi.at(ci) = 0.5*PI;
 	}
 
 	// loop over time, run brownian dynamics with 
 	for (t=0; t<NT; t++){
 		// update virial pressure
-		Pvirial = 0.5*(sigmaXX + sigmaYY);
+		Pvirial = 0.5*(sigmaXX + sigmaYY)/zfishArea();
 
 		// update kinetic energy based on com velocity
 		K = 0.0;
@@ -1338,12 +2192,14 @@ void cellPacking2D::spActiveZebrafishVicsek(vector<double>& radii, double attrac
 			// print if objects have been opened already
 			if (packingPrintObject.is_open()){
 				cout << "	* Printing zebrafish SP center positions to file" << endl;
-				printPositionsZebrafishSP(radii,psi);
+				printPositionsZebrafishSP(radii,psi,Ncurr);
+				// printPositionsZebrafishSP(radii,psi);
 			}
 			
 			if (energyPrintObject.is_open()){
 				cout << "	* Printing zebrafish SP energy to file" << endl;
-				printEnergyZebrafishSP(K);
+				printEnergyZebrafishSP(K,Ncurr);
+				// printEnergyZebrafishSP(K);
 			}
 		}
 
@@ -1444,10 +2300,683 @@ void cellPacking2D::spActiveZebrafishVicsek(vector<double>& radii, double attrac
 
 
 
-
-
-
 // PIPE FLOW GEOMETRY
+
+
+// active DP particles
+
+// NVE sim to check energy conservation
+void cellPacking2D::dpPntNVE(double v0){
+	// local variables
+	int t, d;
+	int ci = 0;
+	double r1, U, K;
+	double Pvirial = 0.0;
+
+	// initialize velocities for particles in main channel
+	for (ci=0; ci<NCELLS; ci++){
+		for (d=0; d<NDIM; d++){
+			r1 = drand48();
+			cell(ci).setCVel(d, v0*(1-d)*cos(2.0*PI*(r1 - 0.5)) + v0*d*sin(2.0*PI*(r1 - 0.5)) );
+		}
+	}
+
+	// run NVE for allotted time
+	for (t=0; t<NT; t++){
+		// calculate energies
+		U = totalPotentialEnergy();
+		K = totalKineticEnergy();
+
+		// update packing fraction
+		phi = packingFraction();
+
+		// print data first to get the initial condition
+		if (t % NPRINT == 0){
+			cout << "===================================================" << endl << endl;
+			cout << " 	Posterior Neural Tube DPM NVE, t = " << t << endl << endl;
+			cout << "===================================================" << endl;
+
+			if (packingPrintObject.is_open()){
+				cout << "	* Printing vetex positions to file" << endl;
+				dpPntPositions();
+			}
+			
+			if (energyPrintObject.is_open()){
+				cout << "	* Printing cell energy to file" << endl;
+				dpPntEnergy();
+			}
+			
+			cout << "	* Run data:" << endl;
+			cout << "	* U 		= " << U << endl;
+			cout << "	* K 		= " << K << endl;
+			cout << "	* E 		= " << U + K << endl;
+			cout << "	* dt 		= " << dt << endl;
+			cout << endl << endl;
+		}
+
+		// use velocity verlet to advance time
+
+		// update positions
+		for (ci=0; ci<NCELLS; ci++){
+			cell(ci).verletPositionUpdate(dt);
+			cell(ci).updateCPos();
+		}
+
+		// reset contacts before force calculation
+		resetContacts();
+
+		// calculate forces
+		calculateForces();
+		dpPNTWallForces();
+
+		// update velocities
+		for (ci=0; ci<NCELLS; ci++)
+			cell(ci).verletVelocityUpdate(dt);
+	}
+
+	// print something to conclude
+	cout << "t = NT = " << t << ", so ending NVE run!" << endl;
+}
+
+// DPM compression simulation
+void cellPacking2D::dpPntIsoCompression(double Ptol, double phiTarget, double deltaPhi){
+	// local variables
+	double phi0, phiNew, dphi, Pvirial, Pcheck;
+	int NSTEPS, k;
+
+	// tolerances
+	const double Ktol = 1e-10;
+
+	// calculate phi before initial minimization
+	phi = packingFraction();
+
+	// relax shapes (energies calculated in relax function)
+	cout << "	** IN qsIsoCompression, performing initial relaxation" << endl;
+	dpPntFireMinP(Ptol, Ktol);
+
+	// get initial packing fraction
+	phi = packingFraction();
+	phi0 = phi;
+
+	// determine number of steps to target
+	NSTEPS = ceil((phiTarget - phi0)/deltaPhi) + 1;
+
+	// update new dphi to make steps even
+	dphi = (phiTarget - phi)/NSTEPS;
+
+	// iterator
+	k = 0;
+
+	// loop until phi is the correct value
+	while (k < NSTEPS){
+		// update iterator
+		k++;
+
+		// output to console
+		cout << "===================================================" << endl << endl << endl;
+		cout << " 	quasistatic isotropic compression to target phi = " << phiTarget << endl << endl;
+		cout << "===================================================" << endl;
+		cout << "	* k 			= " << k << endl;
+		cout << "	* NSTEPS 		= " << NSTEPS << endl;		
+		cout << "	* dphi 			= " << dphi << endl << endl;
+		cout << "	AFTER LAST MINIMIZATION:" << endl;
+		cout << "	* phi 			= " << phi << endl;
+		cout << endl << endl;
+
+		// increase packing fraction to new phi value
+		phiNew = phi0 + k*dphi;
+		setPackingFraction(phiNew);
+
+		// calculate phi after system scale
+		phi = packingFraction();
+
+		// relax shapes (energies calculated in relax function)
+		dpPntFireMinP(Ptol, Ktol);
+
+		// calculate phi after minimization
+		phi = packingFraction();
+	}
+}
+
+void cellPacking2D::dpPntFireMinP(double Ptol, double Ktol){
+	// HARD CODE IN FIRE PARAMETERS
+	const double alpha0 	= 0.25;
+	const double finc 		= 1.05;
+	const double fdec 		= 0.5;
+	const double falpha 	= 0.99;
+	const double dtmax 		= 10*dt0;
+	const double dtmin 		= 0.05*dt0;
+	const int NMIN 			= 20;
+	const int NNEGMAX 		= 2000;
+	const int NDELAY 		= 1000;
+	int npPos				= 0;
+	int npNeg 				= 0;
+	int npPMIN				= 0;
+	double alpha 			= alpha0;
+	double alphat 			= alpha;
+	double t 				= 0.0;
+	double forceScale 		= cell(0).getkint();
+	double energyScale		= forceScale;
+	double P 				= 0;
+	double boundaryArea 	= L.at(0)*L.at(1);
+
+	// local variables
+	int ci,vi,d,k,kmax;
+	double vstarnrm,fstarnrm,vtmp,ftmp;
+	double Knew, Pvirial, Kcheck, Pcheck;
+
+	// variable to test for potential energy minimization
+	bool converged = false;
+
+	// reset time step
+	dt = dt0;
+
+	// initialize forces
+	resetContacts();
+	calculateForces();
+	dpPNTWallForces();
+
+	// initialize virial pressure from pressure from last time
+	Pvirial = 0.5*(sigmaXX + sigmaYY)/boundaryArea;
+
+	// initialize energy and force tracking, pressure
+	Knew = totalKineticEnergy();
+
+	// scale P and K for convergence checking
+	Pcheck = Pvirial/(energyScale*NCELLS);
+	Kcheck = Knew/(energyScale*NCELLS);
+
+	// reset velocities to 0
+	for (ci=0; ci<NCELLS; ci++){
+		for (vi=0; vi<cell(ci).getNV(); vi++){
+			for (d=0; d<NDIM; d++)
+				cell(ci).setVVel(vi,d,0.0);
+		}
+	}
+
+	// iterate through MD time until system converged
+	kmax = 5e5;
+	for (k=0; k<kmax; k++){
+
+		// output some information to console
+		if (k % NPRINT == 0){
+			cout << "===================================================" << endl << endl;
+			cout << " 	FIRE MINIMIZATION in zebrafish boundary, k = " << k << endl << endl;
+			cout << "===================================================" << endl;			
+			cout << "	* Run data:" << endl;
+			cout << "	* K 		= " << Kcheck << endl;
+			cout << "	* Pvirial 	= " << Pcheck << endl;
+			cout << "	* phi 		= " << phi << endl;
+			cout << "	* dt 		= " << dt << endl;
+			cout << "	* alpha 	= " << alpha << endl;
+			cout << "	* alphat 	= " << alphat << endl;
+			cout << "	* P 		= " << P << endl;
+			cout << endl << endl;
+		}
+
+		// Step 1. calculate P and norms
+		P = 0.0;
+		vstarnrm = 0.0;
+		fstarnrm = 0.0;
+		for (ci=0; ci<NCELLS; ci++){
+			for (vi=0; vi<cell(ci).getNV(); vi++){
+				for (d=0; d<NDIM; d++){
+					// get tmp variables
+					ftmp = cell(ci).vforce(vi,d);
+					vtmp = cell(ci).vvel(vi,d);
+
+					// calculate based on all vertices on all cells
+					P += ftmp*vtmp;
+					vstarnrm += vtmp*vtmp;
+					fstarnrm += ftmp*ftmp;
+				}
+			}
+		}
+
+		// get norms
+		vstarnrm = sqrt(vstarnrm);
+		fstarnrm = sqrt(fstarnrm);
+
+
+		// Step 2. Adjust simulation based on net motion of system
+		if (P > 0){
+			// increment pos counter
+			npPos++;
+
+			// reset neg counter
+			npNeg = 0;
+
+			// update alpha_t for next time
+			alphat = alpha;
+
+			// alter sim if enough positive steps taken
+			if (npPos > NMIN){
+				// change time step
+				if (dt*finc < dtmax)
+					dt *= finc;
+				else
+					dt = dtmax;
+
+				// decrease alpha
+				alpha *= falpha;
+			}
+		}
+		else{
+			// reset pos counter
+			npPos = 0;
+
+			// rest neg counter
+			npNeg++;
+
+			// check for stuck sim
+			if (npNeg > NNEGMAX)
+				break;
+
+			// decrease time step if past initial delay
+			if (k > NMIN){
+				// decrease time step 
+				if (dt*fdec > dtmin)
+					dt *= fdec;
+				else
+					dt = dtmin;
+
+				// change alpha
+				alpha = alpha0;
+				alphat = alpha;
+			}
+
+			// take half step backwards
+			for (ci=0; ci<NCELLS; ci++){
+				for (vi=0; vi<cell(ci).getNV(); vi++){
+					for (d=0; d<NDIM; d++)
+						cell(ci).setVPos(vi,d,cell(ci).vpos(vi,d) - 0.5*dt*cell(ci).vvel(vi,d));
+				}
+			}
+
+			// reset velocities to 0
+			for (ci=0; ci<NCELLS; ci++){
+				for (vi=0; vi<cell(ci).getNV(); vi++){
+					for (d=0; d<NDIM; d++)
+						cell(ci).setVVel(vi,d,0.0);
+				}
+			}
+		}
+
+		// update velocities if forces are acting
+		if (fstarnrm > 0){
+			for (ci=0; ci<NCELLS; ci++){
+				for (vi=0; vi<cell(ci).getNV(); vi++){
+					for (d=0; d<NDIM; d++){
+						vtmp = (1 - alphat)*cell(ci).vvel(vi,d) + alphat*(cell(ci).vforce(vi,d)/fstarnrm)*vstarnrm;
+						cell(ci).setVVel(vi,d,vtmp);
+					}
+				}
+			}
+		}
+
+		// do verlet update
+		for (ci=0; ci<NCELLS; ci++){
+			cell(ci).verletPositionUpdate(dt);
+			cell(ci).updateCPos();
+		}
+
+		// reset contacts before force calculation
+		resetContacts();
+
+		// calculate forces
+		calculateForces();
+		dpPNTWallForces();
+
+		// update velocities
+		for (ci=0; ci<NCELLS; ci++)
+			cell(ci).verletVelocityUpdate(dt);
+
+		// update t
+		t += dt;
+
+		// track energy and forces
+		Knew = totalKineticEnergy();
+		Pvirial = 0.5*(sigmaXX + sigmaYY)/boundaryArea;
+
+		// scale P and K for convergence checking
+		Pcheck = Pvirial/(energyScale*NCELLS);
+		Kcheck = Knew/(energyScale*NCELLS);
+
+		// update if Pvirial under tol
+		if (abs(Pcheck) < Ptol)
+			npPMIN++;
+		else
+			npPMIN = 0;
+
+		// check for convergence
+		converged = (abs(Pcheck) < Ptol && npPMIN > NMIN);
+		converged = (converged || (abs(Pcheck) > Ptol && Kcheck < Ktol));
+
+		if (converged){
+			cout << "	** FIRE has converged!" << endl;
+			cout << "	** Kcheck = " << Kcheck << endl;
+			cout << "	** Pcheck = " << Pcheck << endl;
+			cout << "	** k = " << k << ", t = " << t << endl;
+			cout << "	** Breaking out of FIRE protocol." << endl;
+
+			if (packingPrintObject.is_open()){
+				cout << "	* Printing vetex positions to file" << endl;
+				dpPntPositions();
+			}
+			
+			if (energyPrintObject.is_open()){
+				cout << "	* Printing cell energy to file" << endl;
+				dpPntEnergy();
+			}
+			break;
+		}
+	}
+
+	// reset dt to be original value before ending function
+	dt = dt0;
+
+	// if no convergence, just stop
+	if (k == kmax)
+		cout << "	** FIRE not converged in kmax = " << kmax << " force evaluations" << endl;
+}
+
+void cellPacking2D::dpPNTWallForces(){
+	// local variables
+	int ci, vi;
+	double overlap, sigma, x, y, lwy;
+	double ftmp, utmp;
+
+	// loop over cells
+	for (ci=0; ci<NCELLS; ci++){
+		// loop over vertices
+		for (vi=0; vi<cell(ci).getNV(); vi++){
+			// get vertex radius
+			sigma = cell(ci).getl0()*cell(ci).getdel();
+
+			// get vertex positions
+			x = cell(ci).vpos(vi,0);
+			y = cell(ci).vpos(vi,1);
+
+			// if true, interacting with bottom wall
+			if (y < 0.5*sigma){
+				// vector from wall to particle
+				lwy = y;
+
+				// overlap with wall
+				overlap = 2.0*lwy/sigma;
+
+				// add to y force ONLY (points in positive y direction)
+				ftmp = 1 - overlap;
+				cell(ci).setVForce(vi,1,cell(ci).vforce(vi,1) + ftmp);
+
+				// add to energies
+				utmp = 0.25*sigma*pow(1 - overlap,2);
+				cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp);
+
+				// virial stress in YY direction
+				sigmaYY += ftmp*lwy;
+			}
+
+			// if true, interacting with top wall
+			if (y > L.at(1) - 0.5*sigma){
+				// vector from particle to wall
+				lwy = L.at(1) - y;
+
+				// overlap with wall
+				overlap = 2.0*lwy/sigma;
+
+				// add to y force ONLY (points in positive y direction)
+				ftmp = 1 - overlap;
+				cell(ci).setVForce(vi,1,cell(ci).vforce(vi,1) - ftmp);
+
+				// add to energies
+				utmp = 0.25*sigma*pow(1 - overlap,2);
+				cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp);
+
+				// virial stress in YY direction 
+				sigmaYY -= ftmp*lwy;
+			}
+		}
+	}
+}
+
+
+
+// active SP particles
+void cellPacking2D::pipeFireMinP(vector<double>& radii, double attractiveParam){
+	// HARD CODE IN FIRE PARAMETERS
+	const double alpha0 	= 0.25;
+	const double finc 		= 1.01;
+	const double fdec 		= 0.5;
+	const double falpha 	= 0.99;
+	const double dtmax 		= 10*dt0;
+	const double dtmin 		= 0.02*dt0;
+	const int NMIN 			= 200;
+	const int NNEGMAX 		= 2000;
+	const int NDELAY 		= 1000;
+	int npPos				= 0;
+	int npNeg 				= 0;
+	int npPMIN				= 0;
+	int closed 				= 1;
+	double alpha 			= alpha0;
+	double alphat 			= alpha;
+	double t 				= 0.0;
+	double Ptol 			= 1e-6;
+	double Ktol 			= 1e-12;
+	bool converged 			= false;
+	double boundaryArea 	= L.at(0)*L.at(1);
+
+	// local variables
+	int ci,vi,d,itr,itrMax;
+	double P,vstarnrm,fstarnrm,vtmp,ftmp,ptmp;
+	double Knew, Pvirial;
+	double Kcheck, Pcheck;
+
+	// reset time step
+	dt = dt0;
+
+	// reset velocities to 0
+	for (ci=0; ci<NCELLS; ci++){
+		for (d=0; d<NDIM; d++){
+			cell(ci).setCVel(d,0.0);
+			cell(ci).setCForce(d,0.0);
+		}
+	}
+
+	// psi for printing
+	vector<double> psi(NCELLS,0.0);
+
+	// initialize forces (neglect damping forces, only interactions)
+	resetContacts();
+	spAttractiveForces(radii,attractiveParam);
+	spActivePipeWallForces(radii);
+
+	// initialize virial pressure from pressure from last time
+	Pvirial = 0.5*(sigmaXX + sigmaYY)/boundaryArea;
+
+	// update kinetic energy based on com velocity
+	Knew = 0.0;
+	for (ci=0; ci<NCELLS; ci++)
+		Knew += 0.5*(PI*pow(radii.at(ci),2))*sqrt(pow(cell(ci).cvel(0),2) + pow(cell(ci).cvel(1),2));
+
+	// calc check variables
+	Kcheck = Knew/(NDIM*NCELLS);
+	Pcheck = Pvirial/(NDIM*NCELLS);
+
+	// iterate through MD time until system converged
+	itrMax = 1e6;
+	for (itr=0; itr<itrMax; itr++){
+
+		// output some information to console
+		if (itr % NPRINT == 0){
+			cout << "===================================================" << endl << endl;
+			cout << " 	FIRE MINIMIZATION, itr = " << itr << endl << endl;
+			cout << "===================================================" << endl;
+			cout << "	* Run data:" << endl;
+			cout << "	* NCELLS 	= " << NCELLS << endl;
+			cout << "	* Kcheck 	= " << Kcheck << endl;
+			cout << "	* Pcheck 	= " << Pcheck << endl;
+			cout << "	* phi 		= " << phi << endl;
+			cout << "	* dt 		= " << dt << endl;
+			cout << "	* alpha 	= " << alpha << endl;
+			cout << "	* P 		= " << P << endl;
+			cout << endl << endl;
+		}
+
+		// Step 1. calculate P and norms
+		P = 0.0;
+		vstarnrm = 0.0;
+		fstarnrm = 0.0;
+		for (ci=0; ci<NCELLS; ci++){
+			for (d=0; d<NDIM; d++){
+				// get tmp variables
+				ftmp = cell(ci).cforce(d);
+				vtmp = cell(ci).cvel(d);
+
+				// calculate based on all vertices on all cells
+				P += ftmp*vtmp;
+				vstarnrm += vtmp*vtmp;
+				fstarnrm += ftmp*ftmp;
+			}
+		}
+
+
+		// get norms
+		vstarnrm = sqrt(vstarnrm);
+		fstarnrm = sqrt(fstarnrm);
+
+
+		// Step 2. Adjust simulation based on net motion of system
+		if (P > 0){
+			// increment pos counter
+			npPos++;
+
+			// reset neg counter
+			npNeg = 0;
+
+			// update alpha_t for next time
+			alphat = alpha;
+
+			// alter sim if enough positive steps taken
+			if (npPos > NMIN){
+				// change time step
+				if (dt*finc < dtmax)
+					dt *= finc;
+				else
+					dt = dtmax;
+
+				// decrease alpha
+				alpha *= falpha;
+			}
+		}
+		else{
+			// reset pos counter
+			npPos = 0;
+
+			// rest neg counter
+			npNeg++;
+
+			// check for stuck sim
+			if (npNeg > NNEGMAX){
+				cout << "	** FIRE has stalled..." << endl;
+				cout << "	** Kcheck = " << Kcheck << endl;
+				cout << "	** Pcheck = " << Pcheck << endl;
+				cout << "	** itr = " << itr << ", t = " << t << endl;
+				cout << "	** Breaking out of FIRE protocol." << endl;
+				break;
+			}
+
+			// decrease time step if past initial delay
+			if (itr > NMIN){
+				// decrease time step 
+				if (dt*fdec > dtmin)
+					dt *= fdec;
+				else
+					dt = dtmin;
+
+				// change alpha
+				alpha = alpha0;
+				alphat = alpha;
+			}
+
+			// take half step backwards
+			for (ci=0; ci<NCELLS; ci++){
+				for (d=0; d<NDIM; d++)
+					cell(ci).setCPos(d,cell(ci).cpos(d) - 0.5*dt*cell(ci).cvel(d));
+			}
+
+			// reset velocities to 0
+			for (ci=0; ci<NCELLS; ci++){
+				for (d=0; d<NDIM; d++)
+					cell(ci).setCVel(d,0.0);
+			}
+		}
+
+		// update velocities if forces are acting
+		if (fstarnrm > 0){
+			for (ci=0; ci<NCELLS; ci++){
+				for (d=0; d<NDIM; d++){
+					vtmp = (1 - alphat)*cell(ci).cvel(d) + alphat*(cell(ci).cforce(d)/fstarnrm)*vstarnrm;
+					cell(ci).setCVel(d,vtmp);
+				}
+			}
+		}
+
+		// verlet position update
+		spPosVerlet();
+
+		// reset contacts before force calculation
+		resetContacts();
+
+		// calculate forces between disks
+		spAttractiveForces(radii,attractiveParam);
+		spActivePipeWallForces(radii);
+
+		// verlet velocity update
+		spVelVerlet(radii);
+
+		// update t
+		t += dt;
+
+		// update virial pressure
+		Pvirial = 0.5*(sigmaXX + sigmaYY)/boundaryArea;
+
+		// update kinetic energy based on com velocity
+		Knew = 0.0;
+		for (ci=0; ci<NCELLS; ci++)
+			Knew += 0.5*(PI*pow(radii.at(ci),2))*sqrt(pow(cell(ci).cvel(0),2) + pow(cell(ci).cvel(1),2));
+
+		// update if Pvirial under tol
+		if (abs(Pvirial) < Ptol)
+			npPMIN++;
+		else
+			npPMIN = 0;
+
+		// calc check variables
+		Kcheck = Knew/(NDIM*NCELLS);
+		Pcheck = Pvirial/(NDIM*NCELLS);
+
+		// check for convergence
+		converged = (abs(Pcheck) < Ptol && npPMIN > NMIN);
+		converged = (converged || (abs(Pcheck) > Ptol && Kcheck < Ktol));
+
+		if (converged){
+			cout << "	** FIRE has converged!" << endl;
+			cout << "	** Kcheck = " << Kcheck << endl;
+			cout << "	** Pcheck = " << Pcheck << endl;
+			cout << "	** itr = " << itr << ", t = " << t << endl;
+			cout << "	** Breaking out of FIRE protocol." << endl;
+			break;
+		}
+	}
+
+	// reset dt to be original value before ending function
+	dt = dt0;
+
+	// if no convergence, just stop
+	if (itr == itrMax)
+		cout << "	** FIRE not converged in itrMax = " << itr << " force evaluations" << endl;
+}
 
 void cellPacking2D::spActivePipeWallForces(vector<double>& radii){
 	// local variables
@@ -1568,7 +3097,7 @@ void cellPacking2D::spActivePipeNVE(vector<double>& radii, double T0){
 	// loop over time, run NVE dynamics
 	for (t=0; t<NT; t++){
 		// update virial pressure
-		Pvirial = 0.5*(sigmaXX + sigmaYY);
+		Pvirial = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
 
 		// update kinetic energy based on com velocity
 		K = 0.0;
@@ -1632,7 +3161,7 @@ void cellPacking2D::spActivePipeFlow(vector<double>& radii, double attractivePar
 	// loop over time, integrate overdamped eqn of motion with active motility
 	for (t=0; t<NT; t++){
 		// update virial pressure
-		Pvirial = 0.5*(sigmaXX + sigmaYY);
+		Pvirial = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
 
 		// update kinetic energy based on com velocity
 		K = 0.0;
@@ -1727,7 +3256,125 @@ void cellPacking2D::spActivePipeFlow(vector<double>& radii, double attractivePar
 }
 
 
+
+
+
 // PRINT FUNCTIONS
+void cellPacking2D::dpZebrafishPositions(){
+	// local variables
+	int w1 = 12;
+	int w2 = 6;
+	int w3 = 30;
+
+	// check to see if file is open
+	if (!packingPrintObject.is_open()) {
+		cout << "	ERROR: packingPrintObject is not open in printSystemPositions(), ending." << endl;
+		exit(1);
+	}
+
+	// print information starting information
+	packingPrintObject << setw(w1) << left << "NEWFR" << " " << endl;
+	packingPrintObject << setw(w1) << left << "NUMCL" << setw(w2) << right << NCELLS << endl;
+
+	// print hopper information
+	packingPrintObject << setw(w1) << left << "BNDRY";
+	packingPrintObject << setw(w3) << right << L.at(0);
+	packingPrintObject << setw(w3) << right << L.at(1);
+	packingPrintObject << setw(w2) << setprecision(6) << right << w0;
+	packingPrintObject << endl;
+
+	// print stress information
+	packingPrintObject << setw(w1) << left << "VRIAL";
+	packingPrintObject << setw(w3) << right << sigmaXX/zfishArea();
+	packingPrintObject << setw(w3) << right << sigmaXY/zfishArea();
+	packingPrintObject << setw(w3) << right << sigmaYX/zfishArea();
+	packingPrintObject << setw(w3) << right << sigmaYY/zfishArea();
+	packingPrintObject << endl;
+
+	// print info for rest of the cells
+	for (int ci=0; ci<NCELLS; ci++)
+		cell(ci).printVertexPositions(packingPrintObject,ci);
+
+	// print end frame
+	packingPrintObject << setw(w1) << left << "ENDFR" << " " << endl;
+}
+
+void cellPacking2D::dpZebrafishEnergy(){
+	// check to see if file is open
+	if (!energyPrintObject.is_open()) {
+		cout << "	ERROR: energyPrintObject is not open in printSystemEnergy(), ending." << endl;
+		exit(1);
+	}
+
+	// loop over particles, print cell energy
+	energyPrintObject << setw(30) << setprecision(16) << right << interactionPotentialEnergy();
+	energyPrintObject << setw(30) << setprecision(16) << right << totalPotentialEnergy();
+	energyPrintObject << setw(30) << setprecision(16) << right << totalKineticEnergy();
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaXX/zfishArea();
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaXY/zfishArea();
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaYX/zfishArea();
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaYY/zfishArea();
+	energyPrintObject << setw(30) << setprecision(16) << right << phi;
+	energyPrintObject << endl;
+}
+
+void cellPacking2D::dpPntPositions(){
+	// local variables
+	int w1 = 12;
+	int w2 = 6;
+	int w3 = 30;
+
+	// check to see if file is open
+	if (!packingPrintObject.is_open()) {
+		cout << "	ERROR: packingPrintObject is not open in printSystemPositions(), ending." << endl;
+		exit(1);
+	}
+
+	// print information starting information
+	packingPrintObject << setw(w1) << left << "NEWFR" << " " << endl;
+	packingPrintObject << setw(w1) << left << "NUMCL" << setw(w2) << right << NCELLS << endl;
+
+	// print hopper information
+	packingPrintObject << setw(w1) << left << "BNDRY";
+	packingPrintObject << setw(w3) << right << L.at(0);
+	packingPrintObject << setw(w3) << right << L.at(1);
+	packingPrintObject << endl;
+
+	// print stress information
+	packingPrintObject << setw(w1) << left << "VRIAL";
+	packingPrintObject << setw(w3) << right << sigmaXX/(L.at(0)*L.at(1));
+	packingPrintObject << setw(w3) << right << sigmaXY/(L.at(0)*L.at(1));
+	packingPrintObject << setw(w3) << right << sigmaYX/(L.at(0)*L.at(1));
+	packingPrintObject << setw(w3) << right << sigmaYY/(L.at(0)*L.at(1));
+	packingPrintObject << endl;
+
+	// print info for rest of the cells
+	for (int ci=0; ci<NCELLS; ci++)
+		cell(ci).printVertexPositions(packingPrintObject,ci);
+
+	// print end frame
+	packingPrintObject << setw(w1) << left << "ENDFR" << " " << endl;
+}
+
+void cellPacking2D::dpPntEnergy(){
+	// check to see if file is open
+	if (!energyPrintObject.is_open()) {
+		cout << "	ERROR: energyPrintObject is not open in printSystemEnergy(), ending." << endl;
+		exit(1);
+	}
+
+	// loop over particles, print cell energy
+	energyPrintObject << setw(30) << setprecision(16) << right << interactionPotentialEnergy();
+	energyPrintObject << setw(30) << setprecision(16) << right << totalPotentialEnergy();
+	energyPrintObject << setw(30) << setprecision(16) << right << totalKineticEnergy();
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaXX/(L.at(0)*L.at(1));
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaXY/(L.at(0)*L.at(1));
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaYX/(L.at(0)*L.at(1));
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaYY/(L.at(0)*L.at(1));
+	energyPrintObject << setw(30) << setprecision(16) << right << phi;
+	energyPrintObject << endl;
+}
+
 
 void cellPacking2D::printPositionsZebrafishSP(vector<double>& radii, vector<double>& psi){
 	// local variables
@@ -1754,10 +3401,10 @@ void cellPacking2D::printPositionsZebrafishSP(vector<double>& radii, vector<doub
 
 	// print stress information
 	packingPrintObject << setw(w1) << left << "VRIAL";
-	packingPrintObject << setw(w2) << right << sigmaXX;
-	packingPrintObject << setw(w2) << right << sigmaXY;
-	packingPrintObject << setw(w2) << right << sigmaYX;
-	packingPrintObject << setw(w2) << right << sigmaYY;
+	packingPrintObject << setw(w2) << right << sigmaXX/zfishArea();
+	packingPrintObject << setw(w2) << right << sigmaXY/zfishArea();
+	packingPrintObject << setw(w2) << right << sigmaYX/zfishArea();
+	packingPrintObject << setw(w2) << right << sigmaYY/zfishArea();
 	packingPrintObject << endl;
 
 	// print header for information
@@ -1774,6 +3421,79 @@ void cellPacking2D::printPositionsZebrafishSP(vector<double>& radii, vector<doub
 
 	// loop over cells, print positions, forces, velocities
 	for (ci=0; ci<NCELLS; ci++){
+		// print row label
+		packingPrintObject << setw(w1) << left << "SCELL";
+
+		// print sp index
+		packingPrintObject << setw(w2) << right << ci;
+
+		// print radius
+		packingPrintObject << setw(w2) << right << radii.at(ci);
+
+		// print polarization
+		packingPrintObject << setw(w2) << right << psi.at(ci);
+
+		// print sp positions
+		for (d=0; d<NDIM; d++)
+			packingPrintObject << setw(w2) << right << cell(ci).cpos(d);
+
+		// print sp velocities
+		for (d=0; d<NDIM; d++)
+			packingPrintObject << setw(w2) << right << cell(ci).cvel(d);
+
+		// print new line
+		packingPrintObject << endl;
+	}
+
+	// print end frame
+	packingPrintObject << setw(w1) << left << "ENDFR" << " " << endl;
+}
+
+void cellPacking2D::printPositionsZebrafishSP(vector<double>& radii, vector<double>& psi, int Ncurr){
+	// local variables
+	int ci,d;
+	int w1 = 25;
+	int w2 = 15;
+
+	// check to see if file is open
+	if (!packingPrintObject.is_open()) {
+		cout << "	ERROR: packingPrintObject is not open in spActiveZebrafishPosPrint(), ending." << endl;
+		exit(1);
+	}
+
+	// print information starting information
+	packingPrintObject << setw(w1) << left << "NEWFR" << " " << endl;
+	packingPrintObject << setw(w1) << left << "NUMCL" << setw(w2) << right << Ncurr << endl;
+
+	// print hopper information
+	packingPrintObject << setw(w1) << left << "BNDRY";
+	packingPrintObject << setw(w2) << right << L.at(0);
+	packingPrintObject << setw(w2) << right << L.at(1);
+	packingPrintObject << setw(w2) << setprecision(6) << right << w0;
+	packingPrintObject << endl;
+
+	// print stress information
+	packingPrintObject << setw(w1) << left << "VRIAL";
+	packingPrintObject << setw(w2) << right << sigmaXX/zfishArea();
+	packingPrintObject << setw(w2) << right << sigmaXY/zfishArea();
+	packingPrintObject << setw(w2) << right << sigmaYX/zfishArea();
+	packingPrintObject << setw(w2) << right << sigmaYY/zfishArea();
+	packingPrintObject << endl;
+
+	// print header for information
+	packingPrintObject << setw(w1) << left << "SINFO";
+	packingPrintObject << setw(w2) << right << "id";
+	packingPrintObject << setw(w2) << right << "r";
+	packingPrintObject << setw(w2) << right << "x";
+	packingPrintObject << setw(w2) << right << "y";
+	packingPrintObject << setw(w2) << right << "vx";
+	packingPrintObject << setw(w2) << right << "vy";
+	packingPrintObject << setw(w2) << right << "fx";
+	packingPrintObject << setw(w2) << right << "fy";
+	packingPrintObject << endl;
+
+	// loop over cells, print positions, forces, velocities
+	for (ci=0; ci<Ncurr; ci++){
 		// print row label
 		packingPrintObject << setw(w1) << left << "SCELL";
 
@@ -1855,17 +3575,78 @@ void cellPacking2D::printEnergyZebrafishSP(double K){
 	// loop over particles, print cell energy
 	energyPrintObject << setw(30) << setprecision(16) << right << interactionPotentialEnergy();
 	energyPrintObject << setw(30) << setprecision(16) << right << K;
-	energyPrintObject << setw(30) << setprecision(16) << right << sigmaXX;
-	energyPrintObject << setw(30) << setprecision(16) << right << sigmaXY;
-	energyPrintObject << setw(30) << setprecision(16) << right << sigmaYX;
-	energyPrintObject << setw(30) << setprecision(16) << right << sigmaYY;
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaXX/zfishArea();
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaXY/zfishArea();
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaYX/zfishArea();
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaYY/zfishArea();
 	energyPrintObject << setw(30) << setprecision(16) << right << fracOnLeft;
 	energyPrintObject << setw(30) << setprecision(16) << right << polarization;
 	energyPrintObject << setw(30) << setprecision(16) << right << meanADMVel;
 	energyPrintObject << endl;
 }
 
+void cellPacking2D::printEnergyZebrafishSP(double K, int Ncurr){
+	// local variables
+	int ci, d;
+	double w = L.at(0) - w0;
 
+	// check to see if file is open
+	if (!energyPrintObject.is_open()) {
+		cout << "	ERROR: energyPrintObject is not open in printSystemEnergy(), ending." << endl;
+		exit(1);
+	}
+
+	// calculate zebrafish-specific states
+
+	// fraction of cells on left side of boundary
+	double fracOnLeft = 0.0;
+	for (ci=0; ci<Ncurr; ci++){
+		if (cell(ci).cpos(0) < 0)
+			fracOnLeft += 1.0;
+	}
+	fracOnLeft /= Ncurr;
+
+	// polarization
+	double polarization = 0.0;
+	vector<double> meanUnitVec(NDIM,0.0);
+	for (ci=0; ci<Ncurr; ci++){
+
+		// get ci vel vector size
+		polarization = 0.0;
+		for (d=0; d<NDIM; d++)
+			polarization += pow(cell(ci).cvel(d),2);
+		polarization = sqrt(polarization);
+
+		// update mean unit vect
+		for (d=0; d<NDIM; d++)
+			meanUnitVec.at(d) += cell(ci).cvel(d)/(polarization*Ncurr);
+	}
+
+	// calculate polarization from magnitude of mean velocity direction
+	polarization = 0.0;
+	for (d=0; d<NDIM; d++)
+		polarization += pow(meanUnitVec.at(d),2);
+	polarization = sqrt(polarization);
+
+	// calculate mean ADM velocity
+	double meanADMVel = 0.0;
+	for (ci=0; ci<Ncurr; ci++){
+		if (cell(ci).cpos(1) < L.at(1) && cell(ci).cpos(0) < 0.5*(w + w0) && cell(ci).cpos(0) > -0.5*(w + w0))
+			meanADMVel += sqrt(pow(cell(ci).cvel(0),2) + pow(cell(ci).cvel(1),2))/Ncurr;
+	}
+
+	// loop over particles, print cell energy
+	energyPrintObject << setw(30) << setprecision(16) << right << interactionPotentialEnergy();
+	energyPrintObject << setw(30) << setprecision(16) << right << K;
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaXX/zfishArea();
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaXY/zfishArea();
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaYX/zfishArea();
+	energyPrintObject << setw(30) << setprecision(16) << right << sigmaYY/zfishArea();
+	energyPrintObject << setw(30) << setprecision(16) << right << fracOnLeft;
+	energyPrintObject << setw(30) << setprecision(16) << right << polarization;
+	energyPrintObject << setw(30) << setprecision(16) << right << meanADMVel;
+	energyPrintObject << endl;
+}
 
 
 
