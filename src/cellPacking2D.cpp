@@ -1304,10 +1304,10 @@ void cellPacking2D::gelationForces(){
 	}
 
 	// normalize virial stresses by the area
-	sigmaXX /= L.at(0)*L.at(1);
-	sigmaXY /= L.at(0)*L.at(1);
-	sigmaYX /= L.at(0)*L.at(1);
-	sigmaYY /= L.at(0)*L.at(1);
+	// sigmaXX /= L.at(0)*L.at(1);
+	// sigmaXY /= L.at(0)*L.at(1);
+	// sigmaYX /= L.at(0)*L.at(1);
+	// sigmaYY /= L.at(0)*L.at(1);
 }
 
 // fire energy minimization
@@ -3007,7 +3007,7 @@ void cellPacking2D::qsIsoGelRatchet(double phiGel, double deltaPhi, double plThr
 
 	// relax shapes (energies calculated in relax function)
 	cout << "	** IN qsIsoCompression, performing initial relaxation" << endl;
-	fireMinimizeP(Ptol, Ktol);
+	fireMinimizeGel(Ptol, Ktol);
 
 	// get initial packing fraction
 	phi = packingFraction();
