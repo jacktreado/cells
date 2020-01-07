@@ -32,11 +32,11 @@ startSeed=$9
 
 # other parameters
 sizeDisp=0
-plThresh=1e-6
+plThresh=1e-4
 dl0=1e-3
 kl=1.0
 ka=1.0
-kb=0.01
+kb=1e-4
 del=1.0
 
 let numSeeds=$numSeedsPerRun*$numRuns
