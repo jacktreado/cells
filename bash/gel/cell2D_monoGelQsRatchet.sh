@@ -36,7 +36,7 @@ plThresh=1e-4
 dl0=1e-3
 kl=1.0
 ka=1.0
-kb=0.01
+kb=0.1
 del=1.0
 
 let numSeeds=$numSeedsPerRun*$numRuns
