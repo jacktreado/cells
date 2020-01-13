@@ -22,7 +22,7 @@ mkdir -p out
 # inputs
 NCELLS=$1
 NV=$2
-phiTarget=$3
+plThresh=$3
 aGelation=$4
 partition=$5
 time=$6
@@ -32,7 +32,7 @@ startSeed=$9
 
 # other parameters
 sizeDisp=0
-plThresh=1e-4
+phiTarget=1.03
 dl0=1e-3
 kl=1.0
 ka=1.0
@@ -43,7 +43,7 @@ let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=gelQS_N"$NCELLS"_NV"$NV"_pt"$phiTarget"_a"$aGelation"
+basestr=gelQS_N"$NCELLS"_NV"$NV"_pt"$plThresh"_a"$aGelation"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation
@@ -53,7 +53,7 @@ mkdir -p $simdatadir
 # compile into binary using packing.h
 binf=bin/"$runstr".o
 mainf=$maindir/gelQsRatchet.cpp
-echo Running $numSeeds QS gelation sims of $NCELLS cells with $NV verts, starting from phi = $phiTarget using ratchet springs on perimeters and adhesion = $aGelation
+echo Running $numSeeds QS gelation sims of $NCELLS cells with $NV verts, starting from phi = $phiTarget using ratchet springs on perimeters with threshold $plThresh and adhesion = $aGelation
 
 # run compiler
 rm -f $binf
@@ -156,7 +156,7 @@ sbatch -t $time $slurmf
 # ====================
 # 1. NCELLS
 # 2. NV
-# 3. target phi for compression (phiTarget)
+# 3. plThresh (deformation threshold)
 # 4. attraction parameter
 # 5. partition
 # 6. time
