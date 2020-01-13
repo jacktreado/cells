@@ -37,9 +37,9 @@ const double PI = 4.0*atan(1);
 const int NT 					= 5e7; 			// number of time steps
 const int NPRINT 				= 2e3;			// number of time steps between prints
 const double timeStepMag 		= 0.001;		// time step in MD unit
-const double deltaPhi 			= 0.002;		// packing fraction step
+const double deltaPhi 			= 0.0005;		// packing fraction step
 const double phiDisk 			= 0.6;			// initial phi of SP disks
-const double phiGel 			= 0.3;			// final phi of gel phase
+const double phiGel 			= 0.4;			// final phi of gel phase
 const double initialCalA 		= 1.03;			// initial cal A parameter (before extension sim)
 const double calA0max 			= 1.7;			// maximum asphercity parameter
 
