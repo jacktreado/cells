@@ -37,7 +37,8 @@ const double PI = 4.0*atan(1);
 const int NT 					= 5e7; 			// number of time steps
 const int NPRINT 				= 2e3;			// number of time steps between prints
 const double timeStepMag 		= 0.001;		// time step in MD unit
-const double deltaPhi 			= 0.0005;		// packing fraction step
+const double deltaPhiGrow 		= 0.002;		// packing fraction step (packing)
+const double deltaPhiShrink		= 0.0002;		// packing fraction step (gelation)
 const double phiDisk 			= 0.6;			// initial phi of SP disks
 const double phiGel 			= 0.4;			// final phi of gel phase
 const double initialCalA 		= 1.03;			// initial cal A parameter (before extension sim)
@@ -120,7 +121,7 @@ int main(int argc, char const *argv[])
 
 	// compress to set packing fraction using FIRE, pressure relaxation
 	cout << "	** QS compresison protocol to phiTarget = " << phiTarget << endl;
-	packingObject.qsIsoCompression(phiTarget,deltaPhi);
+	packingObject.qsIsoCompression(phiTarget,deltaPhiGrow);
 
 	// -- ramp attraction
 	cout << "	** Setting attraction to a = " << a << endl;
@@ -132,8 +133,8 @@ int main(int argc, char const *argv[])
 	packingObject.openStatObject(contactFile);
 
 	// -- decrease phi as if boundary was growing: phi(t) = phi(0)/(1 + a*t)
-	cout << "	** Running qs gel extension simulation with deltaPhi = " << deltaPhi << ", calA0max = " << calA0max << endl;
-	packingObject.qsIsoGelRatchet(phiGel,deltaPhi,plThresh,dl0,calA0max,timeStepMag);
+	cout << "	** Running qs gel extension simulation with deltaPhiShrink = " << deltaPhiShrink << ", calA0max = " << calA0max << endl;
+	packingObject.qsIsoGelRatchet(phiGel,deltaPhiShrink,plThresh,dl0,calA0max,timeStepMag);
 
 	// end main successfully
 	return 0;
