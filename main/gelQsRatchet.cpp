@@ -41,7 +41,7 @@ const double deltaPhiGrow 		= 0.002;		// packing fraction step (packing)
 const double deltaPhiShrink		= 0.0005;		// packing fraction step (gelation)
 const double phiDisk 			= 0.6;			// initial phi of SP disks
 const double phiGel 			= 0.4;			// final phi of gel phase
-const double initialCalA 		= 1.03;			// initial cal A parameter (before extension sim)
+const double initialCalA 		= 1.1;			// initial cal A parameter (before extension sim)
 const double calA0max 			= 1.7;			// maximum asphercity parameter
 
 // force parameters
