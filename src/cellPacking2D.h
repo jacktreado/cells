@@ -58,6 +58,7 @@ private:
 	std::ofstream packingPrintObject;
 	std::ofstream energyPrintObject;
 	std::ofstream statPrintObject;
+	std::ofstream jamPrintObject;
 
 public:
 
@@ -111,6 +112,14 @@ public:
 		statPrintObject.open(str.c_str());
 		if (!statPrintObject.is_open()) {
 			std::cout << "	ERROR: statPrintObject could not open " << str << "..." << std::endl;
+			exit(1);
+		}
+	}
+	
+	void openJamObject(std::string& str){
+		jamPrintObject.open(str.c_str());
+		if (!jamPrintObject.is_open()) {
+			std::cout << "	ERROR: jamPrintObject could not open " << str << "..." << std::endl;
 			exit(1);
 		}
 	}
@@ -199,6 +208,9 @@ public:
 	// looping functions
 	void jammingFireRamp(double dphi, double dCalA, double asphericityTarget, double kbTarget, double phiTarget, double Ktol, double Ptol, int plotIt);
 	void compressToTarget(double dphi, double phiTarget, double asphericityTarget, double Ktol, double Ptol, int plotIt, int& frameCount);
+
+	// Find jamming functions
+	void findJamming(double dphi0, double Ktol, double Ptol);
 
 	// FIRE 2.0 relaxation functions
 	void fireMinimizeP(double Ptol, double Ktol);
@@ -304,6 +316,7 @@ public:
 
 	// printers
 	void printSystemPositions();
+	void printJammedConfig();
 	void printSystemEnergy();
 	void printSystemEnergy(int kmin);
 	void printSystemContacts();

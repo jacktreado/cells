@@ -2938,6 +2938,149 @@ void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi){
 	}
 }
 
+
+// compress isostatically to jamming
+void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
+	// local variables
+	double phi0, phiNew, dphi, Ptest, Ktest;
+	int NSTEPS, k, kmax, kr, nr, nc;
+
+	// calculate phi before initial minimization
+	phi = packingFraction();
+
+	// relax shapes (energies calculated in relax function)
+	cout << "	** IN findJamming, performing initial relaxation" << endl;
+	fireMinimizeP(Ptol, Ktol);
+
+	// calculate Ptest and Ktest
+	Ptest = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
+	Ktest = totalKineticEnergy();
+
+	Ptest = Ptest/NCELLS;
+	Ktest = Ktest/NCELLS;
+
+	// update rattlers
+	kr = 0;
+	nr = removeRattlers(kr);
+
+	// update number of contacts
+	nc = totalNumberOfContacts();
+
+	// get initial packing fraction
+	phi = packingFraction();
+
+	// iterator
+	k = 0;
+	kmax = 1e5;
+
+	// jamming variables
+	bool jammed, overcompressed, undercompressed;
+	double phiH, phiL;
+
+	// phiJ bounds
+	phiH = -1;
+	phiL = -1;
+
+	// loop until phi is the correct value
+	while (!jammed && k < kmax){
+		// output to console
+		cout << "===================================================" << endl << endl << endl;
+		cout << " 	quasistatic isotropic compression to jamming " << endl << endl;
+		cout << "===================================================" << endl;
+		cout << "	* k 			= " << k << endl;
+		cout << "	* dphi 			= " << dphi << endl;
+		cout << "	* phi 			= " << phi << endl;
+		cout << "	* phiH 			= " << phiH << endl;
+		cout << "	* phiL 			= " << phiL << endl;
+		cout << "	* Ptest 		= " << Ptest << endl;
+		cout << "	* Ktest 		= " << Ktest << endl;
+		cout << "	* # of contacts = " << nc << endl;
+		cout << "	* # of rattlers = " << nr << endl << endl;
+		cout << "	* undercompressed = " << undercompressed << endl;
+		cout << "	* overcompressed = " << overcompressed << endl;
+		cout << "	* jammed = " << jammed << endl;
+		cout << endl << endl;
+
+		// update iterator
+		k++;
+
+		// relax shapes (energies calculated in relax function)
+		fireMinimizeP(Ptol, Ktol);
+
+		// calculate Ptest and Ktest of relaxed system
+		Ptest = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
+		Ktest = totalKineticEnergy();
+
+		Ptest = Ptest/NCELLS;
+		Ktest = Ktest/NCELLS;
+
+		// update rattlers
+		kr = 0;
+		nr = removeRattlers(kr);
+
+		// update number of contacts
+		nc = totalNumberOfContacts();
+
+		// boolean checks
+		undercompressed = (Ptest < Ptol);
+		overcompressed = (Ptest > 2.0*Ptol && Ktest < Ktol && nc > 0 && nr < NCELLS);
+		jammed = (Ptest < 2.0*Ptol && Ptest > Ptol && Ktest < Ktol);
+
+		// update packing fraction based on jamming check
+		dphi = 0.0;
+		if (phiH < 0){
+			if (undercompressed)
+				dphi = dphi0;
+			else if (overcompressed){
+				// set boundaries of phiH and phiL
+				phiH = phi;
+				phiL = phi - dphi0;
+				dphi = -0.5*dphi0;
+			}
+			else if (jammed){
+				phiH = 1.001*phi;
+				phiL = phiH - dphi0;
+				dphi = 0.5*(phiH + phiL) - phi;
+				jammed = false;
+			}
+		}
+		else{
+			if (undercompressed){
+				phiL = phi;
+				dphi = 0.5*(phiH + phiL) - phi;
+			}
+			else if (overcompressed){
+				phiH = phi;
+				dphi = 0.5*(phiH + phiL) - phi;
+			}
+			else if (jammed){
+				cout << "	** At k = 0, jamming found!" << endl;
+				cout << "	** phiJ = " << phi << endl;
+				cout << "	** P = " << Ptest << endl;
+				cout << "	** K = " << Ktest << endl;
+				cout << "	** nc = " << nc << endl;
+				cout << " WRITING JAMMED CONFIG TO .jam FILE" << endl;
+				cout << " ENDING COMPRESSION SIMULATION" << endl;
+				printJammedConfig();
+				break;
+			}
+		}
+
+		// change packing fraction to new phi value (decided on above)
+		phiNew = phi + dphi;
+		setPackingFraction(phiNew);
+
+		// calculate phi after minimization
+		phi = packingFraction();
+	}
+
+	if (k == kmax){
+		cout << "	** ERROR: IN 2d cell jamming finding, k reached kmax without finding jamming. Ending." << endl;
+		exit(1);
+	}
+}
+
+
 // increase attraction quasi-statically, relax after each increment
 void cellPacking2D::attractionRamp(double attractionTarget, double dAttraction){
 	// local variables
@@ -4101,6 +4244,53 @@ void cellPacking2D::printSystemPositions(){
 
 	// print end frame
 	packingPrintObject << setw(w1) << left << "ENDFR" << " " << endl;
+}
+
+void cellPacking2D::printJammedConfig(){
+	// local variables
+	int w1 = 12;
+	int w2 = 6;
+	int w3 = 30;
+
+	// check to see if file is open
+	if (!jamPrintObject.is_open()) {
+		cout << "	ERROR: jamPrintObject is not open in printJammedConfig(), ending." << endl;
+		exit(1);
+	}
+
+	// print information starting information
+	jamPrintObject << setw(w1) << left << "NEWFR" << " " << endl;
+	jamPrintObject << setw(w1) << left << "NUMCL" << setw(w2) << right << NCELLS << endl;
+	jamPrintObject << setw(w1) << left << "JAMPF" << setw(w3) << right << packingFraction() << endl;
+
+	// print box size information
+	jamPrintObject << setw(w1) << left << "BOXSZ";
+	jamPrintObject << setw(w3) << right << L.at(0);
+	jamPrintObject << setw(w3) << right << L.at(1);
+	jamPrintObject << endl;
+
+	// print stress information
+	jamPrintObject << setw(w1) << left << "VRIAL";
+	jamPrintObject << setw(w3) << right << sigmaXX;
+	jamPrintObject << setw(w3) << right << sigmaXY;
+	jamPrintObject << setw(w3) << right << sigmaYX;
+	jamPrintObject << setw(w3) << right << sigmaYY;
+	jamPrintObject << endl;
+
+	// print contact information
+	jamPrintObject << setw(w1) << left << "CTCTS";
+	for (int ci=0; ci<NCELLS; ci++){
+		for (int cj=ci+1; cj<NCELLS; cj++)
+			jamPrintObject << setw(w2) << contacts(ci,cj);
+	}
+	jamPrintObject << endl;
+
+	// print info for rest of the cells
+	for (int ci=0; ci<NCELLS; ci++)
+		cell(ci).printVertexPositions(jamPrintObject,ci);
+
+	// print end frame
+	jamPrintObject << setw(w1) << left << "ENDFR" << " " << endl;
 }
 
 void cellPacking2D::printSystemEnergy(){
