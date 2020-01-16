@@ -25,6 +25,7 @@ const int NPRINT 				= 2e3;			// number of time steps between prints
 const double timeStepMag 		= 0.001;		// time step in MD unit
 const double phiDisk 			= 0.6;			// initial phi of SP disks
 const double phiTarget 			= 1.03;			// confluent packing fraction target
+const double deltaPhi0 			= 1e-3;			// initial delta phi
 
 // force parameters
 const double gam 			= 0.0;			// surface tension force constant
@@ -99,7 +100,7 @@ int main(int argc, char const *argv[])
 
 	// compress to set packing fraction using FIRE, pressure relaxation
 	cout << "	** jamming protocol with Ptol = " << Ptol << " and Ktol = " << Ktol << endl;
-	packingObject.findJamming(deltaPhi, Ktol, Ptol);
+	packingObject.findJamming(deltaPhi0, Ktol, Ptol);
 
 	// get packing fraction, test to see if we should keep compressing
 	double phiJ = packingObject.packingFraction();
@@ -129,7 +130,7 @@ int main(int argc, char const *argv[])
 		packingObject.qsIsoCompression(phiTargetTmp,deltaPhiTmp);
 
 		// check if still under confluent phiTarget
-		phiTmp = packingFraction();
+		phiTmp = packingObject.packingFraction();
 		if (phiTmp < phiTarget){
 			phiTargetTmp = phiTarget;
 			deltaPhiTmp = 1e-3;
