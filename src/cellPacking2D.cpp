@@ -389,6 +389,9 @@ void cellPacking2D::operator=(cellPacking2D& onTheRight){
 	// deep copy cell objects and contact matrix
 	for (ci=0; ci<NCELLS; ci++){
 		// copy cell objects (using overloaded operator in deformableParticle2D class)
+		cell(ci).setNV(onTheRight.cell(ci).getNV());
+		cell(ci).initializeVertices();
+		cell(ci).initializeCell();
 		cell(ci) = onTheRight.cell(ci);
 
 		// copy elements from contact matrix
@@ -400,6 +403,72 @@ void cellPacking2D::operator=(cellPacking2D& onTheRight){
 }
 
 
+// save current state into saveObject
+void cellPacking2D::saveState(cellPacking2D& saveObject){
+	// local variables
+	int ci, cj;
+
+	// test if save object is properly initialized
+	if (saveObject.phi < 0)
+		// use overloaded assignment to store current state into object
+		saveObject = *this;
+	else{
+		// if saveObject has been initialized, copy data, cell objects and contact network
+		saveObject.dt = dt;
+		saveObject.dt0 = dt0;
+		saveObject.phi = phi;
+
+		saveObject.sigmaXX = sigmaXX;
+		saveObject.sigmaXY = sigmaXY;
+		saveObject.sigmaYX = sigmaYX;
+		saveObject.sigmaYY = sigmaYY;
+
+		for (ci=0; ci<NCELLS; ci++){
+			// copy cell objects (using overloaded operator in deformableParticle2D class)
+			saveObject.cell(ci) = cell(ci);
+
+			// copy elements from contact matrix
+			for (cj=ci+1; cj<NCELLS; cj++){
+				if (contacts(ci,cj))
+					saveObject.addContact(ci,cj);
+			}
+		}
+	}
+}
+
+// load saved state from saveObject
+void cellPacking2D::loadState(cellPacking2D& saveObject){
+	// local variables
+	int ci, cj;
+
+	// test that saveObject has been initialized
+	if (saveObject.phi < 0){
+		cout << "	** ERROR: trying to load from saveObject that has no saved data, ending." << endl;
+		exit(1);
+	}
+
+	// load saved packing fraction, dt
+	dt = saveObject.dt;
+	dt0 = saveObject.dt0;
+	phi = saveObject.phi;
+
+	sigmaXX = saveObject.sigmaXX;
+	sigmaXY = saveObject.sigmaXY;
+	sigmaYX = saveObject.sigmaYX;
+	sigmaYY = saveObject.sigmaYY;
+
+	// load cell and contact data from saveObject
+	for (ci=0; ci<NCELLS; ci++){
+		// copy cell objects (using overloaded operator in deformableParticle2D class)
+		cell(ci) = saveObject.cell(ci);
+
+		// copy elements from contact matrix
+		for (cj=ci+1; cj<NCELLS; cj++){
+			if (saveObject.contacts(ci,cj))
+				addContact(ci,cj);
+		}
+	}
+}
 
 
 
@@ -1964,8 +2033,8 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 	Knew = totalKineticEnergy();
 
 	// scale P and K for convergence checking
-	Pcheck = Pvirial/(energyScale*NCELLS*cell(0).getNV());
-	Kcheck = Knew/(energyScale*NCELLS*cell(0).getNV());
+	Pcheck = Pvirial/NCELLS;
+	Kcheck = Knew/NCELLS;
 
 	// reset velocities to 0
 	for (ci=0; ci<NCELLS; ci++){
@@ -2119,8 +2188,8 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 		Pvirial = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
 
 		// scale P and K for convergence checking
-		Pcheck = Pvirial/(energyScale*NCELLS);
-		Kcheck = Knew/(energyScale*NCELLS);
+		Pcheck = Pvirial/NCELLS;
+		Kcheck = Knew/NCELLS;
 
 		// update if Pvirial under tol
 		if (abs(Pcheck) < Ptol)
@@ -2943,7 +3012,8 @@ void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi){
 void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
 	// local variables
 	double phi0, phiNew, dphi, Ptest, Ktest;
-	int NSTEPS, k, kmax, kr, nr, nc;
+	int NSTEPS, k, kmax, kr, nc;
+	cellPacking2D savedState;
 
 	// calculate phi before initial minimization
 	phi = packingFraction();
@@ -2959,15 +3029,14 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
 	Ptest = Ptest/NCELLS;
 	Ktest = Ktest/NCELLS;
 
-	// update rattlers
-	kr = 0;
-	nr = removeRattlers(kr);
-
 	// update number of contacts
 	nc = totalNumberOfContacts();
 
 	// get initial packing fraction
 	phi = packingFraction();
+
+	// save last state before packing fraction is changed
+	saveState(savedState);
 
 	// iterator
 	k = 0;
@@ -2977,30 +3046,15 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
 	bool jammed, overcompressed, undercompressed;
 	double phiH, phiL;
 
+	// initialize to unjammed
+	jammed = false;
+
 	// phiJ bounds
 	phiH = -1;
 	phiL = -1;
 
 	// loop until phi is the correct value
 	while (!jammed && k < kmax){
-		// output to console
-		cout << "===================================================" << endl << endl << endl;
-		cout << " 	quasistatic isotropic compression to jamming " << endl << endl;
-		cout << "===================================================" << endl;
-		cout << "	* k 			= " << k << endl;
-		cout << "	* dphi 			= " << dphi << endl;
-		cout << "	* phi 			= " << phi << endl;
-		cout << "	* phiH 			= " << phiH << endl;
-		cout << "	* phiL 			= " << phiL << endl;
-		cout << "	* Ptest 		= " << Ptest << endl;
-		cout << "	* Ktest 		= " << Ktest << endl;
-		cout << "	* # of contacts = " << nc << endl;
-		cout << "	* # of rattlers = " << nr << endl << endl;
-		cout << "	* undercompressed = " << undercompressed << endl;
-		cout << "	* overcompressed = " << overcompressed << endl;
-		cout << "	* jammed = " << jammed << endl;
-		cout << endl << endl;
-
 		// update iterator
 		k++;
 
@@ -3014,44 +3068,59 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
 		Ptest = Ptest/NCELLS;
 		Ktest = Ktest/NCELLS;
 
-		// update rattlers
-		kr = 0;
-		nr = removeRattlers(kr);
-
 		// update number of contacts
 		nc = totalNumberOfContacts();
 
 		// boolean checks
 		undercompressed = (Ptest < Ptol);
-		overcompressed = (Ptest > 2.0*Ptol && Ktest < Ktol && nc > 0 && nr < NCELLS);
-		jammed = (Ptest < 2.0*Ptol && Ptest > Ptol && Ktest < Ktol);
+		overcompressed = (Ptest > 5.0*Ptol && Ktest < Ktol && nc > 0);
+		jammed = (phiL > 0 && Ptest < 5.0*Ptol && Ptest > Ptol && Ktest < Ktol && nc > 0);
+
+		// output to console
+		cout << "===================================================" << endl << endl << endl;
+		cout << " 	quasistatic isotropic compression to jamming " << endl << endl;
+		cout << "===================================================" << endl;
+		cout << "	* k 			= " << k << endl;
+		cout << "	* dphi 			= " << dphi << endl;
+		cout << "	* phi 			= " << phi << endl;
+		cout << "	* phiH 			= " << phiH << endl;
+		cout << "	* phiL 			= " << phiL << endl;
+		cout << "	* Ptest 		= " << Ptest << endl;
+		cout << "	* Ktest 		= " << Ktest << endl;
+		cout << "	* # of contacts = " << nc << endl;
+		cout << "	* undercompressed = " << undercompressed << endl;
+		cout << "	* overcompressed = " << overcompressed << endl;
+		cout << "	* jammed = " << jammed << endl;
+		cout << endl << endl;
 
 		// update packing fraction based on jamming check
 		dphi = 0.0;
-		if (phiH < 0){
+		if (phiL < 0){
+			// if still undercompressed, then grow until overjammed found
 			if (undercompressed)
 				dphi = dphi0;
+			// if first overcompressed, return to pre-overcompression state, compress by dphi0/2
 			else if (overcompressed){
-				// set boundaries of phiH and phiL
-				phiH = phi;
-				phiL = phi - dphi0;
-				dphi = -0.5*dphi0;
-			}
-			else if (jammed){
-				phiH = 1.001*phi;
-				phiL = phiH - dphi0;
-				dphi = 0.5*(phiH + phiL) - phi;
-				jammed = false;
+				loadState(savedState);
+				dphi = 0.5*dphi0;
+				phiL = phi;
+				phiH = phi + dphi0;
+				cout << "	-- -- overcompressed for first time, setting phi = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
 			}
 		}
 		else{
+			// if found undercompressed state, go to state between undercompressed and last overcompressed states (from saved state)
 			if (undercompressed){
 				phiL = phi;
-				dphi = 0.5*(phiH + phiL) - phi;
+				loadState(savedState);
+				dphi = 0.5*(phiL + phiH) - phi;
+				cout << "	-- -- now undercompressed, setting phi = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
 			}
 			else if (overcompressed){
-				phiH = phi;
-				dphi = 0.5*(phiH + phiL) - phi;
+				phiH = phi - 0.5*dphi;
+				loadState(savedState);
+				dphi = 0.5*(phiL + phiH) - phi;
+				cout << "	-- -- overcompressed (phiL > 0), setting phi = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
 			}
 			else if (jammed){
 				cout << "	** At k = 0, jamming found!" << endl;
@@ -3065,6 +3134,9 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
 				break;
 			}
 		}
+
+		// save last state before packing fraction is changed
+		saveState(savedState);
 
 		// change packing fraction to new phi value (decided on above)
 		phiNew = phi + dphi;

@@ -6,11 +6,10 @@ srcdir=$cellsdir/src
 maindir=$cellsdir/main
 
 # directory for all output for cell simulations
-# (Use symbolic link so can work on any cluster)
 outputdir=~/project/cells
 
 # directory for simulations specific to jamming
-simtypedir=$outputdir/jamming
+simtypedir=$outputdir/dpjam
 
 # make directories, unless they already exist
 mkdir -p $outputdir
@@ -22,20 +21,25 @@ mkdir -p out
 
 # inputs
 NCELLS=$1
-NPRINT=$2
-NV=$3
-asphericity=$4
-partition=$5
-time=$6
-numSeedsPerRun=$7
-numRuns=$8
-startSeed=$9
+NV=$2
+sizeDisp=$3
+calA0=$4
+kb=$5
+partition=$6
+time=$7
+numSeedsPerRun=$8
+numRuns=$9
+startSeed="${10}"
+
+# other parameters
+kl=1.0
+ka=1.0
 
 let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=cell2D_jam_N"$NCELLS"_NV"$NV"_calA"$asphericity"
+basestr=dpjam_N"$NCELLS"_NV"$NV"_sd"$sizeDisp"_calA"$calA0"_kb"$kb"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation
@@ -44,8 +48,8 @@ mkdir -p $simdatadir
 
 # compile into binary using packing.h
 binf=bin/"$runstr".o
-mainf=$maindir/repJammingRamp.cpp
-echo Running $numSeeds sims of $NCELLS with $NV vertices, cal A = $asphericity, will pack to jamming
+mainf=$maindir/cellJamming.cpp
+echo Running $numSeeds jamming sims of $NCELLS cells with $NV verts, with dispersity $sizeDisp , calA0 = $calA0 , and bending energy kb = $kb
 
 # run compiler
 rm -f $binf
@@ -93,11 +97,11 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
 
         # create output files
         posf=$specificdir/$filestr.pos
-        enf=$specificdir/$filestr.energy
-        statf=$specificdir/$filestr.stats
+        enf=$specificdir/$filestr.en
+        jamf=$specificdir/$filestr.jam
 
         # append to runString
-        runString="$runString ; ./$binf $NCELLS $NPRINT $NV $asphericity $runseed $posf $enf $statf"
+        runString="$runString ; ./$binf $NCELLS $NV $sizeDisp $calA0 $kl $ka $kb $runseed $posf $enf $jamf"
     done
 
     # finish off run string
@@ -147,14 +151,15 @@ sbatch -t $time $slurmf
 #       INPUTS
 # ====================
 # 1. NCELLS
-# 2. NPRINT
-# 3. NV
-# 4. asphericity
-# 5. partition
-# 6. time
-# 7. num seeds per run (for each entry in array)
-# 8. number of runs (number of array entries, i.e. arraynum)
-# 9. start seed (end seed determined by number of runs)
+# 2. NV
+# 3. size dispersion (sizeDisp)
+# 4. calA0
+# 5. bending energy (kb)
+# 6. partition
+# 7. time
+# 8. num seeds per run (for each entry in array)
+# 9. number of runs (number of array entries, i.e. arraynum)
+# 10. start seed (end seed determined by number of runs)
 
 
 

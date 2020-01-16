@@ -1,9 +1,10 @@
 /*
 
-	Example file to generate a gel of cells
-	from an initial bidisperse sphere packing,
-	and to decompress at a fixed rate
-	rather than QS
+	Main .cpp file to compress NCELLS to jamming
+	print jammed configuration, and then
+	compress to confluency (phi = 1.03) and record steps in
+	between to monitor the pressure required to deform cells 
+	into confluence
 
 */
 
@@ -18,60 +19,63 @@ using namespace std;
 // define PI
 const double PI = 4.0*atan(1);
 
-// length paramaters
-const int NT 					= 1e7;
-const int NPRINT				= 2000;
-
 // simulation constants
-const double sizeDispersion 	= 0.1;			// size dispersion (std dev of cell sizes)
-const double timeStepMag 		= 0.005;		// time step in MD units (zeta * lenscale / forcescale)
-
-// disk constants
-const double phiDisk	 		= 0.65;			// initial packing fraction of disks
-
-// compression constants
-const double phiTarget			= 1.03;			// cell packing fraction (regardless of final pressure)
-const double deltaPhi			= 0.001;		// compression step size
-
-// gelation constants
-const double phiGel 			= 0.3;			// final packing fraction
-const double gelRate 			= 1e-4;			// rate of size decrease (i.e. area loss relative to initial box area)
-const double varPerimRate 		= 0.01;			// rate of relaxation to deformed perimeter
-const double aGelation			= 0.05;			// attraction parameter during gelation sim
+const int NT 					= 5e7; 			// number of time steps
+const int NPRINT 				= 2e3;			// number of time steps between prints
+const double timeStepMag 		= 0.001;		// time step in MD unit
+const double phiDisk 			= 0.6;			// initial phi of SP disks
+const double phiTarget 			= 1.03;			// confluent packing fraction target
 
 // force parameters
-const double kl 			= 1.0;				// perimeter force constant
-const double ka 			= 1.0;				// area force constant
-const double gam 			= 0.0;				// surface tension force constant
-const double kb 			= 0.0;				// bending energy constant
-const double kint 			= 1.0;				// interaction energy constant
-const double del 			= 1.0;				// width of vertices in units of l0, vertex sep on regular polygon
-const double aInitial 		= 0.0;				// attraction parameter to start
+const double gam 			= 0.0;			// surface tension force constant
+const double kint 			= 1.0;			// interaction energy constant
+const double aInitial 		= 0.0;			// attraction parameter to start
+const double del 			= 1.0;			// radius of vertices in units of l0
 
-// deformability
-const double calA0 			= 1.1;				// ratio of preferred perimeter^2 to preferred area
-
-// tolerances
-const double Ptol 			= 1e-6;				// pressure tolerance
-const double Ktol 			= 1e-14; 			// kinetic energy tolerance
-
-// main function
-int main()
+// int main
+int main(int argc, char const *argv[])
 {
 	// local variables
+	int NCELLS, NV, seed, plotIt;
+	double a, sizeDisp, calA0, kl, ka, kb;
 
-	// output files
-	string posFile = "pos.test";
-	string enFile = "en.test";
-	string jamFile = "jam.test";
+	// inputs from command line
+	string NCELLS_str 			= argv[1];
+	string NV_str 				= argv[2];
+	string sizeDisp_str 		= argv[3];
+	string calA0_str 			= argv[4];
+	string kl_str 				= argv[5];
+	string ka_str 				= argv[6];						
+	string kb_str 				= argv[7];
+	string seed_str				= argv[8];
+	string positionFile			= argv[9];
+	string energyFile 			= argv[10];
+	string jammingFile 			= argv[11];
 
-	// system details
-	int NCELLS 		= 10;
-	int NV			= 14;
-	int seed 		= 5;
+	// load strings into sstream
+	stringstream NCELLSss(NCELLS_str);
+	stringstream NVss(NV_str);
+	stringstream sizeDispss(sizeDisp_str);
+	stringstream calA0ss(calA0_str);
+	stringstream klss(kl_str);
+	stringstream kass(ka_str);
+	stringstream kbss(kb_str);
+	stringstream seedss(seed_str);
+
+	// parse values from strings
+	NCELLSss 		>> NCELLS;
+	NVss 			>> NV;
+	sizeDispss 		>> sizeDisp;
+	calA0ss 		>> calA0;
+	klss 			>> kl;
+	kass 			>> ka;
+	kbss 			>> kb;
+	seedss 			>> seed;
+
+	// temporary box length; will be modified in initialization
 	double Ltmp 	= 1.0;
 
-	// instantiate object
+	// instantiate main packing object
 	cout << "	** Instantiating object for initial disk packing to be turned into a cell packing" << endl;
 	cout << "	** NCELLS = " << NCELLS << endl;
 	cellPacking2D packingObject(NCELLS,NT,NPRINT,Ltmp,seed); 	// NOTE: NEED TO MAKE NEW CONSTRUCTOR, EVERYTHING ELSE DONE IN initializeGel AND regularPolygon FUNCTIONS
@@ -87,7 +91,7 @@ int main()
 	packingObject.setdt(timeStepMag);
 
 	// open position output file
-	packingObject.openJamObject(jamFile);
+	packingObject.openJamObject(jammingFile);
 
 	// compress to set packing fraction using FIRE, pressure relaxation
 	cout << "	** jamming protocol with Ptol = " << Ptol << " and Ktol = " << Ktol << endl;
@@ -98,8 +102,8 @@ int main()
 	double phiTmp, phiTargetTmp, deltaPhiTmp;
 
 	// open energy and position file
-	packingObject.openPackingObject(posFile);
-	packingObject.openEnergyObject(enFile);
+	packingObject.openPackingObject(positionFile);
+	packingObject.openEnergyObject(energyFile);
 
 	// check vs phiTarget
 	if (phiJ < phiTarget){
@@ -133,27 +137,3 @@ int main()
 	cout << "	** FINISHED COMPRESSING ABOVE JAMMING, ENDING MAIN FILE" << endl;
 	return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

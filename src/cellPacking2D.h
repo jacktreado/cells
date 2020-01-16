@@ -72,6 +72,8 @@ public:
 
 	// operators
 	void operator=(cellPacking2D& onTheRight);	// assign one configuration to another object
+	void saveState(cellPacking2D& saveObject);
+	void loadState(cellPacking2D& saveObject);
 
 	// initialize sizes
 	void initializeMonodisperse(int NV, double asphericity);

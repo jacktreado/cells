@@ -148,7 +148,7 @@ deformableParticles2D::~deformableParticles2D(){
 *************************/
 
 
-// overloaded assignment operator
+// overloaded assignment operator (ASSUME ARRAYS IN THIS HAVE BEEN INITIALIZED!)
 void deformableParticles2D::operator=(deformableParticles2D& onTheRight){
 	// local variables
 	int i,d;
@@ -156,30 +156,32 @@ void deformableParticles2D::operator=(deformableParticles2D& onTheRight){
 	// dimensionality ALWAYS set to 2
 	NDIM 	= 2;
 
-	// scalar variables set to 0
-	NV 		= 0;
-	kl 		= 0.0;
-	ka 		= 0.0;
-	gam 	= 0.0;
-	kb 		= 0.0;
-	kint 	= 0.0;
-	l0 		= 0.0;
-	a0 		= 0.0;
-	del 	= 0.0;
-	a 		= 0.0;
+	// check that array pointers do not point to null
+	if (!vertexPositions){
+		cout << "	ERROR: in operator=, memory for vertexPositions not yet allocated. Ending." << endl;
+		exit(1);
+	}
+	else if (!vertexVelocity){
+		cout << "	ERROR: in operator=, memory for vertexVelocity not yet allocated. Ending." << endl;
+		exit(1);
+	}
+	else if (!vertexAcceleration){
+		cout << "	ERROR: in operator=, memory for vertexAcceleration not yet allocated. Ending." << endl;
+		exit(1);
+	}
+	else if (!vertexForces){
+		cout << "	ERROR: in operator=, memory for vertexForces not yet allocated. Ending." << endl;
+		exit(1);
+	}
+	else if (!interactionPotential){
+		cout << "	ERROR: in operator=, memory for interactionPotential not yet allocated. Ending." << endl;
+		exit(1);
+	}
+	else if (!cellPosition){
+		cout << "	ERROR: in operator=, memory for cellPosition not yet allocated. Ending." << endl;
+		exit(1);
+	}
 
-	// box lengths set to 1.0
-	L.resize(NDIM);
-	for (int d=0; d<NDIM; d++)
-		L.at(d) = 1.0;
-
-	// pointer variables point to nullptr
-	vertexPositions 		= nullptr;
-	vertexVelocity	 		= nullptr;
-	vertexAcceleration 		= nullptr;
-	vertexForces 			= nullptr;
-	cellPosition 			= nullptr;
-	interactionPotential 	= nullptr;
 
 	// copy scalar member variables
 	NV 		= onTheRight.NV;
@@ -189,6 +191,7 @@ void deformableParticles2D::operator=(deformableParticles2D& onTheRight){
 	kb 		= onTheRight.kb;
 	kint 	= onTheRight.kint;
 	a0 		= onTheRight.a0;
+	l0 		= onTheRight.l0;
 	del 	= onTheRight.del;
 	a 		= onTheRight.a;
 
@@ -197,10 +200,6 @@ void deformableParticles2D::operator=(deformableParticles2D& onTheRight){
 		pbc.at(d) = onTheRight.pbc.at(d);
 		L.at(d) = onTheRight.L.at(d);
 	}
-
-	// initialize everything else
-	initializeVertices();
-	initializeCell();
 
 	// deep copy vertex values
 	for (i=0; i<NV; i++){
@@ -255,10 +254,11 @@ void deformableParticles2D::initializeVertices(){
 		cout << "	ERROR: in initializeVertices(), memory for vertexForces already allocated. Ending." << endl;
 		exit(1);
 	}
-	if (interactionPotential){
+	else if (interactionPotential){
 		cout << "	ERROR: in initializeVertices(), memory for interactionPotential already allocated. Ending." << endl;
 		exit(1);
 	}
+
 
 	// allocate memory
 	vertexPositions = new double[NDIM*NV];
