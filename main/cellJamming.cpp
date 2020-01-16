@@ -87,7 +87,7 @@ int main(int argc, char const *argv[])
 
 	// set initial conditions as if disks in box with given packing fraction (sets boundary size)
 	cout << "	** Initializing gel at phiDisk = " << phiDisk << " using SP model" << endl;
-	packingObject.initializeGel(NV, phiDisk, sizeDispersion, del);
+	packingObject.initializeGel(NV, phiDisk, sizeDisp, del);
 
 	// set deformability, force values
 	packingObject.gelForceVals(calA0,kl,ka,gam,kb,kint,del,aInitial);
