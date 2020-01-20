@@ -3074,7 +3074,7 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
 		// boolean checks
 		undercompressed = (Ptest < Ptol);
 		overcompressed = (Ptest > 5.0*Ptol && Ktest < Ktol && nc > 0);
-		jammed = (phiL > 0 && Ptest < 5.0*Ptol && Ptest > Ptol && Ktest < Ktol && nc > 0);
+		jammed = (Ptest < 5.0*Ptol && Ptest > Ptol && Ktest < Ktol && nc > 0);
 
 		// output to console
 		cout << "===================================================" << endl << endl << endl;
@@ -3106,6 +3106,19 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
 				phiL = phi;
 				phiH = phi + dphi0;
 				cout << "	-- -- overcompressed for first time, setting phi = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
+			}
+			// if in jammed state before found overcompressed state, 
+			// just call it jammed and declare victory
+			else if (jammed){
+				cout << "	** At k = 0, jamming found!" << endl;
+				cout << "	** phiJ = " << phi << endl;
+				cout << "	** P = " << Ptest << endl;
+				cout << "	** K = " << Ktest << endl;
+				cout << "	** nc = " << nc << endl;
+				cout << " WRITING JAMMED CONFIG TO .jam FILE" << endl;
+				cout << " ENDING COMPRESSION SIMULATION" << endl;
+				printJammedConfig();
+				break;
 			}
 		}
 		else{

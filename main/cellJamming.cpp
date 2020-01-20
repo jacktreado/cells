@@ -35,7 +35,7 @@ const double del 			= 1.0;			// radius of vertices in units of l0
 
 // tolerances
 const double Ktol 			= 1e-16;		// kinetic energy tolerance
-const double Ptol 			= 1e-6;			// pressure tolerance
+const double Ptol 			= 1e-6		;			// pressure tolerance
 
 // int main
 int main(int argc, char const *argv[])

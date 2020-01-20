@@ -49,11 +49,11 @@ const double del 			= 1.0;				// width of vertices in units of l0, vertex sep on
 const double aInitial 		= 0.0;				// attraction parameter to start
 
 // deformability
-const double calA0 			= 1.1;				// ratio of preferred perimeter^2 to preferred area
+const double calA0 			= 1.04;				// ratio of preferred perimeter^2 to preferred area
 
 // tolerances
 const double Ptol 			= 1e-6;				// pressure tolerance
-const double Ktol 			= 1e-14; 			// kinetic energy tolerance
+const double Ktol 			= 1e-16; 			// kinetic energy tolerance
 
 // main function
 int main()
@@ -66,8 +66,8 @@ int main()
 	string jamFile = "jam.test";
 
 	// system details
-	int NCELLS 		= 10;
-	int NV			= 14;
+	int NCELLS 		= 12;
+	int NV			= 16;
 	int seed 		= 5;
 	double Ltmp 	= 1.0;
 
@@ -121,7 +121,7 @@ int main()
 		packingObject.qsIsoCompression(phiTargetTmp,deltaPhiTmp);
 
 		// check if still under confluent phiTarget
-		phiTmp = packingFraction();
+		phiTmp = packingObject.packingFraction();
 		if (phiTmp < phiTarget){
 			phiTargetTmp = phiTarget;
 			deltaPhiTmp = 1e-3;
