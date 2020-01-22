@@ -23,11 +23,11 @@ const int NT 					= 1e7;
 const int NPRINT				= 2000;
 
 // simulation constants
-const double sizeDispersion 	= 0.1;			// size dispersion (std dev of cell sizes)
-const double timeStepMag 		= 0.005;		// time step in MD units (zeta * lenscale / forcescale)
+const double sizeDispersion 	= 0;			// size dispersion (std dev of cell sizes)
+const double timeStepMag 		= 0.001;		// time step in MD units (zeta * lenscale / forcescale)
 
 // disk constants
-const double phiDisk	 		= 0.65;			// initial packing fraction of disks
+const double phiDisk	 		= 0.6;			// initial packing fraction of disks
 
 // compression constants
 const double phiTarget			= 1.03;			// cell packing fraction (regardless of final pressure)
@@ -52,7 +52,7 @@ const double aInitial 		= 0.0;				// attraction parameter to start
 const double calA0 			= 1.04;				// ratio of preferred perimeter^2 to preferred area
 
 // tolerances
-const double Ptol 			= 1e-6;				// pressure tolerance
+const double Ptol 			= 1e-8;				// pressure tolerance
 const double Ktol 			= 1e-16; 			// kinetic energy tolerance
 
 // main function
@@ -66,7 +66,7 @@ int main()
 	string jamFile = "jam.test";
 
 	// system details
-	int NCELLS 		= 12;
+	int NCELLS 		= 9;
 	int NV			= 16;
 	int seed 		= 5;
 	double Ltmp 	= 1.0;
@@ -89,6 +89,10 @@ int main()
 	// open position output file
 	packingObject.openJamObject(jamFile);
 
+	// open energy and position file
+	packingObject.openPackingObject(posFile);
+	packingObject.openEnergyObject(enFile);
+
 	// compress to set packing fraction using FIRE, pressure relaxation
 	cout << "	** jamming protocol with Ptol = " << Ptol << " and Ktol = " << Ktol << endl;
 	packingObject.findJamming(deltaPhi, Ktol, Ptol);
@@ -96,10 +100,6 @@ int main()
 	// get packing fraction, test to see if we should keep compressing
 	double phiJ = packingObject.packingFraction();
 	double phiTmp, phiTargetTmp, deltaPhiTmp;
-
-	// open energy and position file
-	packingObject.openPackingObject(posFile);
-	packingObject.openEnergyObject(enFile);
 
 	// check vs phiTarget
 	if (phiJ < phiTarget){

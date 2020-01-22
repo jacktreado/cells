@@ -25,7 +25,7 @@ const int NPRINT 				= 2e3;			// number of time steps between prints
 const double timeStepMag 		= 0.001;		// time step in MD unit
 const double phiDisk 			= 0.6;			// initial phi of SP disks
 const double phiTarget 			= 1.03;			// confluent packing fraction target
-const double deltaPhi0 			= 1e-3;			// initial delta phi
+const double deltaPhi0 			= 5e-4;			// initial delta phi
 
 // force parameters
 const double gam 			= 0.0;			// surface tension force constant
@@ -35,7 +35,7 @@ const double del 			= 1.0;			// radius of vertices in units of l0
 
 // tolerances
 const double Ktol 			= 1e-16;		// kinetic energy tolerance
-const double Ptol 			= 1e-6		;			// pressure tolerance
+const double Ptol 			= 1e-8;			// pressure tolerance
 
 // int main
 int main(int argc, char const *argv[])

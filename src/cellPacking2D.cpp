@@ -1160,7 +1160,7 @@ void cellPacking2D::setAsphericity(double val){
 		calAMin = nvtmp*tan(PI/nvtmp)/PI;
 
 		// set asphericity in units of calAMin
-		cell(ci).setAsphericityConstA(val/calAMin);
+		cell(ci).setAsphericityConstA(val*calAMin);
 	}
 }
 
@@ -2188,7 +2188,7 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 		Pvirial = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
 
 		// scale P and K for convergence checking
-		Pcheck = Pvirial/NCELLS;
+		Pcheck = Pvirial;
 		Kcheck = Knew/NCELLS;
 
 		// update if Pvirial under tol
@@ -2198,7 +2198,7 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 			npPMIN = 0;
 
 		// check for convergence
-		converged = (abs(Pcheck) < Ptol && npPMIN > NMIN);
+		converged = (abs(Pcheck) < Ptol && npPMIN > NMIN && Kcheck < 100*Ktol);
 		converged = (converged || (abs(Pcheck) > Ptol && Kcheck < Ktol));
 
 		if (converged){
@@ -3065,14 +3065,14 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
 		Ptest = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
 		Ktest = totalKineticEnergy();
 
-		Ptest = Ptest/NCELLS;
+		Ptest = Ptest;
 		Ktest = Ktest/NCELLS;
 
 		// update number of contacts
 		nc = totalNumberOfContacts();
 
 		// boolean checks
-		undercompressed = (Ptest < Ptol);
+		undercompressed = (Ptest < Ptol && Ktest < 100*Ktol);
 		overcompressed = (Ptest > 5.0*Ptol && Ktest < Ktol && nc > 0);
 		jammed = (Ptest < 5.0*Ptol && Ptest > Ptol && Ktest < Ktol && nc > 0);
 
