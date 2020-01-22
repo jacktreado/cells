@@ -2287,7 +2287,7 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, int plotIt, int& fra
 	}
 
 	// iterate through MD time until system converged
-	kmax = 5e5;
+	kmax = 5e6;
 	for (k=0; k<kmax; k++){
 
 		// output some information to console
@@ -2467,8 +2467,10 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, int plotIt, int& fra
 	dt = dt0;
 
 	// if no convergence, just stop
-	if (k == kmax)
-		cout << "	** FIRE not converged in kmax = " << kmax << " force evaluations" << endl;
+	if (k == kmax){
+		cout << "	** ERROR: FIRE not converged in kmax = " << kmax << " force evaluations, ending code" << endl;
+		exit(1);
+	}
 }
 
 
