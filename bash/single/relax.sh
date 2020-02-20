@@ -71,10 +71,6 @@ rm -f $taskf
 # loop over files
 let fcount=0
 
-# make output directory
-specificdir=$simdatadir/"$basestr"
-mkdir -p $specificdir
-
 # LOOP OVER FILES. 
 for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
     # count files
@@ -97,7 +93,7 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         filestr="$basestr"_seed"$seed"
 
         # create output files
-        posf=$specificdir/$filestr.pos
+        posf=$simdatadir/$filestr.pos
 
         # append to runString
         runString="$runString ; ./$binf $NCELLS $NV $sizeDisp $calA0 $kl $ka $kb $runseed $posf $enf $jamf"
