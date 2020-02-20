@@ -71,6 +71,10 @@ rm -f $taskf
 # loop over files
 let fcount=0
 
+# make output directory
+specificdir=$simdatadir/"$basestr"
+mkdir -p $specificdir
+
 # LOOP OVER FILES. 
 for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
     # count files
@@ -84,10 +88,6 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
 
     # loop over seeds to go into runString
     let ssMax=$numSeedsPerRun-1
-
-    # make output directory
-    specificdir=$simdatadir/"$basestr"
-    mkdir -p $specificdir
 
     for ss in `seq 0 $ssMax`; do
         # get seed for actual run
@@ -143,7 +143,7 @@ cat $slurmf
 
 # run sbatch file
 echo -- running on slurm in partition $partition
-echo sbatch -t $time $slurmf
+sbatch -t $time $slurmf
 
 
 # ====================
