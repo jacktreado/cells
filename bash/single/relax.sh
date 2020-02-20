@@ -143,17 +143,17 @@ cat $slurmf
 
 # run sbatch file
 echo -- running on slurm in partition $partition
-sbatch -t $time $slurmf
+echo sbatch -t $time $slurmf
 
 
 # ====================
 #       INPUTS
 # ====================
-# 1. NCELLS
-# 2. NV
-# 3. size dispersion (sizeDisp)
-# 4. calA0
-# 5. bending energy (kb)
+# 1. NV
+# 2. calA0
+# 3. kl
+# 4. kb
+# 5. th0
 # 6. partition
 # 7. time
 # 8. num seeds per run (for each entry in array)
