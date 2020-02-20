@@ -165,13 +165,10 @@ public:
 	void setNT(int nt) { NT = nt; };
 	void setNPRINT(int nprint) { NPRINT = nprint; };
 	void setT(double val) { T = val; };
-
-	// box len
 	void setL(int d, double val) { L.at(d) = val; };
-
-	// set dt: NOTE, IN NON-DIMENSIONAL FORM, so mass = rho pi r^2 = pi
-	// void setdt(double val) { dt0 = val*sqrt(4*atan(1)); dt = dt0; };
 	void setdt(double val) { dt0 = val; dt = dt0; };
+	
+	void vertexDPMTimeScale(double timeStepMag);
 	void addContact(int ci, int cj);
 	void deleteContact(int ci, int cj);
 	void resetContacts();
@@ -216,12 +213,13 @@ public:
 
 	// FIRE 2.0 relaxation functions
 	void fireMinimizeP(double Ptol, double Ktol);
+	void fireMinimizeF(double Ftol, double Ktol);
 	void fireMinimizeF(double Ftol, double Ktol, int plotIt, int& frameCount);
 	void fireMinimizeGel(double Ptol, double Ktol);
 
 	// Gelation functions
 	void twoParticleContact(int NV);
-	void initializeGel(int NV, double phiDisk, double sizeDispersion, double delval);
+	void initializeGel(int NV, double phiDisk, double sizeDispersion, double delval, double ka);
 	void gelForceVals(double calA0, double kl, double ka, double gam, double kb, double kint, double del, double a);
 	void qsIsoCompression(double phiTarget, double deltaPhi);
 	void qsIsoGelRatchet(double phiGel, double deltaPhi, double plThresh, double dl0, double calA0max, double timeStepMag);
@@ -325,7 +323,6 @@ public:
 	void printSystemPositions(int frame);
 	void printSystemEnergy(int frame, double Uval, double Kval);
 	void printSystemStats();
-
 };
 
 #endif

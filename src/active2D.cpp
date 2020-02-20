@@ -1532,7 +1532,7 @@ double cellPacking2D::dpZfishPackingFraction(){
 	// particle area
 	particleArea = 0.0;
 	for (ci=0; ci<NCELLS; ci++)
-		particleArea += cell(ci).vertexArea();
+		particleArea += cell(ci).area();
 
 	// packing fraction
 	return particleArea/zfishArea();

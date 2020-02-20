@@ -36,7 +36,7 @@ const double PI = 4.0*atan(1);
 // simulation constants
 const int NT 					= 5e7; 			// number of time steps
 const int NPRINT 				= 2e3;			// number of time steps between prints
-const double timeStepMag 		= 0.001;		// time step in MD unit
+const double timeStepMag 		= 0.01;			// time step in MD unit
 const double deltaPhiGrow 		= 0.002;		// packing fraction step (packing)
 const double deltaPhiShrink		= 0.0005;		// packing fraction step (gelation)
 const double phiDisk 			= 0.6;			// initial phi of SP disks
@@ -111,13 +111,13 @@ int main(int argc, char const *argv[])
 
 	// set initial conditions as if disks in box with given packing fraction (sets boundary size)
 	cout << "	** Initializing gel at phiDisk = " << phiDisk << " using SP model" << endl;
-	packingObject.initializeGel(NV,phiDisk,sizeDisp,del);
+	packingObject.initializeGel(NV,phiDisk,sizeDisp,del,ka);
 
 	// set deformability, force values
 	packingObject.gelForceVals(initialCalA,kl,ka,gam,kb,kint,del,aInitial);
 
 	// update time scale for compresion protocol
-	packingObject.setdt(timeStepMag);
+	packingObject.vertexDPMTimeScale(timeStepMag);
 
 	// compress to set packing fraction using FIRE, pressure relaxation
 	cout << "	** QS compresison protocol to phiTarget = " << phiTarget << endl;

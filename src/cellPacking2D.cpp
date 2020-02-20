@@ -71,6 +71,9 @@ cellPacking2D::cellPacking2D(int ncells, int nt, int nprint, double l, double s)
 	// set initial seed
 	seed = s;
 
+	// set random number generator
+	srand(seed);
+
 	// first use starting variabls
 	defaultvars();
 
@@ -301,7 +304,7 @@ cellPacking2D::cellPacking2D(ifstream& inputFileObject, double asphericity, doub
 		}
 
 		// determine new l0 for given area
-		l0 = (1.0/nv)*sqrt(4*PI*cell(ci).area()*asphericity);
+		l0 = (1.0/nv)*sqrt(4*PI*cell(ci).polygonArea()*asphericity);
 		a0 = (nv*nv*l0*l0)/(4*PI*asphericity);
 
 		// set a0 to enforce asphericity in cell i
@@ -746,7 +749,7 @@ void cellPacking2D::initializeVelocities(double tmp0){
 	}
 
 	// get vscale
-	vscale = sqrt(T/(cell(0).area()*ek));
+	vscale = sqrt(T/(cell(0).polygonArea()*ek));
 	for (ci=0; ci<NCELLS; ci++){
     	for (d=0; d<NDIM; d++)
         	cell(ci).setCVel(d,cell(ci).cvel(d)*vscale);
@@ -771,7 +774,7 @@ void cellPacking2D::initializeVelocities(int ci, double tmp0){
 		ek += 0.5*pow(cell(ci).cvel(d),2);
 
 	// get vscale
-	vscale = sqrt(tmp0/(cell(ci).area()*ek));
+	vscale = sqrt(tmp0/(cell(ci).polygonArea()*ek));
 	for (d=0; d<NDIM; d++)
     	cell(ci).setCVel(d,cell(ci).cvel(d)*vscale);
 }
@@ -887,14 +890,17 @@ double cellPacking2D::timeScale(){
 double cellPacking2D::packingFraction(){
 	// local variables
 	int ci, vi;;
+	double apoly = 0.0;
+	double adisk = 0.0;
+	double atot = 0.0;
 	double val = 0.0;
 
-	// loop over cells, packing fraction is : triangular area + 0.5*delta*perimeter area + area of circular corners
+	// loop over full area of cells (not just polygon area)
 	for (ci=0; ci<NCELLS; ci++)
-		val += cell(ci).vertexArea();		// needs to be this if vertex forces only
+		atot += cell(ci).area();
 
 	// divide by box area
-	val /= L.at(0)*L.at(1);
+	val = atot/L.at(0)*L.at(1);
 
 	// return value
 	return val;
@@ -1086,6 +1092,33 @@ double cellPacking2D::meanAsphericity(){
 	Setters
 
 *************************/
+
+// set vertex DPM time step mag
+void cellPacking2D::vertexDPMTimeScale(double timeStepMag){
+	// local variables
+	int ci;
+	double a0mean, l0mean, kamean;
+	double t0;
+
+	// initialize means
+	a0mean = 0.0;
+	l0mean = 0.0;
+	kamean = 0.0;
+
+	// loop over cells, get mean a0, l0, r0
+	for(ci=0; ci<NCELLS; ci++){
+		a0mean += cell(ci).geta0()/NCELLS;
+		l0mean += cell(ci).getl0()/NCELLS;
+		kamean += cell(ci).getka()/NCELLS;
+	}
+
+	// get fundamental time step
+	t0 = sqrt((2.0*l0mean)/(kamean*a0mean));
+
+	// set dt and dt0
+	dt = timeStepMag*t0;
+	dt0 = dt;
+}
 
 
 // set value in contact matrix to 1
@@ -1294,7 +1327,7 @@ void cellPacking2D::calculateForces(){
 		}
 
 		// forces on vertices due to shape
-		cell(ci).shapeForces();
+		cell(ci).balancedShapeForces();
 	}
 }
 
@@ -1601,7 +1634,6 @@ void cellPacking2D::fverlet(int& np, double& alpha, double dampingParameter){
 	Simulation Functions
 
 ***************************/
-
 
 // NVE dynamics
 void cellPacking2D::cellNVE(){
@@ -1989,7 +2021,7 @@ void cellPacking2D::compressToTarget(double dphi, double phiTarget, double asphe
 }
 
 
-// FIRE 2.0 energy minimzation with backstepping if P < 0
+// FIRE 2.0 pressure minimzation with backstepping if P < 0
 void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 	// HARD CODE IN FIRE PARAMETERS
 	const double alpha0 	= 0.25;
@@ -2045,7 +2077,7 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 	}
 
 	// iterate through MD time until system converged
-	kmax = 5e5;
+	kmax = 5e6;
 	for (k=0; k<kmax; k++){
 
 		// output some information to console
@@ -2232,8 +2264,285 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 	dt = dt0;
 
 	// if no convergence, just stop
-	if (k == kmax)
-		cout << "	** FIRE not converged in kmax = " << kmax << " force evaluations" << endl;
+	if (k == kmax){
+		cout << "	** ERROR: FIRE not converged in kmax = " << kmax << " force evaluations, ending code" << endl;
+		exit(1);
+	}
+}
+
+
+// FIRE 2.0 force minimization with backstepping
+void cellPacking2D::fireMinimizeF(double Ftol, double Ktol){
+	// HARD CODE IN FIRE PARAMETERS
+	const double alpha0 	= 0.25;
+	const double finc 		= 1.05;
+	const double fdec 		= 0.5;
+	const double falpha 	= 0.99;
+	const double dtmax 		= 10*dt0;
+	const double dtmin 		= 0.05*dt0;
+	const int NMIN 			= 20;
+	const int NNEGMAX 		= 2000;
+	const int NDELAY 		= 1000;
+	int npPos				= 0;
+	int npNeg 				= 0;
+	int npPMIN				= 0;
+	double alpha 			= alpha0;
+	double alphat 			= alpha;
+	double t 				= 0.0;
+	double forceScale 		= cell(0).getkint();
+	double energyScale		= forceScale;
+	double P 				= 0;
+
+	// local variables
+	int ci,vi,d,k,kmax;
+	double vstarnrm,fstarnrm,vtmp,ftmp;
+	double K, F, Kcheck, Fcheck;
+
+	// variable to test for potential energy minimization
+	bool converged = false;
+
+	// reset time step
+	dt = dt0;
+
+	// initialize forces
+	resetContacts();
+	calculateForces();
+
+	// norm of total force vector, kinetic energy
+	F = forceRMS();
+	K = totalKineticEnergy();
+
+	// scale P and K for convergence checking
+	Fcheck = F;
+	Kcheck = K/NCELLS;
+
+	// reset velocities to 0
+	for (ci=0; ci<NCELLS; ci++){
+		for (vi=0; vi<cell(ci).getNV(); vi++){
+			for (d=0; d<NDIM; d++)
+				cell(ci).setVVel(vi,d,0.0);
+		}
+	}
+
+	// iterate through MD time until system converged
+	kmax = 5e6;
+	for (k=0; k<kmax; k++){
+
+		// output some information to console
+		if (k % NPRINT == 0){
+			cout << "===================================================" << endl << endl;
+			cout << " 	FIRE MINIMIZATION, k = " << k << endl << endl;
+			cout << "===================================================" << endl;			
+			cout << "	* Run data:" << endl;
+			cout << "	* Kcheck 	= " << Kcheck << endl;
+			cout << "	* Fcheck 	= " << Fcheck << endl;
+			cout << "	* phi 		= " << phi << endl;
+			cout << "	* dt 		= " << dt << endl;
+			cout << "	* alpha 	= " << alpha << endl;
+			cout << "	* alphat 	= " << alphat << endl;
+			cout << "	* P 		= " << P << endl;
+			cout << endl << endl;
+
+			// print config and energy
+			if (packingPrintObject.is_open()){
+				cout << "	* Printing vetex positions to file" << endl;
+				printSystemPositions();
+			}
+			
+			if (energyPrintObject.is_open()){
+				cout << "	* Printing cell energy to file" << endl;
+				printSystemEnergy(k);
+			}
+		}
+
+		// Step 1. calculate P and norms
+		P = 0.0;
+		vstarnrm = 0.0;
+		fstarnrm = 0.0;
+		for (ci=0; ci<NCELLS; ci++){
+			for (vi=0; vi<cell(ci).getNV(); vi++){
+				for (d=0; d<NDIM; d++){
+					// get tmp variables
+					ftmp = cell(ci).vforce(vi,d);
+					vtmp = cell(ci).vvel(vi,d);
+
+					// calculate based on all vertices on all cells
+					P += ftmp*vtmp;
+					vstarnrm += vtmp*vtmp;
+					fstarnrm += ftmp*ftmp;
+				}
+			}
+		}
+
+		// get norms
+		vstarnrm = sqrt(vstarnrm);
+		fstarnrm = sqrt(fstarnrm);
+
+
+		// Step 2. Adjust simulation based on net motion of system
+		if (P > 0){
+			// increment pos counter
+			npPos++;
+
+			// reset neg counter
+			npNeg = 0;
+
+			// update alpha_t for next time
+			alphat = alpha;
+
+			// alter sim if enough positive steps taken
+			if (npPos > NMIN){
+				// change time step
+				if (dt*finc < dtmax)
+					dt *= finc;
+				else
+					dt = dtmax;
+
+				// decrease alpha
+				alpha *= falpha;
+			}
+		}
+		else{
+			// reset pos counter
+			npPos = 0;
+
+			// rest neg counter
+			npNeg++;
+
+			// check for stuck sim
+			if (npNeg > NNEGMAX)
+				break;
+
+			// decrease time step if past initial delay
+			if (k > NMIN){
+				// decrease time step 
+				if (dt*fdec > dtmin)
+					dt *= fdec;
+				else
+					dt = dtmin;
+
+				// change alpha
+				alpha = alpha0;
+				alphat = alpha;
+			}
+
+			// take half step backwards
+			for (ci=0; ci<NCELLS; ci++){
+				for (vi=0; vi<cell(ci).getNV(); vi++){
+					for (d=0; d<NDIM; d++)
+						cell(ci).setVPos(vi,d,cell(ci).vpos(vi,d) - 0.5*dt*cell(ci).vvel(vi,d));
+				}
+			}
+
+			// reset velocities to 0
+			for (ci=0; ci<NCELLS; ci++){
+				for (vi=0; vi<cell(ci).getNV(); vi++){
+					for (d=0; d<NDIM; d++)
+						cell(ci).setVVel(vi,d,0.0);
+				}
+			}
+		}
+
+		// update velocities if forces are acting
+		if (fstarnrm > 0){
+			for (ci=0; ci<NCELLS; ci++){
+				for (vi=0; vi<cell(ci).getNV(); vi++){
+					for (d=0; d<NDIM; d++){
+						vtmp = (1 - alphat)*cell(ci).vvel(vi,d) + alphat*(cell(ci).vforce(vi,d)/fstarnrm)*vstarnrm;
+						cell(ci).setVVel(vi,d,vtmp);
+					}
+				}
+			}
+		}
+
+		// do verlet update
+		for (ci=0; ci<NCELLS; ci++){
+			cell(ci).verletPositionUpdate(dt);
+			cell(ci).updateCPos();
+		}
+
+		// reset contacts before force calculation
+		resetContacts();
+
+		// calculate forces
+		calculateForces();
+
+		// update velocities
+		for (ci=0; ci<NCELLS; ci++)
+			cell(ci).verletVelocityUpdate(dt);
+
+		// update t
+		t += dt;
+
+		// track energy and forces
+		F = forceRMS();
+		K = totalKineticEnergy();
+
+		// scale P and K for convergence checking
+		Fcheck = F;
+		Kcheck = K/NCELLS;
+
+		// update if Fcheck under tol
+		if (abs(Fcheck) < Ftol)
+			npPMIN++;
+		else
+			npPMIN = 0;
+
+		// check that P is not crazy
+		if (abs(P) > 800){
+			cout << "	ERROR: P = " << P << ", ending." << endl;
+			cout << "	** Kcheck = " << Kcheck << endl;
+			cout << "	** Fcheck = " << Fcheck << endl;
+			cout << "	** k = " << k << ", t = " << t << endl;
+
+			// print minimized config, energy and contact network
+			if (packingPrintObject.is_open()){
+				cout << "	* Printing vetex positions to file" << endl;
+				printSystemPositions();
+			}
+			
+			if (energyPrintObject.is_open()){
+				cout << "	* Printing cell energy to file" << endl;
+				printSystemEnergy(k);
+			}
+
+			exit(1);
+		}
+
+		// check for convergence
+		converged = (abs(Fcheck) < Ftol && npPMIN > NMIN && Kcheck < Ktol);
+		converged = (converged || (abs(Fcheck) > Ftol && Kcheck < Ktol));
+
+		if (converged){
+			cout << "	** FIRE has converged!" << endl;
+			cout << "	** Kcheck = " << Kcheck << endl;
+			cout << "	** Fcheck = " << Fcheck << endl;
+			cout << "	** k = " << k << ", t = " << t << endl;
+			cout << "	** Breaking out of FIRE protocol." << endl;
+
+			// print minimized config, energy and contact network
+			if (packingPrintObject.is_open()){
+				cout << "	* Printing vetex positions to file" << endl;
+				printSystemPositions();
+			}
+			
+			if (energyPrintObject.is_open()){
+				cout << "	* Printing cell energy to file" << endl;
+				printSystemEnergy(k);
+			}
+
+			break;
+		}
+	}
+
+	// reset dt to be original value before ending function
+	dt = dt0;
+
+	// if no convergence, just stop
+	if (k == kmax){
+		cout << "	** ERROR: FIRE not converged in kmax = " << kmax << " force evaluations, ending code" << endl;
+		exit(1);
+	}
 }
 
 
@@ -2723,7 +3032,6 @@ void cellPacking2D::fireMinimizeGel(double Ptol, double Ktol){
 
 
 
-
 // GELATION FUNCTIONS
 
 
@@ -2808,7 +3116,7 @@ void cellPacking2D::twoParticleContact(int NV){
 }
 
 // initialize plant cell particles as disks at input packing fraction
-void cellPacking2D::initializeGel(int NV, double phiDisk, double sizeDispersion, double delval){
+void cellPacking2D::initializeGel(int NV, double phiDisk, double sizeDispersion, double delval, double ka){
 	// local variables
 	int ci, vi, d, nvtmp;
 	double calA;
@@ -2816,6 +3124,7 @@ void cellPacking2D::initializeGel(int NV, double phiDisk, double sizeDispersion,
 	double xmin, xmax, ymin, ymax;
 	double r1, r2, g1, radsum;
 	double rtmp, a0tmp, l0tmp, p0tmp, calA0tmp;
+	double a0mean, l0mean, r0mean;
 	double meanArea = 0.0;
 	double lc = 0.0;
 
@@ -2856,6 +3165,11 @@ void cellPacking2D::initializeGel(int NV, double phiDisk, double sizeDispersion,
 	// reseed rng
 	srand48(56835698*seed);
 
+	// calculate mean a0, l0, r0 so correct time scale can be calculated
+	a0mean = 0.0;
+	l0mean = 0.0;
+	r0mean = 0.0;
+
 	// initialize cell information
 	cout << "		-- Ininitializing plant cell objects" << endl;
 	for (ci=0; ci<NCELLS; ci++){
@@ -2887,11 +3201,21 @@ void cellPacking2D::initializeGel(int NV, double phiDisk, double sizeDispersion,
 		l0tmp = 2.0*rtmp*sin(PI/nvtmp);
 		p0tmp = l0tmp*nvtmp;
 
+		// calculate means
+		a0mean += a0tmp;
+		l0mean += l0tmp;
+		r0mean += rtmp;
+
 		// set preferred area and length 
 		cell(ci).seta0(a0tmp);
 		cell(ci).setl0(l0tmp);
 		cell(ci).setdel(delval);
 	}
+
+	// take means
+	a0mean /= NCELLS;
+	l0mean /= NCELLS;
+	r0mean /= NCELLS;
 
 	// initialize particle positions
 	cout << "		-- Ininitializing cell positions" << endl;
@@ -2914,9 +3238,9 @@ void cellPacking2D::initializeGel(int NV, double phiDisk, double sizeDispersion,
 		cell(ci).regularPolygon();
 	}
 
-	// initial time scales ( = sqrt(m*sigma/f_0) = sqrt(PI)))
+	// initial time scales
 	cout << "		-- Ininitializing time scale" << endl;
-	dt = 0.1*sqrt(PI);
+	dt = 0.01*sqrt((2.0*l0mean)/(ka*a0mean));
 	dt0 = dt;
 
 	// use FIRE in PBC box to relax overlaps

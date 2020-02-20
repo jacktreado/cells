@@ -65,6 +65,7 @@ private:
 	// rest parameters
 	double l0;			// rest length for each perimeter spring
 	double a0;			// rest area for particles
+	double c0; 			// rest angle for cell boundary
 	double del;			// contact distance for two edge segments
 	double a;			// only attraction parameter (distance and strength, good for DM)
 
@@ -93,6 +94,7 @@ public:
 	double getkint() { return kint; };
 	double getl0() { return l0; };
 	double geta0() { return a0; };
+	double getc0() { return c0; };
 	double getdel() { return del; };
 	double geta() { return a; };
 
@@ -122,6 +124,8 @@ public:
 	void setkint(double val) { kint = val; };
 	void setl0(double val) { l0 = val; };
 	void seta0(double val) { a0 = val; };
+	void setc0(double val) { c0 = val; };
+	void setc0Angle(double val) { c0 = cos(val); };
 	void setdel(double val) { del = val; };
 	void seta(double val) { a = val; };
 	void setpbc(int d, int val) { pbc.at(d) = val; };
@@ -147,11 +151,8 @@ public:
 	void scale(double val);
 
 	// calculations
-	double area(int vertex);						// area of singular triangle
+	double polygonArea();							// area of polygon (without vertices)
 	double area();									// area of cell
-	double vertexArea();							// area of cell + area of uncovered vertices
-	double freeVertexArea(int i);					// uncovered vertex area for vertex i
-	int localConvexity(int i);						// local convexity at vertex i
 	double perimeter();								// perimeter of cell
 	double asphericity();							// instantaneous asphericity parameter
 	double calA0();									// preferred asphericity
@@ -163,6 +164,7 @@ public:
 
 	// force functions
 	void shapeForces();
+	void balancedShapeForces();
 	void perimeterForce();
 	void areaForce();
 	void surfaceTensionForce();

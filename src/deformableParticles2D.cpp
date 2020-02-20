@@ -44,6 +44,7 @@ deformableParticles2D::deformableParticles2D(){
 	kint 	= 0.0;
 	l0 		= 0.0;
 	a0 		= 0.0;
+	c0 		= cos(0.0);
 	del 	= 0.0;
 	a 		= 0.0;
 
@@ -325,7 +326,7 @@ void deformableParticles2D::regularPolygon(){
 		setVRel(i,1,polyRad*cos(angleArg));
 	}
 	// output
-	cout << " 	-- creating regular polygon with a0 = " << a0 << ", area = " << area() << " and perimeter = " << perimeter() << ", so init calA0 = " << pow(perimeter(),2.0)/(4.0*PI*area()) << ", compare to " << NV*tan(PI/NV)/PI << endl;
+	cout << " 	-- creating regular polygon with a0 = " << a0 << ", area = " << polygonArea() << " and perimeter = " << perimeter() << ", so init calA0 = " << pow(perimeter(),2.0)/(4.0*PI*polygonArea()) << ", compare to " << NV*tan(PI/NV)/PI << endl;
 }
 
 // initialize vertex positions so cell begins as regular polygon
@@ -376,9 +377,9 @@ void deformableParticles2D::vertexPerturbation(double dscale){
 		dx /= dnorm;
 		dy /= dnorm;
 
-		// rescale dx by small scale
-		dx *= dscale;
-		dy *= dscale;
+		// rescale dx by small scale and l0
+		dx *= dscale*l0;
+		dy *= dscale*l0;
 
 		// perturb x direction
 		setVPos(i,0,vpos(i,0)+dx);
@@ -400,7 +401,7 @@ void deformableParticles2D::vertexPerturbation(double dscale){
 double deformableParticles2D::vpos(int vertex, int dim){
 	// check inputs
 	if (vertex >= NV){
-		cout << "	ERROR: vertex input in vpos = " << vertex << ", which is >= NV. Ending." << endl;
+		cout << "	ERROR: vertex input in vpos = " << vertex << ", which is >= NV, which is NV = " << NV << ". Ending." << endl;
 		exit(1);
 	}
 	else if (dim >= NDIM){
@@ -843,127 +844,70 @@ void deformableParticles2D::scale(double val){
 *************************/
 
 
-// calculate triangular area caused by single segment
-double deformableParticles2D::area(int vertex){
+// calculate polygon area
+double deformableParticles2D::polygonArea(){
 	// local variables
-	int ip1,d;
-	double val;
+	int i, kstart, km1, kp1, kcurr, knext;
+	bool cwpos;
+	double maxy = 0;
+	double totalArea = 0.0;
 
-	// wrap vertex labels
-	ip1 = (vertex+1) % NV;
-
-	// compute value of triangular area
-	val = 0.5*abs(vrel(vertex,0)*vrel(ip1,1) - vrel(ip1,0)*vrel(vertex,1));
-
-	// check area
-	if (val <= 1e-14){
-		cout << "	ERROR: computed triangular area between vertices " << vertex << " and " << ip1 << ", and area found to be = " << val << " which is <= tolerance " << 1e-14 << ", so ending." << endl;
-		cout << "	cpos(0) = " << cpos(0) << ", cpos(1) = " << cpos(1) << endl;
-		cout << "	vrel(" << vertex << ",0) = " << vrel(vertex,0) << ", vrel(" << vertex << ",1) = " << vrel(vertex,1) << endl;
-		cout << "	vrel(" << ip1 << ",0) = " << vrel(ip1,0) << ", vrel(" << ip1 << ",1) = " << vrel(ip1,1) << endl;
-		exit(1);
+	// find index of maximum y value
+	for (i=0; i<NV; i++){
+		if (vrel(i,1) > maxy){
+			maxy = vrel(i,1);
+			kstart = i;
+		}
 	}
 
-	return val;
-}
+	// get indices left and right of kstart
+	km1 	= (kstart + NV - 1) % NV;
+	kp1 	= (kstart + 1) % NV;
 
+	// determine which way is clockwise
+	if (vrel(kp1,0) > vrel(km1,0))
+		cwpos = true;
+	else
+		cwpos = false;
+
+	// initialize indices for counting
+	kcurr = kstart;
+
+	// loop over vertices
+	for (i=0; i<NV; i++){
+		// determine index of next vertex
+		if (cwpos)
+			knext = (kcurr + 1) % NV;
+		else
+			knext = (kcurr + NV - 1) % NV;
+
+		// add to Dong's area formula
+		totalArea += vrel(knext,0)*vrel(kcurr,1) - vrel(kcurr,0)*vrel(knext,1);
+
+		// update k
+		kcurr = knext;
+	}
+
+	// halve area
+	totalArea *= 0.5;
+
+	// check area sign
+	if (totalArea < 0)
+		totalArea *= -1;
+
+	// return area
+	return totalArea;
+}
 
 // calculate cell area
+// NOTE: OLD VERSION USED TRIANGULAR AREA FROM area(i) FUNCTION
 double deformableParticles2D::area(){
-	// local variables
-	int i;
-	double totalArea = 0.0;
-
-	// loop over vertices, get area of each triangle
-	for (i=0; i<NV; i++)
-		totalArea += area(i);
+	// calculate exposedVertexArea, add to polygon area
+	double exposedVertexArea = 0.5*(NV - 2)*PI*pow(0.5*del*l0,2);
 
 	// return area
-	return totalArea;
+	return polygonArea() + exposedVertexArea;
 }
-
-
-// calculate cell area with vertex inclusions
-double deformableParticles2D::vertexArea(){
-	// local variables
-	int i;
-	double totalArea = 0.0;
-
-	// loop over vertices, get area of each triangle and relevant vertex area
-	for (i=0; i<NV; i++){
-		totalArea += area(i) + 0.5*del*l0*segmentLength(i);
-		// totalArea += area(i) + freeVertexArea(i);
-	}
-	totalArea += + PI*pow(0.5*del*l0,2.0);
-
-	// return area
-	return totalArea;
-}
-
-
-// calculate free vertex area of a given vertex by measuring local convexity
-double deformableParticles2D::freeVertexArea(int i){
-	// local variables
-	double bondAngle, vertexRad;
-	double areaval;
-
-	// angle
-	bondAngle = acos(segmentCosine(i));
-
-	// vertex radius
-	vertexRad = 0.5*del*l0;
-
-	// check convexity
-	if (localConvexity(i) == 1)
-		areaval = 0.5*(PI + bondAngle)*pow(vertexRad,2.0);
-	else
-		areaval = 0.5*(PI - bondAngle)*pow(vertexRad,2.0);
-
-	return areaval;
-}
-
-
-// check local convexity of a bond (i-1 -> i -> i+1)
-int deformableParticles2D::localConvexity(int i){
-	// local variables
-	int im1, ip1, d; 
-	double a1, a2;
-	double bilen, hitmp, hilen, C;
-
-	// neighboring bonds
-	im1 = (i-1+NV) % NV;
-	ip1 = (i+1) % NV;
-
-	// 
-	// measure area of triangle formed by i-1, i+1 and center
-	//
-
-	// measure length between i-1 and i+1
-	bilen = 0.0;
-	for (d=0; d<NDIM; d++)
-		bilen = pow(vrel(ip1,d) - vrel(im1,d), 2.0);
-
-	// measure height of triangle (note: -ri-1 = \Delta P, so minus signs flip)
-	hilen = 0.0;
-	for (d=0; d<NDIM; d++){
-		hitmp =  ((dotProduct(im1,ip1) - dotProduct(im1,im1))/bilen)*(vrel(ip1,d) - vrel(im1,d)) - vrel(im1,d);
-		hilen += hitmp*hitmp;
-	}
-
-	// get first triangle area
-	a1 = 0.5*sqrt(hilen)*sqrt(bilen);
-
-	// get area of two triangles (aim1 + ai)
-	a2 = area(im1) + area(i);
-
-	// check convexity
-	if (a1 > a2)
-		return 0;
-	else
-		return 1;
-}
-
-
 
 // calculate cell perimeter
 double deformableParticles2D::perimeter(){
@@ -982,7 +926,7 @@ double deformableParticles2D::perimeter(){
 
 // calculate instantaneous asphericity
 double deformableParticles2D::asphericity(){
-	return pow(perimeter(),2)/(4*PI*area());
+	return pow(perimeter(),2)/(4*PI*polygonArea());
 }
 
 
@@ -1036,7 +980,7 @@ double deformableParticles2D::segment(int vertex, int dim){
 	ip1 = (vertex+1) % NV;
 
 	// check minimum image
-	seg = distance(vpos(ip1,dim),vpos(vertex,dim), dim);
+	seg = distance(vpos(ip1,dim),vpos(vertex,dim),dim);
 
 	// return dim component of segment vector
 	return seg;
@@ -1075,12 +1019,28 @@ double deformableParticles2D::segmentDotProduct(int l1, int l2){
 	return val;
 }
 
-double deformableParticles2D::segmentCosine(int l1){
-	// wrap label of l1 - 1
-	int l1m1 = (l1-1+NV) % NV;
+double deformableParticles2D::segmentCosine(int vi){
+	// local variables
+	int vim1, d;
+	double dp, li, lim1, ui, uim1;
+
+	// wrap label of vi - 1
+	vim1 = (vi-1+NV) % NV;
+
+	// get segment length
+	li = segmentLength(vi);
+	lim1 = segmentLength(vim1);
+
+	// calculate dot product of unit vectors
+	dp = 0.0;
+	for (d=0; d<NDIM; d++){
+		ui = segment(vi,d)/li;
+		uim1 = segment(vim1,d)/lim1;
+		dp += ui*uim1;
+	}
 
 	// return normalized dot product
-	return segmentDotProduct(l1m1,l1)/(segmentLength(l1m1)*segmentLength(l1));
+	return dp;
 }
 
 
@@ -1107,6 +1067,123 @@ void deformableParticles2D::shapeForces(){
 	// calculate perimeter force on vertex i
 	if (kb > 0)
 		bendForce();
+}
+
+
+// RECALCULATE SHAPE FORCES FROM BALANCED ENERGY!!!
+void deformableParticles2D::balancedShapeForces(){
+	// local variables                                                                                                                                                                                                                 
+	int d,i,im1,im2,ip1;
+	double ftmp,fxTmp,fyTmp;
+	double K,Kl,Ka,Kb;
+	double aStrain,lStrainI,lStrainIm1;
+	double Cim1,Ci,sign_i,sign_im1;
+
+	// bending energy parameters
+	double lim2,lim1,li,lip1; 					// segment lengths
+	double cim1,ci,cip1;						// angle cosines
+	double uim2,uim1,ui,uip1;					// segment unit vector elements
+	double cStrainIp1,cStrainI,cStrainIm1;		// cosine strains
+	double normC0;								// cosine strain renormalization
+
+	// total area
+	double totalArea = polygonArea();
+	// c0 = 1.0;
+
+	// loop over vertices, calculate each force that is active
+	for (i=0; i<NV; i++){
+		// wrap vertices
+		im2 = (i-2+NV) % NV;
+		im1 = (i-1+NV) % NV;
+		ip1 = (i+1) % NV;
+
+		// calculate segment lengths
+		lim1 = segmentLength(im1);
+		li = segmentLength(i);
+
+		// calculate perimeter force
+		if (kl > 0){
+			// get constants                                                                                                                                                                                                           
+	        Cim1 = 1.0/lim1;
+	        Ci = 1.0/li;
+
+	        // get segment strains
+	        lStrainI = (li/l0) - 1.0;
+	        lStrainIm1 = (lim1/l0) - 1.0;
+
+	        // get effective segment length spring constant
+	        Kl = kl*NV*l0;
+
+	        // loop over dimensions, add to force                                                                                                                                                                                      
+	        for (d=0; d<NDIM; d++){
+	            ftmp = Ci*lStrainI*segment(i,d) - Cim1*lStrainIm1*segment(im1,d);
+	            ftmp *= Kl;
+	            setVForce(i,d,vforce(i,d)+ftmp);
+	        }
+		}
+
+		// calculate area force
+		if (ka > 0){
+			// effective area spring constant
+			Ka = (ka*a0/(l0*l0));
+
+			// calculate area strain
+			aStrain = (totalArea/a0) - 1.0;
+
+			// calculate force term in each direction (based on calc from notes)
+			fxTmp = -Ka*aStrain*0.5*(vrel(ip1,1) - vrel(im1,1));
+			fyTmp = -Ka*aStrain*0.5*(vrel(im1,0) - vrel(ip1,0));
+
+			// add to force on vertices
+			setVForce(i,0,vforce(i,0)+fxTmp);
+			setVForce(i,1,vforce(i,1)+fyTmp);
+		}
+
+		// calculate bending force
+		if (kb > 0){
+			// define segment lengths
+			lim2 = segmentLength(im2);
+			lip1 = segmentLength(ip1);
+
+			// define cosines
+			cim1 	= segmentCosine(im1);
+			ci 		= segmentCosine(i);
+			cip1 	= segmentCosine(ip1);
+
+			// cosine normalization factor
+			normC0 = 1 + c0;
+
+			// effective bending spring
+			Kb = (kb*NV*l0*l0)/normC0;
+
+			// define cosine strains
+			cStrainIm1 = (cim1 - c0)/normC0;
+			cStrainI = (ci - c0)/normC0;
+			cStrainIp1 = (cip1 - c0)/normC0;
+
+			// add to force in each direction
+			for(d=0; d<NDIM; d++){
+				// define unit vector segment elements
+				uim2 = segment(im2,d)/lim2;
+				uim1 = segment(im1,d)/lim1;
+				ui = segment(i,d)/li;
+				uip1 = segment(ip1,d)/lip1;
+
+				// get force element
+				ftmp = cStrainIm1*(uim2 - cim1*uim1)/lim1;
+				ftmp += cStrainIp1*(cip1*ui - uip1)/li;
+				ftmp += cStrainI*(((ui - ci*uim1)/lim1) + ((ci*ui - uim1)/li));
+				ftmp *= -Kb;
+				
+				// add to vectorial force
+				setVForce(i,d,vforce(i,d)+ftmp);
+			}
+		}
+	}
+
+	// calculate perimeter force on vertex i
+	if (gam > 0)
+		surfaceTensionForce();
 }
 
 void deformableParticles2D::perimeterForce(){
@@ -1136,7 +1213,7 @@ void deformableParticles2D::areaForce(){
 	// local variables
 	int i,ip1,im1,d;
 	double sign_i, sign_im1;
-	double totalArea = area();
+	double totalArea = polygonArea();
 	double fxTmp, fyTmp; // scalar force
 
 
@@ -1200,9 +1277,6 @@ void deformableParticles2D::bendForce(){
 	double kim2_im1,kim1,kim1_i,ki;		// little K constants: define big K constants
 	double cim2,cim1,ci;				// angle cosines
 	double ftmp;						// scalar component of force
-
-	// rest bending angle: reg polygon
-	double c0 = cos(2.0*PI/NV);
 
 	// loop over vertices
 	for (i=0; i<NV; i++){
@@ -1866,7 +1940,31 @@ double deformableParticles2D::perimeterEnergy(){
 	// local variables
 	int i;
 	double val = 0.0;
+	double El;
 
+
+	if (kl > 0){
+		// effective energy scale
+		El = 0.5*kl*NV*l0*l0;
+
+		// sum squared perimeter strains
+		for (i=0; i<NV; i++)
+			val += pow((segmentLength(i)/l0) - 1.0,2.0);
+
+		// multiply by energy scale
+		val *= El;
+
+		// return energy value
+		return val;
+	}
+	else
+		return 0.0;
+	
+
+	/*
+	NOTE: ABOVE VERSION FOR BALANCED FORCE VERSION!
+
+	THIS VERSION FOR ORGINAL MODEL, WITH DIMENSIONAL STRAINS
 	if (kl > 0){
 		// energy based on perimeter deviations
 		for (i=0; i<NV; i++)
@@ -1877,11 +1975,32 @@ double deformableParticles2D::perimeterEnergy(){
 	}
 	else
 		return 0.0;
+	*/
 }
 
 double deformableParticles2D::areaEnergy(){
 	// local variables
 	double val = 0.0;
+	double Ea, aStrain;
+
+	if (ka > 0){
+		// effective area energy scale 
+		Ea = 0.5*ka*pow(a0/l0,2.0);
+
+		// dimensionless strain
+		aStrain = (polygonArea()/a0) - 1.0;
+
+		// calculate and return energy
+		val = Ea*aStrain*aStrain;
+		return val;
+	}
+	else
+		return 0.0;
+
+	/*
+	NOTE: ABOVE VERSION FOR BALANCED FORCE VERSION!
+
+	THIS VERSION FOR ORGINAL MODEL, WITH DIMENSIONAL STRAINS
 
 	if (ka > 0){
 		// calculate energy
@@ -1892,6 +2011,7 @@ double deformableParticles2D::areaEnergy(){
 	}
 	else
 		return 0.0;
+	*/
 }
 
 double deformableParticles2D::surfaceTensionEnergy(){
@@ -1913,11 +2033,34 @@ double deformableParticles2D::surfaceTensionEnergy(){
 
 double deformableParticles2D::bendEnergy(){
 	// local variables
-	int i,ip1;
+	int i;
 	double val = 0.0;
+	double Eb, cStrainI, normC0;
 
-	// rest bending angle: reg polygon
-	double c0 = cos(2.0*PI/NV);
+	if (kb > 0){
+		// bending energy scale
+		Eb = 0.5*kb*NV*l0*l0;
+
+		// cosine normalization
+		normC0 = 1 + c0;
+
+		// loop over vertices to calculate energy
+		for (i=0; i<NV; i++){
+			cStrainI = (segmentCosine(i) - c0)/normC0;
+			val += cStrainI*cStrainI;
+		}
+		val *= Eb;
+
+		// return value
+		return val;
+	}
+	else
+		return 0.0;
+
+	/*
+	NOTE: ABOVE VERSION FOR BALANCED FORCE VERSION!
+
+	THIS VERSION FOR ORGINAL MODEL, WITH DIMENSIONAL STRAINS
 
 	// check if energy is activated
 	if (kb > 0){
@@ -1930,6 +2073,7 @@ double deformableParticles2D::bendEnergy(){
 	}
 	else
 		return 0.0;
+	*/
 }
 
 double deformableParticles2D::interactionEnergy(){
