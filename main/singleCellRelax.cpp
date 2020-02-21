@@ -138,9 +138,6 @@ int main(int argc, char const *argv[])
 	// deform vertex positions slightly
 	packingObject.cell(0).vertexPerturbation(1e-2);
 
-	// print initial position to frame
-	packingObject.printSystemPositions();
-
 	// set preferred theta0
 	packingObject.cell(0).setc0Angle(th0);
 
@@ -153,6 +150,7 @@ int main(int argc, char const *argv[])
 
 	// print positions to file
 	cout << "	** Printing vetex positions to file" << endl;
+	packingObject.openPackingObject(positionFile);
 	packingObject.printSystemPositions();
 
 	// print that end of main has been found
