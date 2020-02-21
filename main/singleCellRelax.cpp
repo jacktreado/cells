@@ -86,9 +86,6 @@ int main(int argc, char const *argv[])
 	cout << "	** Instantiating object for single particle to be relaxed" << endl;
 	cellPacking2D packingObject(NCELLS,NT,NPRINT,Ltmp,seed);
 
-	// open print file
-	packingObject.openPackingObject(positionFile);
-
 	// initialize boundary for cell of packing fraction phiDisk
 	Ltmp = sqrt(PI/phiDisk);
 	packingObject.setL(0,Ltmp);
@@ -153,6 +150,10 @@ int main(int argc, char const *argv[])
 	// use FIRE to relax particle shape to desired force tolerance
 	cout << "	** Relaxing single particle at phiDisk = " << phiDisk << " force-based FIRE algorithm" << endl;
 	packingObject.fireMinimizeF(Ftol, Ktol);
+
+	// print positions to file
+	cout << "	** Printing vetex positions to file" << endl;
+	packingObject.printSystemPositions();
 
 	// print that end of main has been found
 	cout << "	** Reached end of main, single cell relaxation protocol has ended." << endl;

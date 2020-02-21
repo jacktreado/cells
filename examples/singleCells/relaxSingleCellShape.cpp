@@ -69,6 +69,10 @@ int main()
 	cout << "	** NCELLS = " << NCELLS << endl;
 	cellPacking2D packingObject(NCELLS,NT,NPRINT,Ltmp,seed); 	// NOTE: NEED TO MAKE NEW CONSTRUCTOR, EVERYTHING ELSE DONE IN initializeGel AND regularPolygon FUNCTIONS
 
+	// open print files
+	packingObject.openPackingObject(posFile);
+	packingObject.openEnergyObject(enFile);
+
 	// initialize boundary for cell of packing fraction phiDisk
 	Ltmp = sqrt(PI/phiDisk);
 	packingObject.setL(0,Ltmp);
@@ -133,13 +137,6 @@ int main()
 	// use FIRE to relax particle shape to desired force tolerance
 	cout << "	** Relaxing single particle at phiDisk = " << phiDisk << " using SP model" << endl;
 	packingObject.fireMinimizeF(Ftol, Ktol);
-
-	// open print files
-	packingObject.openPackingObject(posFile);
-
-	// print positions to file
-	cout << "	** Printing vetex positions to file" << endl;
-	packingObject.printSystemPositions();
 
 	// end function
 	return 0;
