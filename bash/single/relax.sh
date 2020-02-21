@@ -90,7 +90,7 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         let runseed=$seed+ss
 
         # get file str
-        filestr="$basestr"_seed"$seed"
+        filestr="$basestr"_seed"$runseed"
 
         # create output files
         posf=$simdatadir/$filestr.pos
