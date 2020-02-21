@@ -96,7 +96,7 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         posf=$simdatadir/$filestr.pos
 
         # append to runString
-        runString="$runString ; ./$binf $NCELLS $NV $sizeDisp $calA0 $kl $ka $kb $runseed $posf $enf $jamf"
+        runString="$runString ; ./$binf $NV $calA0 $kl $kb $th0 $runseed $posf"
     done
 
     # finish off run string
