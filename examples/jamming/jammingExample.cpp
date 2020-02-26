@@ -23,25 +23,19 @@ const int NT 					= 1e7;
 const int NPRINT				= 2000;
 
 // simulation constants
-const double sizeDispersion 	= 0;			// size dispersion (std dev of cell sizes)
-const double timeStepMag 		= 0.001;		// time step in MD units (zeta * lenscale / forcescale)
+const double sizeDispersion 	= 0.05;			// size dispersion (std dev of cell sizes)
+const double timeStepMag 		= 0.005;		// time step in MD units (zeta * lenscale / forcescale)
 
 // disk constants
-const double phiDisk	 		= 0.6;			// initial packing fraction of disks
+const double phiDisk	 		= 0.2;			// initial packing fraction of disks
 
 // compression constants
-const double phiTarget			= 1.03;			// cell packing fraction (regardless of final pressure)
-const double deltaPhi			= 0.001;		// compression step size
-
-// gelation constants
-const double phiGel 			= 0.3;			// final packing fraction
-const double gelRate 			= 1e-4;			// rate of size decrease (i.e. area loss relative to initial box area)
-const double varPerimRate 		= 0.01;			// rate of relaxation to deformed perimeter
-const double aGelation			= 0.05;			// attraction parameter during gelation sim
+const double phiTarget			= 1.0;			// cell packing fraction (regardless of final pressure)
+const double deltaPhi			= 0.005;		// compression step size
 
 // force parameters
-const double kl 			= 1.0;				// perimeter force constant
-const double ka 			= 1.0;				// area force constant
+const double kl 			= 0.1;				// perimeter force constant
+const double ka 			= 10.0;				// area force constant
 const double gam 			= 0.0;				// surface tension force constant
 const double kb 			= 0.0;				// bending energy constant
 const double kint 			= 1.0;				// interaction energy constant
@@ -49,16 +43,20 @@ const double del 			= 1.0;				// width of vertices in units of l0, vertex sep on
 const double aInitial 		= 0.0;				// attraction parameter to start
 
 // deformability
-const double calA0 			= 1.04;				// ratio of preferred perimeter^2 to preferred area
+const double calA0 			= 1.1;				// ratio of preferred perimeter^2 to preferred area
 
 // tolerances
-const double Ptol 			= 1e-8;				// pressure tolerance
-const double Ktol 			= 1e-16; 			// kinetic energy tolerance
+const double Ptol 			= 1e-14;			// force tolerance
+const double Ktol 			= 1e-28; 			// kinetic energy tolerance
 
 // main function
 int main()
 {
 	// local variables
+
+	// NOTE: WITH FORCE MIN AND THESE PARAMETERS, JAMMING DOES NOT 
+	// GET STUCK WITH LARGE VOIDS BUT SLOWS DOWN NEAR "REAL" JAMMING,
+	// LOOK INTO JAMMING CRITERIA
 
 	// output files
 	string posFile = "pos.test";
@@ -66,8 +64,8 @@ int main()
 	string jamFile = "jam.test";
 
 	// system details
-	int NCELLS 		= 9;
-	int NV			= 16;
+	int NCELLS 		= 8;
+	int NV			= 12;
 	int seed 		= 5;
 	double Ltmp 	= 1.0;
 
@@ -78,13 +76,13 @@ int main()
 
 	// set initial conditions as if disks in box with given packing fraction (sets boundary size)
 	cout << "	** Initializing gel at phiDisk = " << phiDisk << " using SP model" << endl;
-	packingObject.initializeGel(NV, phiDisk, sizeDispersion, del);
+	packingObject.initializeGel(NV, phiDisk, sizeDispersion, del, ka);
 
 	// set deformability, force values
 	packingObject.gelForceVals(calA0,kl,ka,gam,kb,kint,del,aInitial);
 
 	// update time scale
-	packingObject.setdt(timeStepMag);
+	packingObject.vertexDPMTimeScale(timeStepMag);
 
 	// open position output file
 	packingObject.openJamObject(jamFile);

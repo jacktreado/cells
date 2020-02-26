@@ -902,11 +902,65 @@ double deformableParticles2D::polygonArea(){
 // calculate cell area
 // NOTE: OLD VERSION USED TRIANGULAR AREA FROM area(i) FUNCTION
 double deformableParticles2D::area(){
-	// calculate exposedVertexArea, add to polygon area
-	double exposedVertexArea = 0.5*(NV - 2)*PI*pow(0.5*del*l0,2);
+	// local variables
+	int vi, vim1;
+	double li, lim1, ci;
+	double uxi, uyi, uxim1, uyim1;
+	double thetai, cvxi;
+	double avi, avtot;
+	double av = (PI*pow(0.5*del*l0,2))/(2.0*PI);
+
+	// loop over vertices, add correct area fraction
+	avtot = 0.0;
+	for (vi=0; vi<NV; vi++){
+		// get previous vertex
+		vim1 = (vi - 1 + NV) % NV;
+
+		// check cosine
+		ci = segmentCosine(vi);
+
+		// if parallel segments, just take half vert area, else calc arc area
+		if (abs(ci - 1.0) < 1e-8)
+			avi = PI*av;
+		else{
+			// get arc fraction for given vertex
+			thetai = acos(ci);
+
+			// get segment lengths
+			li = segmentLength(vi);
+			lim1 = segmentLength(vim1);
+
+			// get components of unit vectors
+			uxi = segment(vi,0)/li;
+			uyi = segment(vi,1)/li;
+			uxim1 = segment(vim1,0)/lim1;
+			uyim1 = segment(vim1,1)/lim1;
+
+			// check convexity
+			cvxi = uxim1*uyi - uxi*uyim1;
+
+			// calculate fraction for vertex i
+			if (cvxi > 0.0)
+				avi = av*(PI + thetai);
+			else
+				avi = av*(PI - thetai);
+
+			// add to area
+			avtot += avi;
+		}
+
+		// check for error
+		if (avi != avi){
+			cout << "	ERROR: vertex area calculated is a nan, vi = " << vi << ", thetai = " << thetai << ". " << endl;
+			cout << "	** uxi = " << uxi << ", uyi = " << uyi << "; uxim1 = " << uyim1 << ", uyim1 = " << uyim1 << endl;
+			cout << " 	** segmentCosine(vi) = " << segmentCosine(vi) << endl;
+			cout << "  	** Ending." << endl;
+			exit(1);
+		}
+	}
 
 	// return area
-	return polygonArea() + exposedVertexArea;
+	return polygonArea() + avtot;
 }
 
 // calculate cell perimeter
@@ -2267,7 +2321,9 @@ void deformableParticles2D::printVertexPositions(ofstream& vertexPrintObject, in
 	vertexPrintObject << setw(wNUM) << setprecision(p) << l0;
 	vertexPrintObject << setw(wNUM) << setprecision(p) << a0;
 	vertexPrintObject << setw(wNUM) << setprecision(p) << del;
-	vertexPrintObject << setw(wNUM) << setprecision(p) << asphericity();
+	vertexPrintObject << setw(wNUM) << setprecision(p) << polygonArea();
+	vertexPrintObject << setw(wNUM) << setprecision(p) << area();
+	vertexPrintObject << setw(wNUM) << setprecision(p) << perimeter();
 	vertexPrintObject << endl;
 
 	// print vertex column header

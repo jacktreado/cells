@@ -889,9 +889,7 @@ double cellPacking2D::timeScale(){
 // Calculate the packing fraction
 double cellPacking2D::packingFraction(){
 	// local variables
-	int ci, vi;;
-	double apoly = 0.0;
-	double adisk = 0.0;
+	int ci, vi;
 	double atot = 0.0;
 	double val = 0.0;
 
@@ -900,7 +898,7 @@ double cellPacking2D::packingFraction(){
 		atot += cell(ci).area();
 
 	// divide by box area
-	val = atot/L.at(0)*L.at(1);
+	val = atot/(L.at(0)*L.at(1));
 
 	// return value
 	return val;
@@ -1402,7 +1400,7 @@ void cellPacking2D::gelationForces(){
 		}
 
 		// forces on vertices due to shape
-		cell(ci).shapeForces();
+		cell(ci).balancedShapeForces();
 	}
 
 	// normalize virial stresses by the area
@@ -1410,221 +1408,6 @@ void cellPacking2D::gelationForces(){
 	// sigmaXY /= L.at(0)*L.at(1);
 	// sigmaYX /= L.at(0)*L.at(1);
 	// sigmaYY /= L.at(0)*L.at(1);
-}
-
-// fire energy minimization
-void cellPacking2D::fireStep(int& np, double& alpha){
-	// HARD CODE IN FIRE PARAMETERS
-	const double alpha0 	= 0.25;
-	const double finc 		= 1.1;
-	const double fdec 		= 0.5;
-	const double falpha 	= 0.99;
-	const double dtmax 		= 10*dt0;
-	const int NMIN 			= 5;
-
-	// local variables
-	int ci,vi,d;
-	double P,vstarnrm,fstarnrm,vtmp,ftmp;
-
-	// calculate P and norms
-	P = 0.0;
-	vstarnrm = 0.0;
-	fstarnrm = 0.0;
-	for (ci=0; ci<NCELLS; ci++){
-		for (vi=0; vi<cell(ci).getNV(); vi++){
-			for (d=0; d<NDIM; d++){
-				// get tmp variables
-				ftmp = cell(ci).vforce(vi,d);
-				vtmp = cell(ci).vvel(vi,d);
-
-				// calculate based on all vertices on all cells
-				P += ftmp*vtmp;
-				vstarnrm += vtmp*vtmp;
-				fstarnrm += ftmp*ftmp;
-			}
-		}
-	}
-
-	// get norms
-	vstarnrm = sqrt(vstarnrm);
-	fstarnrm = sqrt(fstarnrm);
-
-	// update velocities if forces are acting
-	if (fstarnrm > 0){
-		for (ci=0; ci<NCELLS; ci++){
-			for (vi=0; vi<cell(ci).getNV(); vi++){
-				for (d=0; d<NDIM; d++){
-					vtmp = (1 - alpha)*cell(ci).vvel(vi,d) + alpha*(cell(ci).vforce(vi,d)/fstarnrm)*vstarnrm;
-					cell(ci).setVVel(vi,d,vtmp);
-				}
-			}
-		}
-	}
-
-	// save current kinetic energy to temperature variable
-	T = totalKineticEnergy();
-
-	// update P and alpha
-	if (P > 0 && np > NMIN){
-
-		// increase dt
-		if (dt * finc < dtmax)
-			dt *= finc;
-		else
-			dt = dtmax;
-
-		// decrease alpha
-		alpha *= falpha;
-
-		np++;
-	}
-	else if (P <= 0) {
-		// decrease time step, but only to limit
-		dt *= fdec;
-
-		// set global velocity vector to zero
-		for (ci=0; ci<NCELLS; ci++){
-			for (vi=0; vi<cell(ci).getNV(); vi++){
-				for (d=0; d<NDIM; d++){
-					cell(ci).setVVel(vi,d,0.0);
-				}
-			}
-		}
-
-		// set alpha -> alpha0
-		alpha = alpha0;
-
-		// set np -> 0
-		np = 0;
-	}
-	else if (P > 0 && np <= NMIN) 
-		np++;
-}
-
-// fire energy minimization with vector of alpha values, individual P values for each cell
-void cellPacking2D::fireStep(vector<int>& np, vector<double>& alpha){
-	// HARD CODE IN FIRE PARAMETERS
-	const double alpha0 	= 0.1;
-	const double finc 		= 1.1;
-	const double fdec 		= 0.1;
-	const double falpha 	= 0.99;
-	const double dtmax 		= 10*dt0;
-	const int NMIN 			= 5;
-
-	// local variables
-	int ci,vi,d;
-	double vstarnrm,fstarnrm,vtmp,ftmp;
-
-	// updated temperature
-	T = 0;
-
-	// P values
-	vector<double> P(NCELLS,0.0);
-
-	// loop over cells
-	for (ci=0; ci<NCELLS; ci++){
-
-		// reset norms
-		vstarnrm = 0.0;
-		fstarnrm = 0.0;
-
-		// loop over vertices
-		for (vi=0; vi<cell(ci).getNV(); vi++){
-			for (d=0; d<NDIM; d++){
-				// get tmp variables
-				ftmp = cell(ci).vforce(vi,d);
-				vtmp = cell(ci).vvel(vi,d);
-
-				// calculate based on all vertices on all cells
-				P.at(ci) += ftmp*vtmp;
-				vstarnrm += vtmp*vtmp;
-				fstarnrm += ftmp*ftmp;
-			}
-		}
-
-		// get norms
-		vstarnrm = sqrt(vstarnrm);
-		fstarnrm = sqrt(fstarnrm);
-
-		// update velocities if forces are acting
-		if (fstarnrm > 0){
-			for (vi=0; vi<cell(ci).getNV(); vi++){
-				for (d=0; d<NDIM; d++){
-					vtmp = (1 - alpha.at(ci))*cell(ci).vvel(vi,d) + alpha.at(ci)*(cell(ci).vforce(vi,d)/fstarnrm)*vstarnrm;
-					cell(ci).setVVel(vi,d,vtmp);
-				}
-			}
-		}
-
-		// update temperature, cannot use function because we are looping over cells
-		for (vi=0; vi<cell(ci).getNV(); vi++){
-			for (d=0; d<NDIM; d++){
-				T += 0.5*cell(ci).vvel(vi,d)*cell(ci).vvel(vi,d)*0.25*PI*cell(ci).getdel()*cell(ci).getdel();
-			}
-		}
-
-		// update P and alpha values
-		if (P.at(ci) > 0){
-
-			if (np.at(ci) > NMIN){
-				// increase dt
-				if (dt * finc < dtmax)
-					dt *= finc;
-				else
-					dt = dtmax;
-
-				// decrease alpha
-				alpha.at(ci) *= falpha;
-
-				// increase np counter
-				np.at(ci)++;
-			}
-			else
-				np.at(ci)++;
-
-		}
-		else {
-			// decrease time step
-			dt *= fdec;
-
-			// set global velocity vector to zero
-			for (vi=0; vi<cell(ci).getNV(); vi++){
-				for (d=0; d<NDIM; d++)
-					cell(ci).setVVel(vi,d,0.0);
-			}
-
-			// set alpha -> alpha0
-			alpha.at(ci) = alpha0;
-
-			// set np -> 0
-			np.at(ci) = 0;
-		}
-	}
-}
-
-// perform single step of a verlet integration with FIRE minimization
-void cellPacking2D::fverlet(int& np, double& alpha, double dampingParameter){
-	// local variables
-	int i;
-
-	// perform FIRE step
-	fireStep(np,alpha);
-
-	// update positions
-	for (i=0; i<NCELLS; i++){
-		cell(i).verletPositionUpdate(dt);
-		cell(i).updateCPos();
-	}
-
-	// reset contacts before force calculation
-	resetContacts();
-
-	// calculate forces
-	calculateForces();
-
-	// update velocities
-	for (i=0; i<NCELLS; i++)
-		cell(i).verletVelocityUpdate(dt,dampingParameter);
 }
 
 
@@ -3338,8 +3121,10 @@ void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi){
 void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
 	// local variables
 	double phi0, phiNew, dphi, Ptest, Ktest;
-	int NSTEPS, k, kmax, kr, nc;
+	int NSTEPS, k, kmax, kr, nc, nr;
 	cellPacking2D savedState;
+
+	double phiBefore = phi;
 
 	// calculate phi before initial minimization
 	phi = packingFraction();
@@ -3385,7 +3170,8 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
 		k++;
 
 		// relax shapes (energies calculated in relax function)
-		fireMinimizeP(Ptol, Ktol);
+		// fireMinimizeP(Ptol, Ktol);
+		fireMinimizeF(Ptol,Ktol);
 
 		// calculate Ptest and Ktest of relaxed system
 		Ptest = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
@@ -3397,9 +3183,13 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
 		// update number of contacts
 		nc = totalNumberOfContacts();
 
+		// remove rattlers
+		kr = 0;
+		nr = removeRattlers(kr);
+
 		// boolean checks
-		undercompressed = (Ptest < Ptol && Ktest < 100*Ktol);
-		overcompressed = (Ptest > 5.0*Ptol && Ktest < Ktol && nc > 0);
+		undercompressed = (Ptest < Ptol && Ktest < Ktol);
+		overcompressed = (Ptest > 2.0*Ptol && Ktest < Ktol && nc > 0);
 		jammed = (Ptest < 5.0*Ptol && Ptest > Ptol && Ktest < Ktol && nc > 0);
 
 		// output to console
@@ -3414,6 +3204,7 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
 		cout << "	* Ptest 		= " << Ptest << endl;
 		cout << "	* Ktest 		= " << Ktest << endl;
 		cout << "	* # of contacts = " << nc << endl;
+		cout << "	* # of rattlers = " << nr << endl;
 		cout << "	* undercompressed = " << undercompressed << endl;
 		cout << "	* overcompressed = " << overcompressed << endl;
 		cout << "	* jammed = " << jammed << endl;
