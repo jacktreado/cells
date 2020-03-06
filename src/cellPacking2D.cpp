@@ -2055,7 +2055,7 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 
 
 // FIRE 2.0 force minimization with backstepping
-void cellPacking2D::fireMinimizeF(double Ftol, double Ktol){
+void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, double& Fcheck, double& Kcheck){
 	// HARD CODE IN FIRE PARAMETERS
 	const double alpha0 	= 0.25;
 	const double finc 		= 1.05;
@@ -2072,14 +2072,14 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol){
 	double alpha 			= alpha0;
 	double alphat 			= alpha;
 	double t 				= 0.0;
-	double forceScale 		= cell(0).getkint();
-	double energyScale		= forceScale;
+	double energyScale 		= cell(0).getka()*pow(cell(0).geta0()/cell(0).getl0(),2.0);
+	double forceScale		= cell(0).getka()*cell(0).geta0()/cell(0).getl0();
 	double P 				= 0;
 
 	// local variables
 	int ci,vi,d,k,kmax;
 	double vstarnrm,fstarnrm,vtmp,ftmp;
-	double K, F, Kcheck, Fcheck;
+	double K, F, Pcheck;
 
 	// variable to test for potential energy minimization
 	bool converged = false;
@@ -2094,10 +2094,12 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol){
 	// norm of total force vector, kinetic energy
 	F = forceRMS();
 	K = totalKineticEnergy();
+	Pcheck = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
+	Pcheck /= forceScale;
 
 	// scale P and K for convergence checking
-	Fcheck = F;
-	Kcheck = K/NCELLS;
+	Fcheck = F/forceScale;
+	Kcheck = K/(NCELLS*energyScale);
 
 	// reset velocities to 0
 	for (ci=0; ci<NCELLS; ci++){
@@ -2108,7 +2110,7 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol){
 	}
 
 	// iterate through MD time until system converged
-	kmax = 5e6;
+	kmax = 1e6;
 	for (k=0; k<kmax; k++){
 
 		// output some information to console
@@ -2119,23 +2121,13 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol){
 			cout << "	* Run data:" << endl;
 			cout << "	* Kcheck 	= " << Kcheck << endl;
 			cout << "	* Fcheck 	= " << Fcheck << endl;
+			cout << "	* Pcheck 	= " << Pcheck << endl;
 			cout << "	* phi 		= " << phi << endl;
 			cout << "	* dt 		= " << dt << endl;
 			cout << "	* alpha 	= " << alpha << endl;
 			cout << "	* alphat 	= " << alphat << endl;
 			cout << "	* P 		= " << P << endl;
 			cout << endl << endl;
-
-			// print config and energy
-			if (packingPrintObject.is_open()){
-				cout << "	* Printing vetex positions to file" << endl;
-				printSystemPositions();
-			}
-			
-			if (energyPrintObject.is_open()){
-				cout << "	* Printing cell energy to file" << endl;
-				printSystemEnergy(k);
-			}
 		}
 
 		// Step 1. calculate P and norms
@@ -2260,10 +2252,12 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol){
 		// track energy and forces
 		F = forceRMS();
 		K = totalKineticEnergy();
+		Pcheck = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
+		Pcheck /= forceScale;
 
 		// scale P and K for convergence checking
-		Fcheck = F;
-		Kcheck = K/NCELLS;
+		Fcheck = F/forceScale;
+		Kcheck = K/(NCELLS*energyScale);
 
 		// update if Fcheck under tol
 		if (abs(Fcheck) < Ftol)
@@ -2276,6 +2270,7 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol){
 			cout << "	ERROR: P = " << P << ", ending." << endl;
 			cout << "	** Kcheck = " << Kcheck << endl;
 			cout << "	** Fcheck = " << Fcheck << endl;
+			cout << "	** Pcheck = " << Pcheck << endl;
 			cout << "	** k = " << k << ", t = " << t << endl;
 
 			// print minimized config, energy and contact network
@@ -2294,12 +2289,14 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol){
 
 		// check for convergence
 		converged = (abs(Fcheck) < Ftol && npPMIN > NMIN && Kcheck < Ktol);
-		converged = (converged || (abs(Fcheck) > Ftol && Kcheck < Ktol));
 
 		if (converged){
 			cout << "	** FIRE has converged!" << endl;
+			cout << "	** F = " << F << endl;
+			cout << "	** K = " << K << endl;
 			cout << "	** Kcheck = " << Kcheck << endl;
 			cout << "	** Fcheck = " << Fcheck << endl;
+			cout << "	** Pcheck = " << Pcheck << endl;
 			cout << "	** k = " << k << ", t = " << t << endl;
 			cout << "	** Breaking out of FIRE protocol." << endl;
 
@@ -2327,244 +2324,6 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol){
 		exit(1);
 	}
 }
-
-
-void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, int plotIt, int& frameCount){
-	// HARD CODE IN FIRE PARAMETERS
-	const double alpha0 	= 0.25;
-	const double finc 		= 1.1;
-	const double fdec 		= 0.5;
-	const double falpha 	= 0.99;
-	const double dtmax 		= 10*dt0;
-	const double dtmin 		= 0.02*dt0;
-	const int NMIN 			= 20;
-	const int NNEGMAX 		= 2000;
-	const int NDELAY 		= 1000;
-	int npPos				= 0;
-	int npNeg 				= 0;
-	int npPMIN				= 0;
-	double alpha 			= alpha0;
-	double alphat 			= alpha;
-	double t 				= 0.0;
-	double energyScale 		= cell(0).getkint();
-	double forceScale		= energyScale/cell(0).getl0();
-
-	// local variables
-	int ci,vi,d,k,kmax;
-	double P,vstarnrm,fstarnrm,vtmp,ftmp;
-	double Knew, fRMS;
-
-	// variable to test for potential energy minimization
-	bool converged = false;
-
-	// reset time step
-	dt = dt0;
-
-	// initialize root-mean-square force from last time
-	fRMS = forceRMS();;
-
-	// initialize forces
-	resetContacts();
-	calculateForces();
-
-	// initialize energy and force tracking, pressure
-	Knew = totalKineticEnergy();
-
-	// reset velocities to 0
-	for (ci=0; ci<NCELLS; ci++){
-		for (vi=0; vi<cell(ci).getNV(); vi++){
-			for (d=0; d<NDIM; d++)
-				cell(ci).setVVel(vi,d,0.0);
-		}
-	}
-
-	// iterate through MD time until system converged
-	kmax = 5e6;
-	for (k=0; k<kmax; k++){
-
-		// output some information to console
-		if (k % NPRINT == 0){
-			cout << "===================================================" << endl << endl;
-			cout << " 	FIRE MINIMIZATION, k = " << k << ", frame = " << frameCount << endl << endl;
-			cout << "===================================================" << endl;
-
-			if (plotIt == 1){
-				if (packingPrintObject.is_open()){
-					cout << "	* Printing vetex positions to file" << endl;
-					printSystemPositions(frameCount);
-				}
-				
-				if (energyPrintObject.is_open()){
-					cout << "	* Printing cell energy to file" << endl;
-					printSystemEnergy(frameCount,fRMS/forceScale,Knew/energyScale);
-				}
-				frameCount++;
-			}
-			
-			cout << "	* Run data:" << endl;
-			cout << "	* K 		= " << Knew/(NCELLS*cell(0).getNV()*energyScale*Ktol) << endl;
-			cout << "	* fRMS 		= " << fRMS/(Ftol*forceScale) << endl;
-			cout << "	* phi 		= " << phi << endl;
-			cout << "	* dt 		= " << dt << endl;
-			cout << "	* alpha 	= " << alpha << endl;
-			cout << "	* P 		= " << P << endl;
-			cout << endl << endl;
-		}
-
-		// Step 1. calculate P and norms
-		P = 0.0;
-		vstarnrm = 0.0;
-		fstarnrm = 0.0;
-		for (ci=0; ci<NCELLS; ci++){
-			for (vi=0; vi<cell(ci).getNV(); vi++){
-				for (d=0; d<NDIM; d++){
-					// get tmp variables
-					ftmp = cell(ci).vforce(vi,d);
-					vtmp = cell(ci).vvel(vi,d);
-
-					// calculate based on all vertices on all cells
-					P += ftmp*vtmp;
-					vstarnrm += vtmp*vtmp;
-					fstarnrm += ftmp*ftmp;
-				}
-			}
-		}
-
-		// get norms
-		vstarnrm = sqrt(vstarnrm);
-		fstarnrm = sqrt(fstarnrm);
-
-
-		// Step 2. Adjust simulation based on net motion of system
-		if (P > 0){
-			// increment pos counter
-			npPos++;
-
-			// reset neg counter
-			npNeg = 0;
-
-			// update alpha_t for next time
-			alphat = alpha;
-
-			// alter sim if enough positive steps taken
-			if (npPos > NMIN){
-				// change time step
-				if (dt*finc < dtmax)
-					dt *= finc;
-				else
-					dt = dtmax;
-
-				// decrease alpha
-				alpha *= falpha;
-			}
-		}
-		else{
-			// reset pos counter
-			npPos = 0;
-
-			// rest neg counter
-			npNeg++;
-
-			// check for stuck sim
-			if (npNeg > NNEGMAX)
-				break;
-
-			// decrease time step if past initial delay
-			if (k > NMIN){
-				// decrease time step 
-				if (dt*fdec > dtmin)
-					dt *= fdec;
-				else
-					dt = dtmin;
-
-				// change alpha
-				alpha = alpha0;
-				alphat = alpha;
-			}
-
-			// take half step backwards
-			for (ci=0; ci<NCELLS; ci++){
-				for (vi=0; vi<cell(ci).getNV(); vi++){
-					for (d=0; d<NDIM; d++)
-						cell(ci).setVPos(vi,d,cell(ci).vpos(vi,d) - 0.5*dt*cell(ci).vvel(vi,d));
-				}
-			}
-
-			// reset velocities to 0
-			for (ci=0; ci<NCELLS; ci++){
-				for (vi=0; vi<cell(ci).getNV(); vi++){
-					for (d=0; d<NDIM; d++)
-						cell(ci).setVVel(vi,d,0.0);
-				}
-			}
-		}
-
-		// update velocities if forces are acting
-		if (fstarnrm > 0){
-			for (ci=0; ci<NCELLS; ci++){
-				for (vi=0; vi<cell(ci).getNV(); vi++){
-					for (d=0; d<NDIM; d++){
-						vtmp = (1 - alphat)*cell(ci).vvel(vi,d) + alphat*(cell(ci).vforce(vi,d)/fstarnrm)*vstarnrm;
-						cell(ci).setVVel(vi,d,vtmp);
-					}
-				}
-			}
-		}
-
-		// do verlet update
-		for (ci=0; ci<NCELLS; ci++){
-			cell(ci).verletPositionUpdate(dt);
-			cell(ci).updateCPos();
-		}
-
-		// reset contacts before force calculation
-		resetContacts();
-
-		// calculate forces
-		calculateForces();
-
-		// update velocities
-		for (ci=0; ci<NCELLS; ci++)
-			cell(ci).verletVelocityUpdate(dt,0.0);
-
-		// update t
-		t += dt;
-
-		// track energy and forces
-		Knew = totalKineticEnergy();
-		fRMS = forceRMS();
-		energyScale = cell(0).getkint();
-		forceScale = energyScale/cell(0).getdel();
-
-		// update if root-mean-square force under tol
-		if (abs(fRMS) < Ftol*energyScale)
-			npPMIN++;
-		else
-			npPMIN = 0;
-
-		// check for convergence
-		converged = (abs(fRMS) < Ftol*forceScale && npPMIN > NMIN);
-		converged = (converged || (abs(fRMS) > 2*Ftol*forceScale && Knew < NCELLS*cell(0).getNV()*energyScale*Ktol));
-
-		if (converged){
-			cout << "	** FIRE has converged!" << endl;
-			cout << "	** k = " << k << ", t = " << t << endl;
-			cout << "	** rms F = " << fRMS << endl;
-			cout << "	** Breaking out of FIRE protocol." << endl;
-			break;
-		}
-	}
-
-	// reset dt to be original value before ending function
-	dt = dt0;
-
-	// if no convergence, just stop
-	if (k == kmax){
-		cout << "	** ERROR: FIRE not converged in kmax = " << kmax << " force evaluations, ending code" << endl;
-		exit(1);
-	}
-}
-
 
 void cellPacking2D::fireMinimizeGel(double Ptol, double Ktol){
 	// HARD CODE IN FIRE PARAMETERS
@@ -3056,21 +2815,17 @@ void cellPacking2D::gelForceVals(double calA0, double kl, double ka, double gam,
 
 
 // compress isostatically
-void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi){
+void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi, double Ftol, double Ktol){
 	// local variables
-	double phi0, phiNew, dphi;
+	double phi0, phiNew, dphi, Fcheck, Kcheck;
 	int NSTEPS, k;
-
-	// tolerances
-	const double Ktol = 1e-10;
-	const double Ptol = 1e-4;
 
 	// calculate phi before initial minimization
 	phi = packingFraction();
 
 	// relax shapes (energies calculated in relax function)
 	cout << "	** IN qsIsoCompression, performing initial relaxation" << endl;
-	fireMinimizeP(Ptol, Ktol);
+	fireMinimizeF(Ftol, Ktol, Fcheck, Kcheck);
 
 	// get initial packing fraction
 	phi = packingFraction();
@@ -3099,6 +2854,8 @@ void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi){
 		cout << "	* dphi 			= " << dphi << endl << endl;
 		cout << "	AFTER LAST MINIMIZATION:" << endl;
 		cout << "	* phi 			= " << phi << endl;
+		cout << "	* Fcheck 		= " << Fcheck << endl;
+		cout << "	* Kcheck 		= " << Kcheck << endl;
 		cout << endl << endl;
 
 		// increase packing fraction to new phi value
@@ -3109,7 +2866,7 @@ void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi){
 		phi = packingFraction();
 
 		// relax shapes (energies calculated in relax function)
-		fireMinimizeP(Ptol, Ktol);
+		fireMinimizeF(Ftol, Ktol, Fcheck, Kcheck);
 
 		// calculate phi after minimization
 		phi = packingFraction();
@@ -3118,9 +2875,10 @@ void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi){
 
 
 // compress isostatically to jamming
-void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
+void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double Ptol){
 	// local variables
-	double phi0, phiNew, dphi, Ptest, Ktest;
+	double phi0, phiNew, dphi, Ptest, Ktest, Ftest;
+	double forceScale = cell(0).getka()*cell(0).geta0()/cell(0).getl0();
 	int NSTEPS, k, kmax, kr, nc, nr;
 	cellPacking2D savedState;
 
@@ -3131,14 +2889,11 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
 
 	// relax shapes (energies calculated in relax function)
 	cout << "	** IN findJamming, performing initial relaxation" << endl;
-	fireMinimizeP(Ptol, Ktol);
+	fireMinimizeF(Ftol, Ktol, Ftest, Ktest);
 
-	// calculate Ptest and Ktest
+	// calculate Ptest for testing
 	Ptest = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
-	Ktest = totalKineticEnergy();
-
-	Ptest = Ptest/NCELLS;
-	Ktest = Ktest/NCELLS;
+	Ptest /= forceScale;
 
 	// update number of contacts
 	nc = totalNumberOfContacts();
@@ -3169,16 +2924,12 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
 		// update iterator
 		k++;
 
-		// relax shapes (energies calculated in relax function)
-		// fireMinimizeP(Ptol, Ktol);
-		fireMinimizeF(Ptol,Ktol);
+		// relax shapes (energies/forces calculated during FIRE minimization)
+		fireMinimizeF(Ftol, Ktol, Ftest, Ktest);
 
-		// calculate Ptest and Ktest of relaxed system
+		// calculate Ptest for comparison
 		Ptest = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
-		Ktest = totalKineticEnergy();
-
-		Ptest = Ptest;
-		Ktest = Ktest/NCELLS;
+		Ptest /= forceScale;
 
 		// update number of contacts
 		nc = totalNumberOfContacts();
@@ -3187,10 +2938,10 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
 		kr = 0;
 		nr = removeRattlers(kr);
 
-		// boolean checks
-		undercompressed = (Ptest < Ptol && Ktest < Ktol);
-		overcompressed = (Ptest > 2.0*Ptol && Ktest < Ktol && nc > 0);
-		jammed = (Ptest < 5.0*Ptol && Ptest > Ptol && Ktest < Ktol && nc > 0);
+		// boolean checks (NOTE: Ktest < Ktol NEEDS TO BE INCLUDED IN FIRE MINIMIZATION, OTHERWISE INCLUDE IT HERE)
+		undercompressed = (Ptest < Ptol);
+		overcompressed = (Ptest > 2.0*Ptol && nc > 0);
+		jammed = (Ptest < 2.0*Ptol && Ptest > Ptol && nc > 0);
 
 		// output to console
 		cout << "===================================================" << endl << endl << endl;
@@ -3201,8 +2952,9 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
 		cout << "	* phi 			= " << phi << endl;
 		cout << "	* phiH 			= " << phiH << endl;
 		cout << "	* phiL 			= " << phiL << endl;
-		cout << "	* Ptest 		= " << Ptest << endl;
+		cout << "	* Ftest 		= " << Ftest << endl;
 		cout << "	* Ktest 		= " << Ktest << endl;
+		cout << "	* Ptest 		= " << Ptest << endl;
 		cout << "	* # of contacts = " << nc << endl;
 		cout << "	* # of rattlers = " << nr << endl;
 		cout << "	* undercompressed = " << undercompressed << endl;
@@ -3229,6 +2981,7 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
 			else if (jammed){
 				cout << "	** At k = 0, jamming found!" << endl;
 				cout << "	** phiJ = " << phi << endl;
+				cout << "	** F = " << Ftest << endl;
 				cout << "	** P = " << Ptest << endl;
 				cout << "	** K = " << Ktest << endl;
 				cout << "	** nc = " << nc << endl;
@@ -3255,6 +3008,7 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ptol){
 			else if (jammed){
 				cout << "	** At k = 0, jamming found!" << endl;
 				cout << "	** phiJ = " << phi << endl;
+				cout << "	** F = " << Ftest << endl;
 				cout << "	** P = " << Ptest << endl;
 				cout << "	** K = " << Ktest << endl;
 				cout << "	** nc = " << nc << endl;
@@ -4192,6 +3946,7 @@ void cellPacking2D::isoExtensionQS(int plotIt, int& frameCount, double phiTarget
 	int isRelaxed = 0;
 	double Ftol = 1e-6;
 	double Ktol = 1e-18;
+	double Fcheck, Kcheck;
 
 	// calculate initial packing fraction
 	phi = packingFraction();
@@ -4224,7 +3979,7 @@ void cellPacking2D::isoExtensionQS(int plotIt, int& frameCount, double phiTarget
 		}
 		// run relaxation until code relaxed
 		else{
-			fireMinimizeF(Ftol, Ktol, plotIt, frameCount);
+			fireMinimizeF(Ftol, Ktol, Fcheck, Kcheck);
 			isRelaxed = 1;
 		}
 

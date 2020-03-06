@@ -27,15 +27,15 @@ const double sizeDispersion 	= 0.05;			// size dispersion (std dev of cell sizes
 const double timeStepMag 		= 0.005;		// time step in MD units (zeta * lenscale / forcescale)
 
 // disk constants
-const double phiDisk	 		= 0.2;			// initial packing fraction of disks
+const double phiDisk	 		= 0.5;			// initial packing fraction of disks
 
 // compression constants
 const double phiTarget			= 1.0;			// cell packing fraction (regardless of final pressure)
-const double deltaPhi			= 0.005;		// compression step size
+const double deltaPhi			= 0.001;		// compression step size
 
 // force parameters
 const double kl 			= 0.1;				// perimeter force constant
-const double ka 			= 10.0;				// area force constant
+const double ka 			= 5.0;				// area force constant
 const double gam 			= 0.0;				// surface tension force constant
 const double kb 			= 0.0;				// bending energy constant
 const double kint 			= 1.0;				// interaction energy constant
@@ -46,8 +46,9 @@ const double aInitial 		= 0.0;				// attraction parameter to start
 const double calA0 			= 1.1;				// ratio of preferred perimeter^2 to preferred area
 
 // tolerances
-const double Ptol 			= 1e-14;			// force tolerance
-const double Ktol 			= 1e-28; 			// kinetic energy tolerance
+const double Ftol 			= 1e-10;			// force tolerance (for FIRE min)
+const double Ktol 			= 1e-20; 			// kinetic energy tolerance
+const double Ptol 			= 1e-6;				// pressure tolerance
 
 // main function
 int main()
@@ -92,8 +93,8 @@ int main()
 	packingObject.openEnergyObject(enFile);
 
 	// compress to set packing fraction using FIRE, pressure relaxation
-	cout << "	** jamming protocol with Ptol = " << Ptol << " and Ktol = " << Ktol << endl;
-	packingObject.findJamming(deltaPhi, Ktol, Ptol);
+	cout << "	** BEGIN jamming protocol " << endl;
+	packingObject.findJamming(deltaPhi, Ktol, Ftol, Ptol);
 
 	// get packing fraction, test to see if we should keep compressing
 	double phiJ = packingObject.packingFraction();
@@ -105,18 +106,18 @@ int main()
 		phiTargetTmp = phiJ + 1e-6;
 		deltaPhiTmp = 1e-8;
 		cout << "	** QS compresison protocol to first phiTarget = " << phiTargetTmp << endl;
-		packingObject.qsIsoCompression(phiTargetTmp,deltaPhiTmp);
+		packingObject.qsIsoCompression(phiTargetTmp,deltaPhiTmp, Ftol, Ktol);
 
 		// set next phi targets to be consecutively larger
 		phiTargetTmp = phiJ + 1e-4;
 		deltaPhiTmp = 1e-6;
 		cout << "	** QS compresison protocol to second phiTarget = " << phiTargetTmp << endl;
-		packingObject.qsIsoCompression(phiTargetTmp,deltaPhiTmp);
+		packingObject.qsIsoCompression(phiTargetTmp,deltaPhiTmp, Ftol, Ktol);
 
 		phiTargetTmp = phiJ + 1e-2;
 		deltaPhiTmp = 1e-4;
 		cout << "	** QS compresison protocol to third phiTarget = " << phiTargetTmp << endl;
-		packingObject.qsIsoCompression(phiTargetTmp,deltaPhiTmp);
+		packingObject.qsIsoCompression(phiTargetTmp,deltaPhiTmp, Ftol, Ktol);
 
 		// check if still under confluent phiTarget
 		phiTmp = packingObject.packingFraction();
@@ -124,9 +125,13 @@ int main()
 			phiTargetTmp = phiTarget;
 			deltaPhiTmp = 1e-3;
 			cout << "	** QS compresison protocol to final phiTarget = " << phiTargetTmp << endl;
-			packingObject.qsIsoCompression(phiTargetTmp,deltaPhiTmp);
+			packingObject.qsIsoCompression(phiTargetTmp,deltaPhiTmp, Ftol, Ktol);
 		}
 	}
+
+	// Print final confluent config to jammed file
+	cout << "	** Printing final confluent state at phi = " << phiTmp << " to jam file" << endl;
+	packingObject.printJammedConfig();
 
 	cout << "	** FINISHED COMPRESSING ABOVE JAMMING, ENDING MAIN FILE" << endl;
 	return 0;

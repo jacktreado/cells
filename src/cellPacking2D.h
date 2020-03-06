@@ -209,19 +209,18 @@ public:
 	void compressToTarget(double dphi, double phiTarget, double asphericityTarget, double Ktol, double Ptol, int plotIt, int& frameCount);
 
 	// Find jamming functions
-	void findJamming(double dphi0, double Ktol, double Ptol);
+	void findJamming(double dphi0, double Ktol, double Ftol, double Ptol);
 
 	// FIRE 2.0 relaxation functions
 	void fireMinimizeP(double Ptol, double Ktol);
-	void fireMinimizeF(double Ftol, double Ktol);
-	void fireMinimizeF(double Ftol, double Ktol, int plotIt, int& frameCount);
+	void fireMinimizeF(double Ftol, double Ktol, double& Ftest, double& Ktest);
 	void fireMinimizeGel(double Ptol, double Ktol);
 
 	// Gelation functions
 	void twoParticleContact(int NV);
 	void initializeGel(int NV, double phiDisk, double sizeDispersion, double delval, double ka);
 	void gelForceVals(double calA0, double kl, double ka, double gam, double kb, double kint, double del, double a);
-	void qsIsoCompression(double phiTarget, double deltaPhi);
+	void qsIsoCompression(double phiTarget, double deltaPhi, double Ftol, double Ktol);
 	void qsIsoGelRatchet(double phiGel, double deltaPhi, double plThresh, double dl0, double calA0max, double timeStepMag);
 	void ratchetPerimeter(double plThresh, double dl0, double calA0max);
 	void attractionRamp(double attractionTarget, double dAttraction);
