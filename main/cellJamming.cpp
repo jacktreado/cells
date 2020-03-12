@@ -34,8 +34,8 @@ const double aInitial 		= 0.0;			// attraction parameter to start
 const double del 			= 1.0;			// radius of vertices in units of l0
 
 // tolerances
-const double Ftol 			= 1e-10;			// force tolerance (for FIRE min)
-const double Ktol 			= 1e-20;		// kinetic energy tolerance
+const double Ftol 			= 1e-8;			// force tolerance (for FIRE min)
+const double Ktol 			= Ftol*Ftol;	// kinetic energy tolerance
 const double Ptol 			= 1e-6;			// pressure tolerance
 
 // int main
@@ -117,18 +117,18 @@ int main(int argc, char const *argv[])
 		phiTargetTmp = phiJ + 1e-6;
 		deltaPhiTmp = 1e-8;
 		cout << "	** QS compresison protocol to first phiTarget = " << phiTargetTmp << endl;
-		packingObject.qsIsoCompression(phiTargetTmp, deltaPhiTmp, Ftol, Ktol);
+		packingObject.qsIsoCompression(phiTargetTmp, deltaPhiTmp, 1e2*Ftol, 1e2*Ktol);
 
 		// set next phi targets to be consecutively larger
 		phiTargetTmp = phiJ + 1e-4;
 		deltaPhiTmp = 1e-6;
 		cout << "	** QS compresison protocol to second phiTarget = " << phiTargetTmp << endl;
-		packingObject.qsIsoCompression(phiTargetTmp, deltaPhiTmp, Ftol, Ktol);
+		packingObject.qsIsoCompression(phiTargetTmp, deltaPhiTmp, 1e2*Ftol, 1e2*Ktol);
 
 		phiTargetTmp = phiJ + 1e-2;
 		deltaPhiTmp = 1e-4;
 		cout << "	** QS compresison protocol to third phiTarget = " << phiTargetTmp << endl;
-		packingObject.qsIsoCompression(phiTargetTmp, deltaPhiTmp, Ftol, Ktol);
+		packingObject.qsIsoCompression(phiTargetTmp, deltaPhiTmp, 1e2*Ftol, 1e2*Ktol);
 
 		// check if still under confluent phiTarget
 		phiTmp = packingObject.packingFraction();
@@ -136,7 +136,7 @@ int main(int argc, char const *argv[])
 			phiTargetTmp = phiTarget;
 			deltaPhiTmp = 1e-3;
 			cout << "	** QS compresison protocol to final phiTarget = " << phiTargetTmp << endl;
-			packingObject.qsIsoCompression(phiTargetTmp, deltaPhiTmp, Ftol, Ktol);
+			packingObject.qsIsoCompression(phiTargetTmp, deltaPhiTmp, 1e2*Ftol, 1e2*Ktol);
 		}
 	}
 
