@@ -96,12 +96,11 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         mkdir -p $specificdir
 
         # create output files
-        posf=$specificdir/$filestr.pos
         enf=$specificdir/$filestr.en
         jamf=$specificdir/$filestr.jam
 
         # append to runString
-        runString="$runString ; ./$binf $NCELLS $NV $sizeDisp $calA0 $kl $ka $kb $runseed $posf $enf $jamf"
+        runString="$runString ; ./$binf $NCELLS $NV $sizeDisp $calA0 $kl $ka $kb $runseed $enf $jamf"
     done
 
     # finish off run string

@@ -2057,12 +2057,12 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 // FIRE 2.0 force minimization with backstepping
 void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, double& Fcheck, double& Kcheck){
 	// HARD CODE IN FIRE PARAMETERS
-	const double alpha0 	= 0.25;
+	const double alpha0 	= 0.1;
 	const double finc 		= 1.05;
 	const double fdec 		= 0.5;
 	const double falpha 	= 0.99;
-	const double dtmax 		= 10*dt0;
-	const double dtmin 		= 0.05*dt0;
+	const double dtmax 		= 5*dt0;
+	const double dtmin 		= 0.01*dt0;
 	const int NMIN 			= 20;
 	const int NNEGMAX 		= 2000;
 	const int NDELAY 		= 1000;
@@ -2657,12 +2657,14 @@ void cellPacking2D::twoParticleContact(int NV){
 	cout << "		-- Initial packing fraction = " << phi << endl;
 }
 
+
 // initialize plant cell particles as disks at input packing fraction
 void cellPacking2D::initializeGel(int NV, double phiDisk, double sizeDispersion, double delval, double ka){
 	// local variables
 	int ci, vi, d, nvtmp;
+	int lx, ly;
 	double calA;
-	double xpos, ypos;
+	double xpos, ypos, dx, dy;
 	double xmin, xmax, ymin, ymax;
 	double r1, r2, g1, radsum;
 	double rtmp, a0tmp, l0tmp, p0tmp, calA0tmp;
@@ -2761,14 +2763,19 @@ void cellPacking2D::initializeGel(int NV, double phiDisk, double sizeDispersion,
 
 	// initialize particle positions
 	cout << "		-- Ininitializing cell positions" << endl;
-	for (ci=0; ci<NCELLS; ci++){
-		// set min and max values of positions
-		xmin = 0;
-		xmax = L.at(0);
-		ymin = 0;
-		ymax = L.at(1);
 
-		// get random location in box
+	// set min and max values of positions
+	xmin = 0;
+	xmax = L.at(0);
+	ymin = 0;
+	ymax = L.at(1);
+
+	// set lattice spacing
+
+
+	for (ci=0; ci<NCELLS; ci++){
+
+		// map onto random x and y position
 		xpos = (xmax-xmin)*drand48() + xmin;
 		ypos = (ymax-ymin)*drand48() + ymin;
 
@@ -2778,6 +2785,9 @@ void cellPacking2D::initializeGel(int NV, double phiDisk, double sizeDispersion,
 
 		// initialize vertices as a regular polygon
 		cell(ci).regularPolygon();
+
+		// perturb vertex positions a little bit
+		cell(ci).vertexPerturbation(0.1);
 	}
 
 	// initial time scales
@@ -2931,17 +2941,17 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 		Ptest = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
 		Ptest /= forceScale;
 
-		// update number of contacts
-		nc = totalNumberOfContacts();
-
 		// remove rattlers
 		kr = 0;
 		nr = removeRattlers(kr);
 
+		// update number of contacts
+		nc = totalNumberOfContacts();
+
 		// boolean checks (NOTE: Ktest < Ktol NEEDS TO BE INCLUDED IN FIRE MINIMIZATION, OTHERWISE INCLUDE IT HERE)
-		undercompressed = (Ptest < Ptol);
+		undercompressed = ((Ptest < 2.0*Ptol && phiH < 0) || (Ptest < Ptol && phiH > 0));
 		overcompressed = (Ptest > 2.0*Ptol && nc > 0);
-		jammed = (Ptest < 2.0*Ptol && Ptest > Ptol && nc > 0);
+		jammed = (Ptest < 2.0*Ptol && Ptest > Ptol && nc > 0 && phiH > 0);
 
 		// output to console
 		cout << "===================================================" << endl << endl << endl;
@@ -2975,20 +2985,6 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 				phiL = phi;
 				phiH = phi + dphi0;
 				cout << "	-- -- overcompressed for first time, setting phi = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
-			}
-			// if in jammed state before found overcompressed state, 
-			// just call it jammed and declare victory
-			else if (jammed){
-				cout << "	** At k = 0, jamming found!" << endl;
-				cout << "	** phiJ = " << phi << endl;
-				cout << "	** F = " << Ftest << endl;
-				cout << "	** P = " << Ptest << endl;
-				cout << "	** K = " << Ktest << endl;
-				cout << "	** nc = " << nc << endl;
-				cout << " WRITING JAMMED CONFIG TO .jam FILE" << endl;
-				cout << " ENDING COMPRESSION SIMULATION" << endl;
-				printJammedConfig();
-				break;
 			}
 		}
 		else{
@@ -3543,7 +3539,7 @@ void cellPacking2D::gelRK4(){
 // FUNCTIONS FOR INTIIAL SP RELAXATION STAGE
 void cellPacking2D::fireMinimizeSP(vector<double>& lenscales){
 	// HARD CODE IN FIRE PARAMETERS
-	const double alpha0 	= 0.25;
+	const double alpha0 	= 0.1;
 	const double finc 		= 1.01;
 	const double fdec 		= 0.5;
 	const double falpha 	= 0.99;
@@ -3559,8 +3555,8 @@ void cellPacking2D::fireMinimizeSP(vector<double>& lenscales){
 	double alpha 			= alpha0;
 	double alphat 			= alpha;
 	double t 				= 0.0;
-	double Ptol 			= 1e-8;
-	double Ktol 			= 1e-12;
+	double Ptol 			= 1e-12;
+	double Ktol 			= 1e-16;
 	bool converged 			= false;
 
 	// local variables
@@ -4160,8 +4156,6 @@ void cellPacking2D::printSystemEnergy(int frame, double Pval, double Kval){
 	energyPrintObject << setw(30) << setprecision(16) << right << calA0;
 	energyPrintObject << setw(30) << setprecision(16) << right << meanCalA;
 	energyPrintObject << endl;
-
-	// NOTE: HOW TO ADD ENERGIES OF INDIVIDUAL CELLS?
 }
 
 
@@ -4180,19 +4174,13 @@ void cellPacking2D::printSystemPositions(){
 	// print information starting information
 	packingPrintObject << setw(w1) << left << "NEWFR" << " " << endl;
 	packingPrintObject << setw(w1) << left << "NUMCL" << setw(w2) << right << NCELLS << endl;
+	packingPrintObject << setw(w1) << left << "PACKF" << setw(w3) << right << packingFraction() << endl;
+
 
 	// print hopper information
 	packingPrintObject << setw(w1) << left << "BOXSZ";
 	packingPrintObject << setw(w3) << right << L.at(0);
 	packingPrintObject << setw(w3) << right << L.at(1);
-	packingPrintObject << endl;
-
-	// print stress information
-	packingPrintObject << setw(w1) << left << "VRIAL";
-	packingPrintObject << setw(w3) << right << sigmaXX;
-	packingPrintObject << setw(w3) << right << sigmaXY;
-	packingPrintObject << setw(w3) << right << sigmaYX;
-	packingPrintObject << setw(w3) << right << sigmaYY;
 	packingPrintObject << endl;
 
 	// print info for rest of the cells
@@ -4218,21 +4206,13 @@ void cellPacking2D::printJammedConfig(){
 	// print information starting information
 	jamPrintObject << setw(w1) << left << "NEWFR" << " " << endl;
 	jamPrintObject << setw(w1) << left << "NUMCL" << setw(w2) << right << NCELLS << endl;
-	jamPrintObject << setw(w1) << left << "JAMPF" << setw(w3) << right << packingFraction() << endl;
+	jamPrintObject << setw(w1) << left << "PACKF" << setw(w3) << right << packingFraction() << endl;
 
 	// print box size information
 	jamPrintObject << setw(w1) << left << "BOXSZ";
 	jamPrintObject << setw(w3) << right << L.at(0);
 	jamPrintObject << setw(w3) << right << L.at(1);
-	jamPrintObject << endl;
-
-	// print stress information
-	jamPrintObject << setw(w1) << left << "VRIAL";
-	jamPrintObject << setw(w3) << right << sigmaXX;
-	jamPrintObject << setw(w3) << right << sigmaXY;
-	jamPrintObject << setw(w3) << right << sigmaYX;
-	jamPrintObject << setw(w3) << right << sigmaYY;
-	jamPrintObject << endl;
+	jamPrintObject << endl;	
 
 	// print contact information
 	jamPrintObject << setw(w1) << left << "CTCTS";
@@ -4251,6 +4231,8 @@ void cellPacking2D::printJammedConfig(){
 }
 
 void cellPacking2D::printSystemEnergy(){
+	// local variables
+	int ci;
 
 	// check to see if file is open
 	if (!energyPrintObject.is_open()) {
@@ -4258,22 +4240,32 @@ void cellPacking2D::printSystemEnergy(){
 		exit(1);
 	}
 
-	// loop over particles, print cell energy
+	// print system energies, stress and packing fraction
 	energyPrintObject << setw(30) << setprecision(16) << right << interactionPotentialEnergy();
 	energyPrintObject << setw(30) << setprecision(16) << right << totalPotentialEnergy();
 	energyPrintObject << setw(30) << setprecision(16) << right << totalKineticEnergy();
 	energyPrintObject << setw(30) << setprecision(16) << right << sigmaXX;
 	energyPrintObject << setw(30) << setprecision(16) << right << sigmaXY;
-	energyPrintObject << setw(30) << setprecision(16) << right << sigmaYX;
 	energyPrintObject << setw(30) << setprecision(16) << right << sigmaYY;
 	energyPrintObject << setw(30) << setprecision(16) << right << packingFraction();
-	energyPrintObject << endl;
 
-	// NOTE: HOW TO ADD ENERGIES OF INDIVIDUAL CELLS?
+	// loop over particles, print cell calA and calA0
+	for (ci=0; ci<NCELLS; ci++){
+		energyPrintObject << setw(30) << setprecision(16) << right << cell(ci).calA0();
+		energyPrintObject << setw(30) << setprecision(16) << right << cell(ci).asphericity();
+	}
+
+	// print new line
+	energyPrintObject << endl;
 }
 
 void cellPacking2D::printSystemEnergy(int intVal){
 
+	// local variables
+	int ci;
+	double forceScale = cell(0).getka()*cell(0).geta0()/cell(0).getl0();
+
+
 	// check to see if file is open
 	if (!energyPrintObject.is_open()) {
 		cout << "	ERROR: energyPrintObject is not open in printSystemEnergy(), ending." << endl;
@@ -4284,15 +4276,21 @@ void cellPacking2D::printSystemEnergy(int intVal){
 	energyPrintObject << setw(30) << setprecision(16) << right << interactionPotentialEnergy();
 	energyPrintObject << setw(30) << setprecision(16) << right << totalPotentialEnergy();
 	energyPrintObject << setw(30) << setprecision(16) << right << totalKineticEnergy();
+	energyPrintObject << setw(30) << setprecision(16) << right << forceRMS()/forceScale;
 	energyPrintObject << setw(30) << setprecision(16) << right << sigmaXX;
 	energyPrintObject << setw(30) << setprecision(16) << right << sigmaXY;
-	energyPrintObject << setw(30) << setprecision(16) << right << sigmaYX;
 	energyPrintObject << setw(30) << setprecision(16) << right << sigmaYY;
 	energyPrintObject << setw(30) << setprecision(16) << right << packingFraction();
 	energyPrintObject << setw(30) << setprecision(16) << right << intVal;
-	energyPrintObject << endl;
 
-	// NOTE: LAST COLUMN WILL BE NUMBER OF MINIMIZATION STEPS IN fireMinimizeP
+	// loop over particles, print cell calA and calA0
+	for (ci=0; ci<NCELLS; ci++){
+		energyPrintObject << setw(30) << setprecision(16) << right << cell(ci).calA0();
+		energyPrintObject << setw(30) << setprecision(16) << right << cell(ci).asphericity();
+	}
+
+	// print new line
+	energyPrintObject << endl;
 }
 
 void cellPacking2D::printSystemContacts(){

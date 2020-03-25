@@ -980,7 +980,7 @@ double deformableParticles2D::perimeter(){
 
 // calculate instantaneous asphericity
 double deformableParticles2D::asphericity(){
-	return pow(perimeter(),2)/(4*PI*polygonArea());
+	return pow(perimeter(),2.0)/(4.0*PI*polygonArea());
 }
 
 
