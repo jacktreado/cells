@@ -34,8 +34,8 @@ const double aInitial 		= 0.0;			// attraction parameter to start
 const double del 			= 1.0;			// radius of vertices in units of l0
 
 // tolerances
-const double Ftol 			= 1e-12;		// force tolerance (for FIRE min)
-const double Ktol 			= 1e-12;		// kinetic energy tolerance
+const double Ftol 			= 1e-10;		// force tolerance (for FIRE min)
+const double Ktol 			= 1e-10;		// kinetic energy tolerance
 const double Ptol 			= 1e-7;			// pressure tolerance
 
 // int main
@@ -98,9 +98,6 @@ int main(int argc, char const *argv[])
 	// open position output file
 	packingObject.openJamObject(jammingFile);
 
-	// open energy and position file
-	packingObject.openEnergyObject(energyFile);
-
 	// compress to set packing fraction using FIRE, pressure relaxation
 	cout << "	** jamming protocol with Ptol = " << Ptol << " and Ktol = " << Ktol << endl;
 	packingObject.findJamming(deltaPhi0, Ktol, Ftol, Ptol);
@@ -109,30 +106,50 @@ int main(int argc, char const *argv[])
 	double phiJ = packingObject.packingFraction();
 	double phiTmp, phiTargetTmp, deltaPhiTmp;
 
+	// open energy and position file
+	packingObject.openEnergyObject(energyFile);
+
+	// create vector of logarithmically spaced points
+	int nlogpts = 30;
+	double p0 = 1e-6;
+	double p1 = 1e-2;
+	vector<double> dphiLogSpace(nlogpts,0.0);
+	double dp = (log10(p1) - log10(p0))/(nlogpts - 1);
+	double logp, linp;
+	logp = log10(p0);
+	dphiLogSpace.at(0) = p0;
+
+	// loop over vector, populate with points
+	for (int i=1; i<nlogpts; i++){
+		logp = logp + dp;
+		linp = pow(10.0,logp);
+		dphiLogSpace.at(i) = linp;
+	}
+
 	// check vs phiTarget
 	if (phiJ < phiTarget){
-		// set first phi targets to be slightly greater than jamming
-		phiTargetTmp = phiJ + 1e-6;
-		deltaPhiTmp = 1e-8;
-		cout << "	** QS compresison protocol to first phiTarget = " << phiTargetTmp << endl;
-		packingObject.qsIsoCompression(phiTargetTmp, deltaPhiTmp, Ftol, Ktol);
+		// compress packing in nlogpts logarithmically spaced steps to 1e-2 over phiJ
+		for (int i=0; i<nlogpts; i++){
+			// get current packing fraction
+			phiTmp = packingObject.packingFraction();
 
-		// set next phi targets to be consecutively larger
-		phiTargetTmp = phiJ + 1e-4;
-		deltaPhiTmp = 1e-6;
-		cout << "	** QS compresison protocol to second phiTarget = " << phiTargetTmp << endl;
-		packingObject.qsIsoCompression(phiTargetTmp, deltaPhiTmp, Ftol, Ktol);
+			// get log spaced delta phi
+			deltaPhiTmp = dphiLogSpace.at(i);
 
-		phiTargetTmp = phiJ + 1e-2;
-		deltaPhiTmp = 1e-4;
-		cout << "	** QS compresison protocol to third phiTarget = " << phiTargetTmp << endl;
-		packingObject.qsIsoCompression(phiTargetTmp, deltaPhiTmp, Ftol, Ktol);
+			// get new phi target
+			phiTargetTmp = phiTmp + deltaPhiTmp;
 
-		cout << "	** Printing compressed state at phi = " << packingObject.packingFraction() << " to jam file" << endl;
+			// compress to new phiTarget by new deltaPhi
+			cout << "	** QS compression protocol i = " << i << " from phi = " << phiTmp << " to phiTarget = " << phiTargetTmp << " by dphi = " << deltaPhiTmp << endl;
+			packingObject.qsIsoCompression(phiTargetTmp, deltaPhiTmp, Ftol, Ktol);
+		}
+
+		// after logarithmic compression, print to jam file
+		phiTmp = packingObject.packingFraction();
+		cout << "	** Printing compressed state at phi = " << phiTmp << " to jam file" << endl;
 		packingObject.printJammedConfig();
 
-		// check if still under confluent phiTarget
-		phiTmp = packingObject.packingFraction();
+		// if still not confluent, compress to confluency
 		if (phiTmp < phiTarget){
 			phiTargetTmp = phiTarget;
 			deltaPhiTmp = 1e-3;

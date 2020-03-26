@@ -2830,19 +2830,14 @@ void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi, double F
 	double phi0, phiNew, dphi, Fcheck, Kcheck;
 	int NSTEPS, k;
 
-	// calculate phi before initial minimization
-	phi = packingFraction();
-
-	// relax shapes (energies calculated in relax function)
-	cout << "	** IN qsIsoCompression, performing initial relaxation" << endl;
-	fireMinimizeF(Ftol, Ktol, Fcheck, Kcheck);
-
 	// get initial packing fraction
 	phi = packingFraction();
 	phi0 = phi;
 
 	// determine number of steps to target
-	NSTEPS = ceil((phiTarget - phi0)/deltaPhi) + 1;
+	NSTEPS = floor((phiTarget - phi0)/deltaPhi);
+	if (NSTEPS == 0)
+		NSTEPS = 1;
 
 	// update new dphi to make steps even
 	dphi = (phiTarget - phi)/NSTEPS;
@@ -2857,7 +2852,7 @@ void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi, double F
 
 		// output to console
 		cout << "===================================================" << endl << endl << endl;
-		cout << " 	quasistatic isotropic compression to target phi = " << phiTarget << endl << endl;
+		cout << " 	quasistatic isotropic compression with NSTEPS = " << NSTEPS << " and dphi = " << dphi << endl << endl;
 		cout << "===================================================" << endl;
 		cout << "	* k 			= " << k << endl;
 		cout << "	* NSTEPS 		= " << NSTEPS << endl;		
