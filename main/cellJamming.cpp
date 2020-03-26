@@ -22,10 +22,10 @@ const double PI = 4.0*atan(1);
 // simulation constants
 const int NT 					= 5e7; 			// number of time steps
 const int NPRINT 				= 2e3;			// number of time steps between prints
-const double timeStepMag 		= 0.05;		// time step in MD unit
+const double timeStepMag 		= 0.02;		// time step in MD unit
 const double phiDisk 			= 0.7;			// initial phi of SP disks
 const double phiTarget 			= 1.0;			// confluent packing fraction target
-const double deltaPhi0 			= 3e-3;			// initial delta phi
+const double deltaPhi0 			= 2e-3;			// initial delta phi
 
 // force parameters
 const double gam 			= 0.0;			// surface tension force constant
