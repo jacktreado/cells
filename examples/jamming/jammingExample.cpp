@@ -65,8 +65,8 @@ int main()
 	string jamFile = "jam.test";
 
 	// system details
-	int NCELLS 		= 16;
-	int NV			= 12;
+	int NCELLS 		= 12;
+	int NV			= 16;
 	int seed 		= 5;
 	double Ltmp 	= 1.0;
 

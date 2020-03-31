@@ -216,6 +216,9 @@ public:
 	void fireMinimizeF(double Ftol, double Ktol, double& Ftest, double& Ktest);
 	void fireMinimizeGel(double Ptol, double Ktol);
 
+	// cell VDOS functions
+	void cellVDOS(std::ofstream& vdosOutObj, double dphi, double Ftol, double Ktol);
+
 	// Gelation functions
 	void twoParticleContact(int NV);
 	void initializeGel(int NV, double phiDisk, double sizeDispersion, double delval, double ka);

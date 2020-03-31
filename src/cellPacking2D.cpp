@@ -2932,6 +2932,9 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 		// relax shapes (energies/forces calculated during FIRE minimization)
 		fireMinimizeF(Ftol, Ktol, Ftest, Ktest);
 
+		// calculate new packing fraction after relaxation
+		phi = packingFraction();
+
 		// calculate Ptest for comparison
 		Ptest = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
 		Ptest /= forceScale;
@@ -2973,12 +2976,12 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 			// if still undercompressed, then grow until overjammed found
 			if (undercompressed)
 				dphi = dphi0;
-			// if first overcompressed, return to pre-overcompression state, compress by dphi0/2
+			// if first overcompressed, return to pre-overcompression state, to midpoint between phi and phiH
 			else if (overcompressed){
+				phiH = phi;
 				loadState(savedState);
-				dphi = 0.5*dphi0;
 				phiL = phi;
-				phiH = phi + dphi0;
+				dphi = 0.5*(phiH - phiL);
 				cout << "	-- -- overcompressed for first time, setting phi = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
 			}
 		}
@@ -2987,13 +2990,14 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 			if (undercompressed){
 				phiL = phi;
 				loadState(savedState);
-				dphi = 0.5*(phiL + phiH) - phi;
+				dphi = 0.5*(phiH - phiL);
 				cout << "	-- -- now undercompressed, setting phi = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
 			}
 			else if (overcompressed){
-				phiH = phi - 0.5*dphi;
+				phiH = phi;
 				loadState(savedState);
-				dphi = 0.5*(phiL + phiH) - phi;
+				phiL = phi;
+				dphi = 0.5*(phiH - phiL);
 				cout << "	-- -- overcompressed (phiL > 0), setting phi = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
 			}
 			else if (jammed){
@@ -4077,7 +4081,37 @@ void cellPacking2D::tumorForce(int NTUMORCELLS, double forceScale, double adipos
 
 
 
+// VDOS FUNCTIONS
 
+// incremement by dphi, relax, calculate vdos, print to file
+void cellPacking2D::cellVDOS(ofstream& vdosOutObj, double dphi, double Ftol, double Ktol){
+	// local variables
+	int vi, kx, ky, lx, ly;
+	double Ftest, Ktest;
+	double phiNew;
+
+	// vdos variables
+
+	// calculate current packing fraction
+	phi = packingFraction();
+	cout << "	** IN cellVDOS, current packing fraction = " << phi << endl;
+
+	// increment packing fraction
+	phiNew = phi + dphi;
+	setPackingFraction(phiNew);
+	cout << "	** IN cellVDOS, incrementing phi by dphi = " << dphi << endl;
+
+	// recalculate new packing fraction
+	phi = packingFraction();
+	cout << "	** IN cellVDOS, new packing fraction = " << phi << endl;
+
+	// relax shapes (energies calculated in relax function)
+	cout << "	** IN cellVDOS, performing relaxation" << endl;
+	fireMinimizeF(Ftol, Ktol, Ftest, Ktest);
+
+	// now loop over cells, compute shape stiffness and stress matrices
+
+}
 
 
 

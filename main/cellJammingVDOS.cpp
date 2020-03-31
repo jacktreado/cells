@@ -131,7 +131,7 @@ int main(int argc, char const *argv[])
 		packingObject.loadState(jammedState);
 
 		// calculate VDOS
-		packingObject.cellVDOS(jammingFile, dphiLogSpace.at(i));
+		packingObject.cellVDOS(jammingFile, dphiLogSpace.at(i), Ftol, Ktol);
 	}
 
 	cout << "	** FINISHED COMPRESSING TO JAMMING AND VDOS CALCULATIONS, ENDING MAIN FILE" << endl;
