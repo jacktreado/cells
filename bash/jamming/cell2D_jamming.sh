@@ -32,8 +32,8 @@ numRuns=$9
 startSeed="${10}"
 
 # other parameters
-kl=0.01
-ka=0.1
+kl=1.0
+ka=2.0
 
 let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1

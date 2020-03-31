@@ -24,8 +24,10 @@ const int NT 					= 1e7; 			// number of time steps
 const int NPRINT 				= 2e3;			// number of time steps between prints
 const double timeStepMag 		= 0.005;		// time step in MD unit
 const double phiDisk 			= 0.7;			// initial phi of SP disks
-const double phiTarget 			= 1.0;			// confluent packing fraction target
 const double deltaPhi0 			= 1e-3;			// initial delta phi
+const double deltaPhiVDOS	 	= 1e-8;			// phi increase for VDOS calculation
+const double deltaPhiVDOSMAX 	= deltaPhi0; 	// max phi increase for VDOS calculation
+const double NVDOSPHI 			= 10;			// number of increased packing fractions to check
 
 // force parameters
 const double gam 			= 0.0;			// surface tension force constant
@@ -102,17 +104,14 @@ int main(int argc, char const *argv[])
 	cout << "	** jamming protocol with Ptol = " << Ptol << " and Ktol = " << Ktol << endl;
 	packingObject.findJamming(deltaPhi0, Ktol, Ftol, Ptol);
 
-	// get packing fraction, test to see if we should keep compressing
-	double phiJ = packingObject.packingFraction();
-	double phiTmp, phiTargetTmp, deltaPhiTmp;
+	cout << "	** saving jammed state" << endl;
+	cellPacking2D jammedState;
+	packingObject.saveState(jammedState); 
 
-	// open energy and position file
-	packingObject.openEnergyObject(energyFile);
-
-	// create vector of logarithmically spaced points
-	int nlogpts = 30;
-	double p0 = 1e-6;
-	double p1 = 1e-2;
+	// create vector of logarithmically spaced points for dphi
+	int nlogpts = NVDOSPHI;
+	double p0 = deltaPhiVDOS;
+	double p1 = deltaPhiVDOSMAX;
 	vector<double> dphiLogSpace(nlogpts,0.0);
 	double dp = (log10(p1) - log10(p0))/(nlogpts - 1);
 	double logp, linp;
@@ -126,42 +125,15 @@ int main(int argc, char const *argv[])
 		dphiLogSpace.at(i) = linp;
 	}
 
-	// check vs phiTarget
-	if (phiJ < phiTarget){
-		// compress packing in nlogpts logarithmically spaced steps to 1e-2 over phiJ
-		for (int i=0; i<nlogpts; i++){
-			// get current packing fraction
-			phiTmp = packingObject.packingFraction();
+	// loop over packing fraction increments, calculate VDOS, save dynamical matrices to file
+	for (int i=0; i<NVDOSPHI; i++){
+		// load jammed state
+		packingObject.loadState(jammedState);
 
-			// get log spaced delta phi
-			deltaPhiTmp = dphiLogSpace.at(i);
-
-			// get new phi target
-			phiTargetTmp = phiTmp + deltaPhiTmp;
-
-			// compress to new phiTarget by new deltaPhi
-			cout << "	** QS compression protocol i = " << i << " from phi = " << phiTmp << " to phiTarget = " << phiTargetTmp << " by dphi = " << deltaPhiTmp << endl;
-			packingObject.qsIsoCompression(phiTargetTmp, deltaPhiTmp, Ftol, Ktol);
-		}
-
-		// after logarithmic compression, print to jam file
-		phiTmp = packingObject.packingFraction();
-		cout << "	** Printing compressed state at phi = " << phiTmp << " to jam file" << endl;
-		packingObject.printJammedConfig();
-
-		// if still not confluent, compress to confluency
-		if (phiTmp < phiTarget){
-			phiTargetTmp = phiTarget;
-			deltaPhiTmp = 1e-3;
-			cout << "	** QS compresison protocol to final phiTarget = " << phiTargetTmp << endl;
-			packingObject.qsIsoCompression(phiTargetTmp, deltaPhiTmp, Ftol, Ktol);
-		}
+		// calculate VDOS
+		packingObject.cellVDOS(jammingFile, dphiLogSpace.at(i));
 	}
 
-	// Print final confluent config to jammed file
-	cout << "	** Printing final confluent state at phi = " << packingObject.packingFraction() << " to jam file" << endl;
-	packingObject.printJammedConfig();
-
-	cout << "	** FINISHED COMPRESSING ABOVE JAMMING, ENDING MAIN FILE" << endl;
+	cout << "	** FINISHED COMPRESSING TO JAMMING AND VDOS CALCULATIONS, ENDING MAIN FILE" << endl;
 	return 0;
 }

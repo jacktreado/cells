@@ -23,31 +23,31 @@ const int NT 					= 1e7;
 const int NPRINT				= 2000;
 
 // simulation constants
-const double sizeDispersion 	= 0.05;			// size dispersion (std dev of cell sizes)
+const double sizeDispersion 	= 0.1;			// size dispersion (std dev of cell sizes)
 const double timeStepMag 		= 0.005;		// time step in MD units (zeta * lenscale / forcescale)
 
 // disk constants
-const double phiDisk	 		= 0.5;			// initial packing fraction of disks
+const double phiDisk	 		= 0.7;			// initial packing fraction of disks
 
 // compression constants
 const double phiTarget			= 1.0;			// cell packing fraction (regardless of final pressure)
 const double deltaPhi			= 0.001;		// compression step size
 
 // force parameters
-const double kl 			= 0.1;				// perimeter force constant
-const double ka 			= 5.0;				// area force constant
+const double kl 			= 1.0;				// perimeter force constant
+const double ka 			= 2.0;				// area force constant
 const double gam 			= 0.0;				// surface tension force constant
 const double kb 			= 0.0;				// bending energy constant
-const double kint 			= 1.0;				// interaction energy constant
+const double kint 			= 0.5;				// interaction energy constant
 const double del 			= 1.0;				// width of vertices in units of l0, vertex sep on regular polygon
 const double aInitial 		= 0.0;				// attraction parameter to start
 
 // deformability
-const double calA0 			= 1.1;				// ratio of preferred perimeter^2 to preferred area
+const double calA0 			= 1.04;				// ratio of preferred perimeter^2 to preferred area
 
 // tolerances
-const double Ftol 			= 1e-10;			// force tolerance (for FIRE min)
-const double Ktol 			= 1e-20; 			// kinetic energy tolerance
+const double Ftol 			= 1e-8;			// force tolerance (for FIRE min)
+const double Ktol 			= 1e-8; 			// kinetic energy tolerance
 const double Ptol 			= 1e-6;				// pressure tolerance
 
 // main function
@@ -65,7 +65,7 @@ int main()
 	string jamFile = "jam.test";
 
 	// system details
-	int NCELLS 		= 8;
+	int NCELLS 		= 16;
 	int NV			= 12;
 	int seed 		= 5;
 	double Ltmp 	= 1.0;
@@ -95,6 +95,8 @@ int main()
 	// compress to set packing fraction using FIRE, pressure relaxation
 	cout << "	** BEGIN jamming protocol " << endl;
 	packingObject.findJamming(deltaPhi, Ktol, Ftol, Ptol);
+
+	return 0;
 
 	// get packing fraction, test to see if we should keep compressing
 	double phiJ = packingObject.packingFraction();
