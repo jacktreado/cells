@@ -55,10 +55,6 @@ int main()
 {
 	// local variables
 
-	// NOTE: WITH FORCE MIN AND THESE PARAMETERS, JAMMING DOES NOT 
-	// GET STUCK WITH LARGE VOIDS BUT SLOWS DOWN NEAR "REAL" JAMMING,
-	// LOOK INTO JAMMING CRITERIA
-
 	// output files
 	string posFile = "pos.test";
 	string enFile = "en.test";

@@ -2978,27 +2978,25 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 				dphi = dphi0;
 			// if first overcompressed, return to pre-overcompression state, to midpoint between phi and phiH
 			else if (overcompressed){
+				cout << "	-- -- overcompressed for first time, setting phi = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
 				phiH = phi;
 				loadState(savedState);
 				phiL = phi;
-				dphi = 0.5*(phiH - phiL);
-				cout << "	-- -- overcompressed for first time, setting phi = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
-			}
+				dphi = 0.5*(phiH - phiL);			}
 		}
 		else{
 			// if found undercompressed state, go to state between undercompressed and last overcompressed states (from saved state)
 			if (undercompressed){
-				phiL = phi;
-				loadState(savedState);
-				dphi = 0.5*(phiH - phiL);
 				cout << "	-- -- now undercompressed, setting phi = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
+				phiL = phi;
+				dphi = 0.5*(phiH - phiL);
 			}
 			else if (overcompressed){
+				cout << "	-- -- overcompressed (phiL > 0), setting phi = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
 				phiH = phi;
 				loadState(savedState);
 				phiL = phi;
 				dphi = 0.5*(phiH - phiL);
-				cout << "	-- -- overcompressed (phiL > 0), setting phi = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
 			}
 			else if (jammed){
 				cout << "	** At k = 0, jamming found!" << endl;
@@ -3021,7 +3019,7 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 		phiNew = phi + dphi;
 		setPackingFraction(phiNew);
 
-		// calculate phi after minimization
+		// calculate phi after increase in packing fraction
 		phi = packingFraction();
 	}
 
