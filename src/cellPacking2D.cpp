@@ -2882,7 +2882,7 @@ void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi, double F
 // compress isostatically to jamming
 void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double Ptol){
 	// local variables
-	double phi0, phiNew, dphi, dphiH, Ptest, Ktest, Ftest;
+	double phiNew, dphi, dphiH, Ptest, Ktest, Ftest;
 	double forceScale = cell(0).getka()*cell(0).geta0()/cell(0).getl0();
 	int NSTEPS, k, kmax, kr, nc, nr;
 	cellPacking2D savedState;
@@ -2931,9 +2931,6 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 
 		// relax shapes (energies/forces calculated during FIRE minimization)
 		fireMinimizeF(Ftol, Ktol, Ftest, Ktest);
-
-		// calculate new packing fraction after relaxation
-		phi = packingFraction();
 
 		// calculate Ptest for comparison
 		Ptest = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
@@ -3021,7 +3018,7 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 		phiNew = phi + dphi;
 		setPackingFraction(phiNew);
 
-		// calculate phi after increase in packing fraction
+		// update new phi (only update here, do NOT calculate relaxed phi value)
 		phi = packingFraction();
 	}
 
