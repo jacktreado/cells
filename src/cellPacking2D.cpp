@@ -3012,6 +3012,7 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 		}
 
 		// save last state before packing fraction is changed
+		phi = packingFraction();
 		saveState(savedState);
 
 		// change packing fraction to new phi value (decided on above)
