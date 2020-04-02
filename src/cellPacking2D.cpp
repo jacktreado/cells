@@ -2882,7 +2882,7 @@ void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi, double F
 // compress isostatically to jamming
 void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double Ptol){
 	// local variables
-	double phi0, phiNew, dphi, Ptest, Ktest, Ftest;
+	double phi0, phiNew, dphi, dphiH, Ptest, Ktest, Ftest;
 	double forceScale = cell(0).getka()*cell(0).geta0()/cell(0).getl0();
 	int NSTEPS, k, kmax, kr, nc, nr;
 	cellPacking2D savedState;
@@ -2978,25 +2978,27 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 				dphi = dphi0;
 			// if first overcompressed, return to pre-overcompression state, to midpoint between phi and phiH
 			else if (overcompressed){
-				cout << "	-- -- overcompressed for first time, setting phi = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
 				phiH = phi;
 				loadState(savedState);
 				phiL = phi;
-				dphi = 0.5*(phiH - phiL);			}
+				dphi = (0.5*(phiH + phiL)) - phi;
+				cout << "	-- -- overcompressed for first time, resetting to phi0 = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
+			}
 		}
 		else{
 			// if found undercompressed state, go to state between undercompressed and last overcompressed states (from saved state)
 			if (undercompressed){
-				cout << "	-- -- now undercompressed, setting phi = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
 				phiL = phi;
-				dphi = 0.5*(phiH - phiL);
+				loadState(savedState);
+				dphi = (0.5*(phiH + phiL)) - phi;
+				cout << "	-- -- now undercompressed, resetting to phi0 = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
+
 			}
 			else if (overcompressed){
-				cout << "	-- -- overcompressed (phiL > 0), setting phi = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
 				phiH = phi;
 				loadState(savedState);
-				phiL = phi;
-				dphi = 0.5*(phiH - phiL);
+				dphi = (0.5*(phiH + phiL)) - phi;
+				cout << "	-- -- overcompressed (phiL > 0), rresetting to phi0 = " << phi << ", phiH = " << phiH << ", compressing by dphi = " << dphi << endl;
 			}
 			else if (jammed){
 				cout << "	** At k = 0, jamming found!" << endl;

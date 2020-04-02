@@ -63,7 +63,7 @@ int main()
 	// system details
 	int NCELLS 		= 12;
 	int NV			= 16;
-	int seed 		= 5;
+	int seed 		= 20;
 	double Ltmp 	= 1.0;
 
 	// instantiate object
