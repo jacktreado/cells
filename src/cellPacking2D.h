@@ -76,22 +76,10 @@ public:
 	void loadState(cellPacking2D& saveObject);
 
 	// initialize sizes
-	void initializeMonodisperse(int NV, double asphericity);
-	void initializeBidisperse(int NV, double sizeRatio);
-	void initializeBidisperse(int NV, double sizeRatio, double asphericity);
-	void initializePolydisperse(int NV, double sizeVariance, double asphericity, char distChoice);	// NEEDS WORKS
-
-	// initialize parameters
-	void initializeForceConstants(double kl, double ka, double gam, double kb, double kint);
-	void initializeInteractionParams(double del, double a);
-
-	// initialize positions
-	void squareLattice();
-	void hexagonalLattice();	// NEEDS WORKS
+	void initializeBidisperse(int NV, double phi0, double sizeRatio, double sizeFraction, double delval);
 
 	// initialize velocities
 	void initializeVelocities(double tmp0);
-	void initializeVelocities(int ci, double tmp0);
 
 	// file openers
 	void openPackingObject(std::string& str){
@@ -148,10 +136,7 @@ public:
 
 	// system-wide calculations
 	int totalNumberOfContacts();			// calculate total number of contacts
-	double timeScale();						// MD characteristic time scale
 	double packingFraction();				// calculate system packing fraction
-	double shapePotentialEnergy();			// calculate potential energy due to shape
-	double relaxPotentialEnergy();			// potential energy - bending energy
 	double totalPotentialEnergy();			// calculate total potential energy
 	double interactionPotentialEnergy();	// calculate only interaction potential energy
 	double totalKineticEnergy();			// calculate total kinetic energy
@@ -167,6 +152,10 @@ public:
 	void setT(double val) { T = val; };
 	void setL(int d, double val) { L.at(d) = val; };
 	void setdt(double val) { dt0 = val; dt = dt0; };
+
+	// set force values for all cells to be the same
+	void forceVals(double calA0, double ka, double kl, double gam, double kb, double kint, double del, double a);
+
 	
 	void vertexDPMTimeScale(double timeStepMag);
 	void addContact(int ci, int cj);
@@ -189,14 +178,32 @@ public:
 
 	void calculateForces();
 	void gelationForces();
-	void fverlet(int& np, double& alpha, double dampingParameter);
-	void activeBrownian(double diffusionConstant);	// NEEDS WORKS
-
 
 
 	/**************************
 
-		Simulation Functions
+		FIRE energy minimzation
+
+	***************************/
+
+	// FIRE 2.0 relaxation functions
+	void fireMinimizeP(double Ptol, double Ktol);
+	void fireMinimizeF(double Ftol, double Ktol, double& Ftest, double& Ktest);
+
+
+	/**************************
+
+		Vibrational 
+			density of states
+
+	***************************/
+
+	void cellVDOS(std::ofstream& vdosOutObj, double dphi, double Ftol, double Ktol);
+
+
+	/**************************
+
+		Simulation Functions:
 
 	***************************/
 
@@ -204,32 +211,24 @@ public:
 	void cellNVE();
 	void cellOverDamped();
 
-	// looping functions
-	void jammingFireRamp(double dphi, double dCalA, double asphericityTarget, double kbTarget, double phiTarget, double Ktol, double Ptol, int plotIt);
-	void compressToTarget(double dphi, double phiTarget, double asphericityTarget, double Ktol, double Ptol, int plotIt, int& frameCount);
-
-	// Find jamming functions
+	// Find jammed state from initially dilute configuration
 	void findJamming(double dphi0, double Ktol, double Ftol, double Ptol);
 
-	// FIRE 2.0 relaxation functions
-	void fireMinimizeP(double Ptol, double Ktol);
-	void fireMinimizeF(double Ftol, double Ktol, double& Ftest, double& Ktest);
-	void fireMinimizeGel(double Ptol, double Ktol);
-
-	// cell VDOS functions
-	void cellVDOS(std::ofstream& vdosOutObj, double dphi, double Ftol, double Ktol);
+	// compress isotropically to a target packing fraction
+	void qsIsoCompression(double phiTarget, double deltaPhi, double Ftol, double Ktol);
 
 	// Gelation functions
 	void twoParticleContact(int NV);
-	void initializeGel(int NV, double phiDisk, double sizeDispersion, double delval, double ka);
-	void gelForceVals(double calA0, double kl, double ka, double gam, double kb, double kint, double del, double a);
-	void qsIsoCompression(double phiTarget, double deltaPhi, double Ftol, double Ktol);
+	void initializeGel(int NV, double phiDisk, double sizeDispersion, double delval);
 	void qsIsoGelRatchet(double phiGel, double deltaPhi, double plThresh, double dl0, double calA0max, double timeStepMag);
 	void ratchetPerimeter(double plThresh, double dl0, double calA0max);
-	void attractionRamp(double attractionTarget, double dAttraction);
-	void gelRateExtension(double phiGel, double gelRate, double timeStepMag);
-	void gelVarPerimRate(double phiGel, double gelRate, double varPerimRate, double timeStepMag);
-	void gelRK4();
+	void cellRK4();
+
+
+
+
+
+
 
 	// Sticky SP particle functions
 	void initializeStickySP(std::vector<double>& radii, double phiDisk, double sizeDispersion);
@@ -239,6 +238,7 @@ public:
 	void printPositionsStickySP(std::vector<double>& radii);
 	void printEnergyStickySP();
 
+
 	// Repulsive SP particle functions
 	void fireMinimizeSP(std::vector<double>& lenscales);
 	void fireMinimizeSP(std::vector<double>& radii, double attractiveParam);
@@ -247,6 +247,7 @@ public:
 	void spPosVerlet();
 	void spVelVerlet(std::vector<double>& lenscales);
 	void spNVE(std::vector<double>& lenscales, int nt);
+
 
 	// Zebrafish active flow functions
 	void dpInitializeActiveZebrafish(int NV, double phiDisk, double sizeDispersion, double R0);
@@ -284,10 +285,6 @@ public:
 	void spActivePipeNVE(std::vector<double>& radii, double T0);
 	void spActivePipeFlow(std::vector<double>& radii, double a, double v0, double Dr);
 
-	// non-equilibrium MD functions
-	void isoExtensionQS(int plotIt, int& frameCount, double phiTarget, double dphi);
-
-
 	// Hopper functions
 	void initializeHopperSP(std::vector<double>& radii, double w0, double w, double th, double Lmin, int NV);
 	void fireMinimizeHopperSP(std::vector<double>& radii, double w0, double w, double th);
@@ -305,16 +302,6 @@ public:
 	void hopperVelVerletSP(std::vector<double>& radii);
 	void printHopperSP(std::vector<double>& radii, double w0, double w, double th, double g);
 	void printHopperDP(double w0, double w, double th, double g);
-
-
-	// tumor MD functions
-	void tumorForce(int NTUMORCELLS, double forceScale, double adiposeDamping);
-
-
-	// fire energy minimization
-	void fireStep(int& np, double& alpha);
-	void fireStep(std::vector<int>& np, std::vector<double>& alphaVec);
-
 
 	// printers
 	void printSystemPositions();

@@ -322,42 +322,11 @@ void deformableParticles2D::regularPolygon(){
 	// loop over vertices, set positions using rotations
 	for (i=0; i<NV; i++){
 		angleArg = (2.0*PI*i)/NV;
-		setVRel(i,0,-polyRad*sin(angleArg));
-		setVRel(i,1,polyRad*cos(angleArg));
+		setVRel(i,0,polyRad*cos(angleArg));
+		setVRel(i,1,polyRad*sin(angleArg));
 	}
 	// output
 	cout << " 	-- creating regular polygon with a0 = " << a0 << ", area = " << polygonArea() << " and perimeter = " << perimeter() << ", so init calA0 = " << pow(perimeter(),2.0)/(4.0*PI*polygonArea()) << ", compare to " << NV*tan(PI/NV)/PI << endl;
-}
-
-// initialize vertex positions so cell begins as regular polygon
-void deformableParticles2D::regularPolygon(double inputArea){
-	// local variables
-	int i;
-	double angleArg = 0.0;
-	double polyRad;
-
-	// set a0 to inputArea
-	a0 = inputArea;
-
-	// check if NV has been set > 0
-	if (NV <= 0){
-		cout << "	ERROR: in regularPolygon(), NV = " << NV << ", so not set properly. Ending." << endl;
-		exit(1);
-	}
-	else if (inputArea < 0.1){
-		cout << "	ERROR: in regularPolygon(), inputArea = " << inputArea << ", so too small and not set properly. Ending." << endl;
-		exit(1);
-	}
-
-	// set radius of polygon
-	polyRad = sqrt((2*inputArea)/(NV*sin(2*PI/NV)));
-
-	// loop over vertices, set positions using rotations
-	for (i=0; i<NV; i++){
-		angleArg = (2*PI*i)/NV;
-		setVRel(i,0,-polyRad*sin(angleArg));
-		setVRel(i,1,polyRad*cos(angleArg));
-	}
 }
 
 // perturb vertex positions
@@ -1105,44 +1074,19 @@ double deformableParticles2D::segmentCosine(int vi){
 
 *************************/
 
+
+// all shape forces
 void deformableParticles2D::shapeForces(){
-	// calculate perimeter force on vertex i
-	if (kl > 0)
-		perimeterForce();
-
-	// calculate perimeter force on vertex i
-	if (ka > 0)
-		areaForce();
-
-	// calculate perimeter force on vertex i
-	if (gam > 0)
-		surfaceTensionForce();
-
-	// calculate perimeter force on vertex i
-	if (kb > 0)
-		bendForce();
-}
-
-
-// RECALCULATE SHAPE FORCES FROM BALANCED ENERGY!!!
-void deformableParticles2D::balancedShapeForces(){
 	// local variables                                                                                                                                                                                                                 
 	int d,i,im1,im2,ip1;
 	double ftmp,fxTmp,fyTmp;
-	double K,Kl,Ka,Kb;
 	double aStrain,lStrainI,lStrainIm1;
-	double Cim1,Ci,sign_i,sign_im1;
-
-	// bending energy parameters
-	double lim2,lim1,li,lip1; 					// segment lengths
-	double cim1,ci,cip1;						// angle cosines
-	double uim2,uim1,ui,uip1;					// segment unit vector elements
-	double cStrainIp1,cStrainI,cStrainIm1;		// cosine strains
-	double normC0;								// cosine strain renormalization
+	double lim1,li;
+	double ulim1,uli;
 
 	// total area
 	double totalArea = polygonArea();
-	// c0 = 1.0;
+	double astrain = (totalArea/a0) - 1.0;
 
 	// loop over vertices, calculate each force that is active
 	for (i=0; i<NV; i++){
@@ -1151,42 +1095,36 @@ void deformableParticles2D::balancedShapeForces(){
 		im1 = (i-1+NV) % NV;
 		ip1 = (i+1) % NV;
 
-		// calculate segment lengths
-		lim1 = segmentLength(im1);
-		li = segmentLength(i);
-
 		// calculate perimeter force
 		if (kl > 0){
-			// get constants                                                                                                                                                                                                           
-	        Cim1 = 1.0/lim1;
-	        Ci = 1.0/li;
+			// calculate segment lengths
+			lim1 = segmentLength(im1);
+			li = segmentLength(i);
 
 	        // get segment strains
 	        lStrainI = (li/l0) - 1.0;
 	        lStrainIm1 = (lim1/l0) - 1.0;
 
-	        // get effective segment length spring constant
-	        Kl = kl*NV*l0;
-
 	        // loop over dimensions, add to force                                                                                                                                                                                      
 	        for (d=0; d<NDIM; d++){
-	            ftmp = Ci*lStrainI*segment(i,d) - Cim1*lStrainIm1*segment(im1,d);
-	            ftmp *= Kl;
+	        	// get segment unit vectors
+	        	uli = segment(i,d)/li;
+	        	ulim1 = segment(im1,d)/lim1;
+
+	        	// add to force
+	            ftmp = lStrainI*uli - lStrainIm1*ulim1;
+	            ftmp *= kl;
 	            setVForce(i,d,vforce(i,d)+ftmp);
 	        }
 		}
 
 		// calculate area force
 		if (ka > 0){
-			// effective area spring constant
-			Ka = (ka*a0/(l0*l0));
-
-			// calculate area strain
-			aStrain = (totalArea/a0) - 1.0;
+			// NOTE: assuming that ka = 1
 
 			// calculate force term in each direction (based on calc from notes)
-			fxTmp = -Ka*aStrain*0.5*(vrel(ip1,1) - vrel(im1,1));
-			fyTmp = -Ka*aStrain*0.5*(vrel(im1,0) - vrel(ip1,0));
+			fxTmp = astrain*0.5*(vrel(im1,1) - vrel(ip1,1));
+			fyTmp = astrain*0.5*(vrel(ip1,0) - vrel(im1,0));
 
 			// add to force on vertices
 			setVForce(i,0,vforce(i,0)+fxTmp);
@@ -1195,186 +1133,33 @@ void deformableParticles2D::balancedShapeForces(){
 
 		// calculate bending force
 		if (kb > 0){
-			// define segment lengths
-			lim2 = segmentLength(im2);
-			lip1 = segmentLength(ip1);
-
-			// define cosines
-			cim1 	= segmentCosine(im1);
-			ci 		= segmentCosine(i);
-			cip1 	= segmentCosine(ip1);
-
-			// cosine normalization factor
-			normC0 = 1 + c0;
-
-			// effective bending spring
-			Kb = (kb*NV*l0*l0)/normC0;
-
-			// define cosine strains
-			cStrainIm1 = (cim1 - c0)/normC0;
-			cStrainI = (ci - c0)/normC0;
-			cStrainIp1 = (cip1 - c0)/normC0;
-
-			// add to force in each direction
 			for(d=0; d<NDIM; d++){
-				// define unit vector segment elements
-				uim2 = segment(im2,d)/lim2;
-				uim1 = segment(im1,d)/lim1;
-				ui = segment(i,d)/li;
-				uip1 = segment(ip1,d)/lip1;
-
-				// get force element
-				ftmp = cStrainIm1*(uim2 - cim1*uim1)/lim1;
-				ftmp += cStrainIp1*(cip1*ui - uip1)/li;
-				ftmp += cStrainI*(((ui - ci*uim1)/lim1) + ((ci*ui - uim1)/li));
-				ftmp *= -Kb;
+				// compute force vector in d direction
+				ftmp = kb*(3.0*segment(i,d) - 3.0*segment(im1,d) + segment(im2,d) - segment(ip1,d));
 				
 				// add to vectorial force
 				setVForce(i,d,vforce(i,d)+ftmp);
 			}
 		}
-	}
 
-	// calculate perimeter force on vertex i
-	if (gam > 0)
-		surfaceTensionForce();
-}
+		// calculate surface tension force
+		if (gam > 0){
+			// calculate segment lengths
+			lim1 = segmentLength(im1);
+			li = segmentLength(i);
 
-void deformableParticles2D::perimeterForce(){
-	// local variables                                                                                                                                                                                                                 
-	int d,i,im1;
-	double Cim1,Ci,ftmp;
+			// loop over dimensions, add to force                                                                                                                                                                                      
+	        for (d=0; d<NDIM; d++){
+	        	// force is difference in unit vectors
+	            ftmp = (segment(i,d)/li) - (segment(im1,d)/lim1);
+	            ftmp *= gam;
 
-	// loop over vertices, calculate forces                                                                                                                                                                                            
-    for (i=0; i<NV; i++){
-        // wrap vertices                                                                                                                                                                                                           
-        im1 = (i-1+NV) % NV;
-
-        // get constants                                                                                                                                                                                                           
-        Cim1 = 1.0-(l0/segmentLength(im1));
-        Ci = 1.0-(l0/segmentLength(i));
-
-        // loop over dimensions, add to force                                                                                                                                                                                      
-        for (d=0; d<NDIM; d++){
-            ftmp = Ci*segment(i,d) - Cim1*segment(im1,d);
-            ftmp *= kl;
-            setVForce(i,d,vforce(i,d)+ftmp);
-        }
-    }
-}
-
-void deformableParticles2D::areaForce(){
-	// local variables
-	int i,ip1,im1,d;
-	double sign_i, sign_im1;
-	double totalArea = polygonArea();
-	double fxTmp, fyTmp; // scalar force
-
-
-	// loop over vertices
-	for (i=0; i<NV; i++){
-		// determine ip1,im1 vertices
-		im1 = (i-1+NV) % NV;
-		ip1 = (i+1) % NV;
-
-		// get sign of grad terms
-		sign_i = vrel(i,0)*vrel(ip1,1) - vrel(ip1,0)*vrel(i,1);
-		if (sign_i < 0)
-			sign_i = -1.0;
-		else
-			sign_i = 1.0;
-
-		sign_im1 = vrel(im1,0)*vrel(i,1) - vrel(i,0)*vrel(im1,1);
-		if (sign_im1 < 0)
-			sign_im1 = -1.0;
-		else
-			sign_im1 = 1.0;
-
-		// calculate force term in each direction (based on calc from notes)
-		fxTmp = -ka*0.5*(totalArea-a0)*(sign_i*vrel(ip1,1) - sign_im1*vrel(im1,1));
-		fyTmp = -ka*0.5*(totalArea-a0)*(sign_im1*vrel(im1,0) - sign_i*vrel(ip1,0));
-
-		// add to force on vertices
-		setVForce(i,0,vforce(i,0)+fxTmp);
-		setVForce(i,1,vforce(i,1)+fyTmp);
-	}
-}
-
-void deformableParticles2D::surfaceTensionForce(){
-	// local variables
-	int i,im1,d;
-	double iUnitVectorComponent,im1UnitVectorComponent,ftmp;
-
-	// loop over vertices
-	for (i=0; i<NV; i++){
-		// make sure loop is cyclic
-		im1 = (i-1+NV) % NV;
-
-		// add to force
-		for (d=0; d<NDIM; d++){
-			// get unit vector components
-			im1UnitVectorComponent = segment(im1,d)/segmentLength(im1);
-			iUnitVectorComponent = segment(i,d)/segmentLength(i);
-			ftmp = -gam*(iUnitVectorComponent - im1UnitVectorComponent);
-
-			// add to force
-			setVForce(i,d,vforce(i,d)+ftmp);
-		}
-	} 
-}
-
-void deformableParticles2D::bendForce(){
-	// local variables
-	int i,ip1,im1,im2,d;				// indices
-	double lim2,lim1,li,lip1; 			// segment lengths
-	double Kim2, Kim1, Ki, Kip1;		// big K constants: scale segment unit vectors
-	double kim2_im1,kim1,kim1_i,ki;		// little K constants: define big K constants
-	double cim2,cim1,ci;				// angle cosines
-	double ftmp;						// scalar component of force
-
-	// loop over vertices
-	for (i=0; i<NV; i++){
-		// wrap vertex labels
-		im2 = (i-2+NV) % NV;
-		im1 = (i-1+NV) % NV;
-		ip1 = (i+1) % NV;
-		
-		// define segment lengths
-		lim2 = segmentLength(im2);
-		lim1 = segmentLength(im1);
-		li = segmentLength(i);
-		lip1 = segmentLength(ip1);
-
-		// define cosines
-		cim2 = segmentDotProduct(im2,im1)/(lim2*lim1);
-		cim1 = segmentDotProduct(im1,i)/(lim1*li);
-		ci = segmentDotProduct(i,ip1)/(li*lip1);
-
-		// define little k constants
-		kim2_im1 = (cim2-c0)/lim1;
-		kim1 = (cim1-c0)/lim1;
-		kim1_i = (cim1-c0)/li;
-		ki = (ci-c0)/li;
-
-		// define big K constants
-		Kim2 = kim2_im1;
-		Kim1 = Kim2*cim2 + kim1*cim1 + kim1_i;
-		Ki = ki*ci + kim1 + kim1_i*cim1;
-		Kip1 = ki;
-
-		// add to force in each direction
-		for(d=0; d<NDIM; d++){
-			// get ftmp
-			ftmp = Kip1*segment(ip1,d)/lip1 - Ki*segment(i,d)/li;
-			ftmp += Kim1*segment(im1,d)/lim1 - Kim2*segment(im2,d)/lim2;
-			ftmp *= kb;
-			
-			// add to vectorial force
-			setVForce(i,d,vforce(i,d)+ftmp);
+	            // add to force
+	            setVForce(i,d,vforce(i,d) + ftmp);
+	        }
 		}
 	}
 }
-
 
 
 /************************
@@ -1520,7 +1305,6 @@ int deformableParticles2D::segmentForce(deformableParticles2D &onTheRight){
 // force between vertices
 // 		* interacting parts are disks of diameter delta = l_0
 // 		* also updates interaction potential
-
 int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector<double>& fij, vector<double>& rij){
 	// return variable
 	int inContact = 0;
@@ -1612,9 +1396,8 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 				distScale = vertexDist/contactDistance;
 
 				// update force and energy scales
-				forceScale = kint;
-				energyScale = kint * contactDistance;
-				// energyScale = forceScale;
+				forceScale = kint / contactDistance;
+				energyScale = kint;
 
 				// IF in zone to use repulsive force (and, if a > 0, bottom of attractive well)
 				if (vertexDist < contactDistance){
@@ -1637,8 +1420,6 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 						onTheRight.setVForce(j,d,onTheRight.vforce(j,d) - ftmp);
 
 						// calculate contribution from vertex-vertex interaction
-						// for (dd=0; dd<NDIM; dd++)
-							// virialStress.at(NDIM*d + dd) += ftmp*vertexVec.at(dd);
 						fij.at(d) += ftmp;
 					}
 				}
@@ -1999,7 +1780,7 @@ double deformableParticles2D::perimeterEnergy(){
 
 	if (kl > 0){
 		// effective energy scale
-		El = 0.5*kl*NV*l0*l0;
+		El = 0.5*kl*l0;
 
 		// sum squared perimeter strains
 		for (i=0; i<NV; i++)
@@ -2013,59 +1794,23 @@ double deformableParticles2D::perimeterEnergy(){
 	}
 	else
 		return 0.0;
-	
-
-	/*
-	NOTE: ABOVE VERSION FOR BALANCED FORCE VERSION!
-
-	THIS VERSION FOR ORGINAL MODEL, WITH DIMENSIONAL STRAINS
-	if (kl > 0){
-		// energy based on perimeter deviations
-		for (i=0; i<NV; i++)
-			val += 0.5*kl*pow(segmentLength(i) - l0,2.0);
-
-		// return value
-		return val;
-	}
-	else
-		return 0.0;
-	*/
 }
 
 double deformableParticles2D::areaEnergy(){
 	// local variables
 	double val = 0.0;
-	double Ea, aStrain;
+	double aStrain;
 
 	if (ka > 0){
-		// effective area energy scale 
-		Ea = 0.5*ka*pow(a0/l0,2.0);
-
 		// dimensionless strain
 		aStrain = (polygonArea()/a0) - 1.0;
 
-		// calculate and return energy
-		val = Ea*aStrain*aStrain;
+		// calculate and return energy (note inclusion of a0 even though mean in system is unit)
+		val = 0.5*a0*aStrain*aStrain;
 		return val;
 	}
 	else
 		return 0.0;
-
-	/*
-	NOTE: ABOVE VERSION FOR BALANCED FORCE VERSION!
-
-	THIS VERSION FOR ORGINAL MODEL, WITH DIMENSIONAL STRAINS
-
-	if (ka > 0){
-		// calculate energy
-		val = 0.5*ka*pow(area()-a0,2.0);
-
-		// return value
-		return val;
-	}
-	else
-		return 0.0;
-	*/
 }
 
 double deformableParticles2D::surfaceTensionEnergy(){
@@ -2087,21 +1832,27 @@ double deformableParticles2D::surfaceTensionEnergy(){
 
 double deformableParticles2D::bendEnergy(){
 	// local variables
-	int i;
+	int i, im1;
 	double val = 0.0;
-	double Eb, cStrainI, normC0;
+	double Eb, kpi, kp0;
 
 	if (kb > 0){
 		// bending energy scale
-		Eb = 0.5*kb*NV*l0*l0;
+		Eb = 0.5*kb*l0*l0;
 
-		// cosine normalization
-		normC0 = 1 + c0;
+		// preferred curvature based on preffered angle cosine
+		kp0 = sqrt(2*(1 - c0));
 
 		// loop over vertices to calculate energy
 		for (i=0; i<NV; i++){
-			cStrainI = (segmentCosine(i) - c0)/normC0;
-			val += cStrainI*cStrainI;
+			// wrap vertices
+			im1 = (i-1+NV) % NV;
+
+			// compute instaneous curvature
+			kpi = sqrt(pow(segment(i,0) - segment(im1,0),2.0) + pow(segment(i,1) - segment(im1,1),2.0))/l0;
+
+			// add to energy value
+			val += pow(kpi - kp0,2.0);
 		}
 		val *= Eb;
 
@@ -2110,24 +1861,6 @@ double deformableParticles2D::bendEnergy(){
 	}
 	else
 		return 0.0;
-
-	/*
-	NOTE: ABOVE VERSION FOR BALANCED FORCE VERSION!
-
-	THIS VERSION FOR ORGINAL MODEL, WITH DIMENSIONAL STRAINS
-
-	// check if energy is activated
-	if (kb > 0){
-		// loop over vertices to calculate energy
-		for (i=0; i<NV; i++)
-			val += 0.5*kb*pow(segmentCosine(i) - c0,2.0);
-
-		// return value
-		return val;
-	}
-	else
-		return 0.0;
-	*/
 }
 
 double deformableParticles2D::interactionEnergy(){
@@ -2166,17 +1899,14 @@ double deformableParticles2D::totalKineticEnergy(){
 	int i,d;
 	double val = 0.0;
 
-	// vertex mass
-	double segmentMass = PI*pow(0.5*del*l0,2.0);
-
-	// loop over vertices, get kinetic energy
+	// loop over vertices, get kinetic energy ( assume unit mass on all vertices )
 	for (i=0; i<NV; i++){
 		for (d=0; d<NDIM; d++)
-			val += 0.5*segmentMass*vvel(i,d)*vvel(i,d);
+			val += vvel(i,d)*vvel(i,d);
 	}
 
 	// return value
-	return val;
+	return 0.5*val;
 }
 
 
@@ -2215,11 +1945,7 @@ void deformableParticles2D::verletPositionUpdate(double dt){
 void deformableParticles2D::verletVelocityUpdate(double dt){
 	// local variables
 	int i,d;
-	double veltmp,anew,segmentMass,b;
-	double ftmp, dampNum, dampDenom, dampUpdate;
-
-	// get segment mass
-	segmentMass = PI*pow(0.5*del*l0,2);
+	double veltmp,anew;
 
 	// update vertex velocities
 	for (i=0; i<NV; i++){
@@ -2227,8 +1953,8 @@ void deformableParticles2D::verletVelocityUpdate(double dt){
 			// get current velocities	
 			veltmp = vvel(i,d);
 
-			// get the new acceleration from forces with damping
-			anew = vforce(i,d)/segmentMass;
+			// get the new acceleration from forces
+			anew = vforce(i,d);
 
 			// update velocity
 			veltmp += 0.5*dt*(anew + vacc(i,d));
@@ -2243,16 +1969,13 @@ void deformableParticles2D::verletVelocityUpdate(double dt){
 void deformableParticles2D::verletVelocityUpdate(double dt, double dampingParam){
     // local variables                                                                                                                                                                                                                 
     int i,d;
-    double veltmp,anew,segmentMass,b;
+    double veltmp,anew,b;
     double ftmp, dampNum, dampDenom, dampUpdate;
 
-    // get segment mass                                                                                                                                                                                                                
-    segmentMass = PI*pow(0.5*del*l0,2);
-
     // scale damping                                                                                                                                                                                                                   
-    b = dampingParam*sqrt(segmentMass);
+    b = dampingParam;
 
-    // update vertex velocities                                                                                                                                                                                                        
+    // update vertex velocities (assume unit mass)                                                                                                                                                                                                 
     for (i=0; i<NV; i++){
 		for (d=0; d<NDIM; d++){
             // get current velocities                                                                                                                                                                                          
@@ -2268,7 +1991,7 @@ void deformableParticles2D::verletVelocityUpdate(double dt, double dampingParam)
             setVForce(i,d,dampUpdate);
 
 	        // get the new acceleration from forces with damping                                                                                                                                                               
-            anew = vforce(i,d)/segmentMass;
+            anew = vforce(i,d);
 
 			// update velocity                                                                                                                                                                                                 
 			veltmp += 0.5*dt*(anew + vacc(i,d));

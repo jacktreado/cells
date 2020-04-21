@@ -82,7 +82,6 @@ public:
 	void initializeVertices();
 	void initializeCell();
 	void regularPolygon();
-	void regularPolygon(double inputArea);
 	void vertexPerturbation(double dscale);
 
 	// getters (simple access)
@@ -164,11 +163,6 @@ public:
 
 	// force functions
 	void shapeForces();
-	void balancedShapeForces();
-	void perimeterForce();
-	void areaForce();
-	void surfaceTensionForce();
-	void bendForce();
 	int segmentForce(deformableParticles2D& onTheRight); // return 0 or 1, depending on contact
 	int vertexForce(deformableParticles2D& onTheRight, std::vector<double>& fij, std::vector<double>& rij);
 	int vertexForce(deformableParticles2D &onTheRight, std::vector<double>& fij, std::vector<double>& rij, double aij);
