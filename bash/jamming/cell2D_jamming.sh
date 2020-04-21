@@ -48,7 +48,7 @@ mkdir -p $simdatadir
 
 # compile into binary using packing.h
 binf=bin/"$runstr".o
-mainf=$maindir/cellJamming.cpp
+mainf=$maindir/jamming/cellJamming.cpp
 echo Running $numSeeds jamming sims of $NCELLS cells with $NV verts, with dispersity $sizeDisp , calA0 = $calA0 , and bending energy kb = $kb
 
 # run compiler
