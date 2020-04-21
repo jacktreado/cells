@@ -1991,6 +1991,9 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 	            // save overcompressed state
 	            saveState(savedState);
 
+	            // compute new phi
+	            phiNew = 0.5*(phiH + phiL);
+
 	            // print to console
 				cout << "	-- -- overcompressed for first time, phiNew = " << phiNew << endl;
 			}
@@ -2028,7 +2031,7 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 				phi = phiH0;
 
 				// print to console
-				cout << "	-- -- undercompressed, phiNew = " << phiNew << endl;
+				cout << "	-- -- overcompressed, phiNew = " << phiNew << endl;
 			}
 			else if (jammed){
 				cout << "	** At k = 0, jamming found!" << endl;
