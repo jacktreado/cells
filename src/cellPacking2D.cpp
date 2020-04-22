@@ -1468,11 +1468,11 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 // FIRE 2.0 force minimization with backstepping
 void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, double& Fcheck, double& Kcheck){
 	// HARD CODE IN FIRE PARAMETERS
-	const double alpha0 	= 0.1;
-	const double finc 		= 1.05;
+	const double alpha0 	= 0.2;
+	const double finc 		= 1.1;
 	const double fdec 		= 0.5;
 	const double falpha 	= 0.99;
-	const double dtmax 		= 5*dt0;
+	const double dtmax 		= 10*dt0;
 	const double dtmin 		= 0.01*dt0;
 	const int NMIN 			= 20;
 	const int NNEGMAX 		= 2000;
@@ -1508,14 +1508,6 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, double& Fcheck, doub
 	// scale P and K for convergence checking
 	Fcheck = F;
 	Kcheck = K/NCELLS;
-
-	// reset velocities to 0
-	for (ci=0; ci<NCELLS; ci++){
-		for (vi=0; vi<cell(ci).getNV(); vi++){
-			for (d=0; d<NDIM; d++)
-				cell(ci).setVVel(vi,d,0.0);
-		}
-	}
 
 	// iterate through MD time until system converged
 	kmax = 1e6;
@@ -1892,11 +1884,9 @@ void cellPacking2D::cellOverDamped(){
 // compress isotropically to jamming
 void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double Ptol){
 	// local variables
-	double phiNew, Ptest, Ktest, Ftest;
+	double Ptest, Ktest, Ftest;
 	int NSTEPS, k, kmax, kr, nc, nr;
 	cellPacking2D savedState;
-
-	double phiBefore = phi;
 
 	// calculate phi before initial minimization
 	phi = packingFraction();
@@ -1920,15 +1910,18 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 
 	// jamming variables
 	bool jammed, overcompressed, undercompressed;
-	double phiH, phiH0, phiL;
+	double rH, rH0, rL, dr0, scaleFactor;
+
+	// compute first dr0 based on current phi (i.e. non root search)
+	dr0 = sqrt((phi+dphi0)/phi);
 
 	// initialize to unjammed
 	jammed = false;
 
 	// phiJ bounds
-	phiH0 = -1;
-	phiH = -1;
-	phiL = -1;
+	rH0 = -1;
+	rH = -1;
+	rL = -1;
 
 	// loop until phi is the correct value
 	while (!jammed && k < kmax){
@@ -1949,9 +1942,9 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 		nc = totalNumberOfContacts();
 
 		// boolean checks (NOTE: Ktest < Ktol NEEDS TO BE INCLUDED IN FIRE MINIMIZATION, OTHERWISE INCLUDE IT HERE)
-		undercompressed = ((Ptest < 2.0*Ptol && phiH < 0) || (Ptest < Ptol && phiH > 0));
+		undercompressed = ((Ptest < 2.0*Ptol && rH < 0) || (Ptest < Ptol && rH > 0));
 		overcompressed = (Ptest > 2.0*Ptol && nc > 0);
-		jammed = (Ptest < 2.0*Ptol && Ptest > Ptol && nc > 0 && phiH > 0);
+		jammed = (Ptest < 2.0*Ptol && Ptest > Ptol && nc > 0 && rH > 0);
 
 		// output to console
 		cout << "===================================================" << endl << endl << endl;
@@ -1960,8 +1953,9 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 		cout << "	* k 			= " << k << endl;
 		cout << "	* dphi 			= " << dphi0 << endl;
 		cout << "	* phi 			= " << phi << endl;
-		cout << "	* phiH 			= " << phiH << endl;
-		cout << "	* phiL 			= " << phiL << endl;
+		cout << "	* rH0 			= " << rH0 << endl;
+		cout << "	* rH 			= " << rH << endl;
+		cout << "	* rL 			= " << rL << endl;
 		cout << "	* Ftest 		= " << Ftest << endl;
 		cout << "	* Ktest 		= " << Ktest << endl;
 		cout << "	* Ptest 		= " << Ptest << endl;
@@ -1973,65 +1967,61 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 		cout << endl << endl;
 
 		// update packing fraction based on jamming check
-		if (phiL < 0){
+		if (rL < 0){
 			// if still undercompressed, then grow until overjammed found
-			if (undercompressed)
-				phiNew = phi + dphi0;
+			if (undercompressed){
+				// set scale to normal compression
+				scaleFactor = dr0;
+			}
 			// if first overcompressed, return to pre-overcompression state, to midpoint between phi and phiH
 			else if (overcompressed){
-				// current = upper bound packing fraction
-	            phiH = phi;
+				// current = upper bound length scale r
+	            rH = sqrt(cell(0).geta0());
 	            
-	            // save this packing fraction
-	            phiH0 = phi;
+	            // save this length scale
+	            rH0 = rH;
 	            
-	            // old = old upper bound packing fraction
-	            phiL = phiH - dphi0;
+	            // old = old length scale
+	            rL = rH/scaleFactor;
 
 	            // save overcompressed state
 	            saveState(savedState);
 
-	            // compute new phi
-	            phiNew = 0.5*(phiH + phiL);
+	            // compute new scale factor
+	            scaleFactor = 0.5*(rH + rL)/rH0;
 
 	            // print to console
-				cout << "	-- -- overcompressed for first time, phiNew = " << phiNew << endl;
+				cout << "	-- -- overcompressed for first time, scaleFactor = " << scaleFactor << endl;
 			}
 		}
 		else{
 			// if found undercompressed state, go to state between undercompressed and last overcompressed states (from saved state)
 			if (undercompressed){
-				// current = new lower bound on phiJ
-				phiL = phi;
+				// current = new lower bound length scale r
+				rL = sqrt(cell(0).geta0());
 
 				// load state
 				loadState(savedState);
 
-				// comput new phi
-				phiNew = 0.5*(phiH + phiL);
-
-				// reset instaneous phi to be initial overcompressed state
-				phi = phiH0;
+				// compute new scale factor
+	            scaleFactor = 0.5*(rH + rL)/rH0;
 
 				// print to console
-				cout << "	-- -- undercompressed, phiNew = " << phiNew << endl;
+				cout << "	-- -- undercompressed, scaleFactor = " << scaleFactor << endl;
 
 			}
 			else if (overcompressed){
-				// current = new upper bound on phiJ
-				phiH = phi;
+				// current = new upper bound length scale r
+	            rH = sqrt(cell(0).geta0());
 
 				// load state
 				loadState(savedState);
 
-				// compute new phi
-				phiNew = 0.5*(phiH + phiL);
-
-				// reset instaneous phi to be initial overcompressed state
-				phi = phiH0;
+				// compute new scale factor
+	            scaleFactor = 0.5*(rH + rL)/rH0;
 
 				// print to console
-				cout << "	-- -- overcompressed, phiNew = " << phiNew << endl;
+				cout << "	-- -- overcompressed, scaleFactor = " << scaleFactor << endl;
 			}
 			else if (jammed){
 				cout << "	** At k = 0, jamming found!" << endl;
@@ -2047,8 +2037,8 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 			}
 		}
 
-		// change packing fraction to new phi value (decided on above)
-		setPackingFraction(phiNew);
+		// grow or shrink particles by scale factor
+		scaleLengths(scaleFactor);
 
 		// update new phi (only update here, do NOT calculate relaxed phi value)
 		phi = packingFraction();
@@ -2404,6 +2394,13 @@ void cellPacking2D::cellRK4(){
 		}
 	}
 }
+
+
+
+// CANCER SIMULATION FUNCTIONS
+
+// function to simulate a single active tumor cell (particle 0) 
+// void cellPacking2D::singleActiveTumorCell(double tumorCalA0, double tv0, double tDr)
 
 
 

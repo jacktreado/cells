@@ -59,7 +59,9 @@ int main(int argc, char const *argv[])
 	// inputs from command line
 	string NCELLS_str 			= argv[1];
 	string NV_str 				= argv[2];
-	string calA0_str 			= argv[3];
+	string tumorCalA0_str 		= argv[3];
+	string adiposeCalA0_str 	= argv[3];
+	string tumorMotility_str 	= argv[4];
 	string kl_str 				= argv[4];
 	string kb_str 				= argv[5];
 	string seed_str				= argv[6];
