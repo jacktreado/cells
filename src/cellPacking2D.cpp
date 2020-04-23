@@ -1509,6 +1509,8 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, double& Fcheck, doub
 	Fcheck = F;
 	Kcheck = K/NCELLS;
 
+	// QUESTION: should I rescale velocities before minimization just to make sure P is not too small initially?
+
 	// iterate through MD time until system converged
 	kmax = 1e6;
 	for (k=0; k<kmax; k++){
