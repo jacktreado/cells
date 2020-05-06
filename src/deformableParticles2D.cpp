@@ -1083,6 +1083,8 @@ void deformableParticles2D::shapeForces(){
 	double aStrain,lStrainI,lStrainIm1;
 	double lim1,li;
 	double ulim1,uli;
+	double Kb;
+	double calA0 = pow(NV*l0,2.0)/(4.0*PI*a0);
 
 	// total area
 	double totalArea = polygonArea();
@@ -1133,9 +1135,13 @@ void deformableParticles2D::shapeForces(){
 
 		// calculate bending force
 		if (kb > 0){
+
+			// compute force scale
+			Kb = (kb*NV*calA0)/(4.0*PI*PI*a0*l0*l0);
+
 			for(d=0; d<NDIM; d++){
 				// compute force vector in d direction
-				ftmp = kb*(3.0*segment(i,d) - 3.0*segment(im1,d) + segment(im2,d) - segment(ip1,d));
+				ftmp = Kb*(3.0*segment(i,d) - 3.0*segment(im1,d) + segment(im2,d) - segment(ip1,d));
 				
 				// add to vectorial force
 				setVForce(i,d,vforce(i,d)+ftmp);
@@ -1835,10 +1841,11 @@ double deformableParticles2D::bendEnergy(){
 	int i, im1;
 	double val = 0.0;
 	double Eb, kpi, kp0;
+	double calA0 = pow(NV*l0,2.0)/(4.0*PI*a0);
 
 	if (kb > 0){
 		// bending energy scale
-		Eb = 0.5*kb*l0*l0;
+		Eb = 0.5*(kb*NV*calA0)/(4.0*PI*PI*a0);
 
 		// preferred curvature based on preffered angle cosine
 		kp0 = sqrt(2*(1 - c0));
