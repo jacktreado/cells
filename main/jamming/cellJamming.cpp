@@ -34,9 +34,9 @@ const double aInitial 		= 0.0;			// attraction parameter to start
 const double del 			= 1.0;			// radius of vertices in units of l0
 
 // tolerances
-const double Ftol 			= 1e-8;		// force tolerance (for FIRE min)
-const double Ktol 			= 1e-8;		// kinetic energy tolerance
-const double Ptol 			= 1e-6;			// pressure tolerance
+const double Ftol 			= 1e-9;			// force tolerance (for FIRE min)
+const double Ktol 			= 1e-11;		// kinetic energy tolerance
+const double Ptol 			= 1e-7;			// pressure tolerance
 
 // int main
 int main(int argc, char const *argv[])

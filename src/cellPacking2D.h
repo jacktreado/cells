@@ -25,6 +25,9 @@
 #include <cstdlib>
 #include <cmath>
 #include <vector>
+#include <Eigen/Core>
+#include <Eigen/Dense>
+#include <Eigen/Eigenvalues>
 
 class cellPacking2D{
 private:
@@ -35,12 +38,17 @@ private:
 	int NT;							// number of total time steps
 	int NPRINT;						// number of time steps between print steps
 
+	// contact numbers
+	int Ncc;						// number of cell-cell contacts
+	int Nvv;						// number of vertex-vertex contacts
+
 	// double scalars
 	double seed;					// initial seed
 	double dt;						// time step size
 	double dt0;						// initial time step size (for dynamic time step methods)
 	double T;						// system temperature
 	double phi;						// system packing/volume fraction
+	double shearStrain;				// applied shear strain to compute shear modulus
 
 	// boundary lengths
 	std::vector<double> L;
@@ -124,6 +132,11 @@ public:
 	double getdt() { return dt; };
 	double getT() { return T; };
 	double getphi() { return phi; };
+	double getShearStrain() { return shearStrain; };
+	double getSigmaXX() { return sigmaXX; };
+	double getSigmaXY() { return sigmaXY; };
+	double getSigmaYX() { return sigmaYX; };
+	double getSigmaYY() { return sigmaYY; };
 
 	// box len
 	double getL(int d) { return L.at(d); };
@@ -152,6 +165,7 @@ public:
 	void setT(double val) { T = val; };
 	void setL(int d, double val) { L.at(d) = val; };
 	void setdt(double val) { dt0 = val; dt = dt0; };
+	void setShearStrain(double val) { shearStrain = val; };
 
 	// set force values for all cells to be the same
 	void forceVals(double calA0, double ka, double kl, double gam, double kb, double kint, double del, double a);
@@ -188,17 +202,7 @@ public:
 
 	// FIRE 2.0 relaxation functions
 	void fireMinimizeP(double Ptol, double Ktol);
-	void fireMinimizeF(double Ftol, double Ktol, double& Ftest, double& Ktest);
-
-
-	/**************************
-
-		Vibrational 
-			density of states
-
-	***************************/
-
-	void cellVDOS(std::ofstream& vdosOutObj, double dphi, double Ftol, double Ktol);
+	void fireMinimizeF(double Ftol, double& Ftest, double& Ktest);
 
 
 	/**************************
@@ -212,10 +216,16 @@ public:
 	void cellOverDamped();
 
 	// Find jammed state from initially dilute configuration
-	void findJamming(double dphi0, double Ktol, double Ftol, double Ptol);
+	void findJamming(double dphi0, double Ftol, double Ptol);
 
 	// compress isotropically to a target packing fraction
-	void qsIsoCompression(double phiTarget, double deltaPhi, double Ftol, double Ktol);
+	void qsIsoCompression(double phiTarget, double deltaPhi, double Ftol);
+
+	// compute the instantaneous shear modulus
+	double shearModulus();
+
+	// compute the vibrational density of states
+	void vdos();
 
 	// Gelation functions
 	void twoParticleContact(int NV);

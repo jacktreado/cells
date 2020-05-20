@@ -47,6 +47,7 @@ deformableParticles2D::deformableParticles2D(){
 	c0 		= cos(0.0);
 	del 	= 0.0;
 	a 		= 0.0;
+	strain 	= 0.0;
 
 	// pointer variables point to nullptr
 	vertexPositions 		= nullptr;
@@ -83,6 +84,7 @@ deformableParticles2D::deformableParticles2D(int n){
 	a0 		= 0.0;
 	del 	= 0.0;
 	a 		= 0.0;
+	strain 	= 0.0;
 
 	// box lengths set to 1.0
 	L.resize(NDIM);
@@ -195,6 +197,7 @@ void deformableParticles2D::operator=(deformableParticles2D& onTheRight){
 	l0 		= onTheRight.l0;
 	del 	= onTheRight.del;
 	a 		= onTheRight.a;
+	strain 	= onTheRight.strain;
 
 	// set box lengths equal
 	for (int d=0; d<NDIM; d++){
@@ -399,11 +402,24 @@ double deformableParticles2D::vrel(int vertex, int dim){
 	}
 
 	// local variable
-	int index = NDIM*vertex + dim;
-	double relDist;
+	int im;
+	double relDist, dy;
 
-	// get relative distance with MIC
-	relDist = distance(vertexPositions[index],cellPosition[dim],dim);
+	// calculate normal distance component between centers
+	relDist = vpos(vertex,dim) - cellPosition[dim];
+
+	// if pbc and LEbc, get image distance
+	if (pbc.at(dim) == 1){
+		// if strain non zero, use LEbc
+		if (strain > 0 && dim == 0){
+			// y correction
+			dy = vpos(vertex,1) - cellPosition[1];
+			im = round(dy/L.at(1));
+			relDist -= round((relDist/L.at(0)))*L.at(0) - im*strain*L.at(0);
+		}
+		else
+			relDist -= L.at(dim)*round(relDist/L.at(dim));
+	}
 
 	// return value
 	return relDist;
@@ -538,38 +554,57 @@ double deformableParticles2D::uInt(int vertex){
 }
 
 
-// distance between points
-double deformableParticles2D::distance(double p2, double p1, int d){
+// distance between two vertices in a given direction on same or different objects
+double deformableParticles2D::distance(deformableParticles2D& onTheRight, int vj, int vi, int d){
 	// local variables
-	double dp;
+	int im;
+	double dp, dy;
 
 	// calculate distance between points
-	dp = p2 - p1;
+	dp = onTheRight.vpos(vj,d) - vpos(vi,d);
 
-	// if pbc, check minimum image distance
-	if (pbc.at(d) == 1)
-		dp -= L.at(d)*round(dp/L.at(d));
+	// if pbc and LEbc, get image distance
+	if (pbc.at(d) == 1){
+		// if strain non zero, use LEbc
+		if (strain > 0 && d == 0){
+			// y correction
+			dy = onTheRight.vpos(vj,1) - vpos(vi,1);
+			im = round(dy/L.at(1));
+			dp -= round((dp/L.at(0)))*L.at(0) - im*strain*L.at(0);
+		}
+		else
+			dp -= L.at(d)*round(dp/L.at(d));
+	}
 
 	// return value
 	return dp;
 }
 
 
-
 // distance between two cells: points from this to cell onTheRight
 double deformableParticles2D::cellDistance(deformableParticles2D& onTheRight, int d){
 	// local variables
-	double distComp;
+	int im;
+	double dp, dy;
 
 	// calculate normal distance component between centers
-	distComp = onTheRight.cpos(d) - cpos(d);
+	dp = onTheRight.cpos(d) - cpos(d);
 
-	// if pbcs are on, check minimum image distance
-	if (pbc.at(d) == 1)
-		distComp -= L.at(d)*round(distComp/L.at(d));
+	// if pbc and LEbc, get image distance
+	if (pbc.at(d) == 1){
+		// if strain non zero, use LEbc
+		if (strain > 0 && d == 0){
+			// y correction
+			dy = onTheRight.cpos(1) - cpos(1);
+			im = round(dy/L.at(1));
+			dp -= round((dp/L.at(0)))*L.at(0) - im*strain*L.at(0);
+		}
+		else
+			dp -= L.at(d)*round(dp/L.at(d));
+	}
 
 	// return distance component
-	return distComp;
+	return dp;
 }
 
 
@@ -1003,7 +1038,7 @@ double deformableParticles2D::segment(int vertex, int dim){
 	ip1 = (vertex+1) % NV;
 
 	// check minimum image
-	seg = distance(vpos(ip1,dim),vpos(vertex,dim),dim);
+	seg = distance(*this,ip1,vertex,dim);
 
 	// return dim component of segment vector
 	return seg;
@@ -1311,7 +1346,7 @@ int deformableParticles2D::segmentForce(deformableParticles2D &onTheRight){
 // force between vertices
 // 		* interacting parts are disks of diameter delta = l_0
 // 		* also updates interaction potential
-int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector<double>& fij, vector<double>& rij){
+int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, double& sigmaXX, double& sigmaXY, double& sigmaYX, double& sigmaYY){
 	// return variable
 	int inContact = 0;
 
@@ -1336,7 +1371,6 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 		distTmp = cellDistance(onTheRight,d);
 
 		// save distance in vector
-		rij.at(d) = -distTmp;
 		deltaMuNu.at(d) = distTmp;
 
 		// calculate vector norm
@@ -1378,7 +1412,7 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 			vertexDist = 0.0;
 			for (d=0; d<NDIM; d++){
 				// get distance to nearest image
-				distTmp = distance(onTheRight.vpos(j,d),vpos(i,d),d);
+				distTmp = distance(onTheRight,j,i,d);
 
 				// add to vertex distance
 				vertexVec.at(d) = distTmp;
@@ -1395,8 +1429,8 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 
 			// check overlap distances
 			if (vertexDist < contactDistance*p1){
-				// set inContact to 1 for return
-				inContact = 1;
+				// increment number of vertex-vertex contacts
+				inContact++;
 
 				// define scaled distance (x = distance/contact distance)
 				distScale = vertexDist/contactDistance;
@@ -1425,8 +1459,15 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 						// subtract off complement from force on j
 						onTheRight.setVForce(j,d,onTheRight.vforce(j,d) - ftmp);
 
-						// calculate contribution from vertex-vertex interaction
-						fij.at(d) += ftmp;
+						// add to stress tensor
+						if (d==0){
+							sigmaXX -= 2.0*ftmp*vertexVec.at(0);
+							sigmaXY -= 2.0*ftmp*vertexVec.at(1);
+						}
+						else{
+							sigmaYX -= 2.0*ftmp*vertexVec.at(0);
+							sigmaYY -= 2.0*ftmp*vertexVec.at(1);
+						}
 					}
 				}
 
@@ -1450,8 +1491,15 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 						// subtract off complement from force on j
 						onTheRight.setVForce(j,d,onTheRight.vforce(j,d) - ftmp);
 
-						// calculate contribution from vertex-vertex interaction
-						fij.at(d) += ftmp;
+						// add to stress tensor
+						if (d==0){
+							sigmaXX -= 2.0*ftmp*vertexVec.at(0);
+							sigmaXY -= 2.0*ftmp*vertexVec.at(1);
+						}
+						else{
+							sigmaYX -= 2.0*ftmp*vertexVec.at(0);
+							sigmaYY -= 2.0*ftmp*vertexVec.at(1);
+						}
 					}
 				}
 			}
@@ -1462,7 +1510,7 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 	return inContact;
 }
 
-int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector<double>& fij, vector<double>& rij, double aij){
+int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, double& sigmaXX, double& sigmaXY, double& sigmaYX, double& sigmaYY, double aij){
 	// return variable
 	int inContact = 0;
 
@@ -1487,7 +1535,6 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 		distTmp = cellDistance(onTheRight,d);
 
 		// save distance in vector
-		rij.at(d) = -distTmp;
 		deltaMuNu.at(d) = distTmp;
 
 		// calculate vector norm
@@ -1498,7 +1545,7 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 	// get effect radii
 	muREff = sqrt(area()/PI);
 	nuREff = sqrt(onTheRight.area()/PI);
-	buffer = 0.1*perimeter();
+	buffer = 0.2*perimeter();
 
 	// if not close enough, return 0
 	if ((muREff + nuREff + 0.5*(del*l0 + onTheRight.del*onTheRight.l0) + buffer) < centerDistance)
@@ -1532,7 +1579,7 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 			vertexDist = 0.0;
 			for (d=0; d<NDIM; d++){
 				// get distance to nearest image
-				distTmp = distance(onTheRight.vpos(j,d),vpos(i,d),d);
+				distTmp = distance(onTheRight,j,i,d);
 
 				// add to vertex distance
 				vertexVec.at(d) = distTmp;
@@ -1549,8 +1596,8 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 
 			// check overlap distances
 			if (vertexDist < contactDistance*p2){
-				// set inContact to 1 for return
-				inContact = 1;
+				// increment number of vertex-vertex contacts
+				inContact++;
 
 				// define scaled distance (x = distance/contact distance)
 				distScale = vertexDist/contactDistance;
@@ -1579,8 +1626,15 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 						// subtract off complement from force on j
 						onTheRight.setVForce(j,d,onTheRight.vforce(j,d) - ftmp);
 
-						// calculate force contribution from vertex-vertex interaction
-						fij.at(d) += ftmp;
+						// add to stress tensor
+						if (d==0){
+							sigmaXX -= 2.0*ftmp*vertexVec.at(0);
+							sigmaXY -= 2.0*ftmp*vertexVec.at(1);
+						}
+						else{
+							sigmaYX -= 2.0*ftmp*vertexVec.at(0);
+							sigmaYY -= 2.0*ftmp*vertexVec.at(1);
+						}
 					}
 				}
 
@@ -1604,8 +1658,15 @@ int deformableParticles2D::vertexForce(deformableParticles2D &onTheRight, vector
 						// subtract off complement from force on j
 						onTheRight.setVForce(j,d,onTheRight.vforce(j,d) - ftmp);
 
-						// calculate contribution from vertex-vertex interaction
-						fij.at(d) += ftmp;
+						// add to stress tensor
+						if (d==0){
+							sigmaXX -= 2.0*ftmp*vertexVec.at(0);
+							sigmaXY -= 2.0*ftmp*vertexVec.at(1);
+						}
+						else{
+							sigmaYX -= 2.0*ftmp*vertexVec.at(0);
+							sigmaYY -= 2.0*ftmp*vertexVec.at(1);
+						}
 					}
 				}
 			}
@@ -1681,7 +1742,7 @@ int deformableParticles2D::pwAttractiveContacts(deformableParticles2D &onTheRigh
 			vertexDist = 0.0;
 			for (d=0; d<NDIM; d++){
 				// get distance to nearest image
-				distTmp = distance(onTheRight.vpos(j,d),vpos(i,d),d);
+				distTmp = distance(onTheRight,j,i,d);
 
 				// add to vertex distance
 				vertexVec.at(d) = distTmp;
@@ -1937,11 +1998,18 @@ void deformableParticles2D::verletPositionUpdate(double dt){
 		for (d=0; d<NDIM; d++){
 			// update positions using velocity-Verlet with PBCs
 			postmp = vpos(i,d) + dt*vvel(i,d) + 0.5*vacc(i,d)*dt*dt;
+
+			// save update
 			setVPos(i,d,postmp);
 
 			// set forces to 0
 			setVForce(i,d,0.0);
 		}
+
+		// update x position based on LEbc (does not change if strain = 0)
+		postmp = vpos(i,0);
+		postmp -= floor(vpos(i,1)/L.at(1))*strain*L.at(0);
+		setVPos(i,0,postmp);
 
 		// set uint to 0
 		setUInt(i,0.0);

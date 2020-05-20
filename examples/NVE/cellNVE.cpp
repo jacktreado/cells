@@ -12,7 +12,7 @@ using namespace std;
 const double PI = 4.0*atan(1);
 
 // length paramaters
-const int NT 					= 2e4;				// number of time steps
+const int NT 					= 1e5;				// number of time steps
 const int NPRINT				= 100;				// number of steps between prints
 
 // simulation constants
@@ -41,12 +41,12 @@ int main()
 	double T0, phiDisk, sizeRatio, sizeFraction, calA0;
 
 	// set system variables
-	NCELLS 			= 10;		// number of particles
+	NCELLS 			= 32;		// number of particles
 	NV 				= 24;		// number of vertices on smaller particle
 	seed 			= 1;		// initial seed for random number generator
 
-	T0 				= 1e-3;		// initial temperature
-	phiDisk 		= 0.6;		// initial packing fraction
+	T0 				= 1e-4;		// initial temperature
+	phiDisk 		= 0.7;		// initial packing fraction
 	sizeRatio 		= 1.4;		// ratio of large radii to small radii
 	sizeFraction	= 0.5;		// fraction of small particles
 	calA0 			= 1.1;		// preferred shape parameter

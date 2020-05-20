@@ -10,6 +10,7 @@
 #include "cellPacking2D.h"
 
 // namespace
+using namespace Eigen;
 using namespace std;
 
 // constants
@@ -26,25 +27,26 @@ const double PI = 4*atan(1);
 // set up variables
 void cellPacking2D::defaultvars(){
 	// dimensionality ALWAYS set to 2
-	NDIM 	= 2;
+	NDIM 			= 2;
 
 	// scalar variables set to 0
-	NCELLS 		= 0;
-	NT 			= 0;
-	NPRINT 		= 0;
-	dt 			= 0.0;
-	dt0 		= 0.0;
-	T 			= -1.0;
-	phi 		= -1.0;
-	sigmaXX 	= 0.0;
-	sigmaXY 	= 0.0;
-	sigmaYX 	= 0.0;
-	sigmaYY 	= 0.0;
+	NCELLS 			= 0;
+	NT 				= 0;
+	NPRINT 			= 0;
+	dt 				= 0.0;
+	dt0 			= 0.0;
+	T 				= -1.0;
+	phi 			= -1.0;
+	sigmaXX 		= 0.0;
+	sigmaXY 		= 0.0;
+	sigmaYX 		= 0.0;
+	sigmaYY 		= 0.0;
+	shearStrain 	= 0.0;
 
 	// set box lengths to 1.0
 	L.resize(NDIM);
 	for (int d=0; d<NDIM; d++)
-		L.at(d) = 1.0;
+		L.at(d) 	= 1.0;
 
 	// pointer variables point to nullptr
 	cellArray 				= nullptr;
@@ -347,10 +349,11 @@ void cellPacking2D::operator=(cellPacking2D& onTheRight){
 	for (int d=0; d<NDIM; d++)
 		L.at(d) = onTheRight.getL(d);
 
-	sigmaXX = onTheRight.sigmaXX;
-	sigmaXY = onTheRight.sigmaXY;
-	sigmaYX = onTheRight.sigmaYX;
-	sigmaYY = onTheRight.sigmaYY;
+	sigmaXX 	= onTheRight.sigmaXX;
+	sigmaXY 	= onTheRight.sigmaXY;
+	sigmaYX 	= onTheRight.sigmaYX;
+	sigmaYY 	= onTheRight.sigmaYY;
+	shearStrain = onTheRight.shearStrain;
 
 	// test that memory has not yet been initialized
 	if (cellArray){
@@ -403,6 +406,8 @@ void cellPacking2D::saveState(cellPacking2D& saveObject){
 		saveObject.sigmaYX = sigmaYX;
 		saveObject.sigmaYY = sigmaYY;
 
+		saveObject.shearStrain = shearStrain;
+
 		for (ci=0; ci<NCELLS; ci++){
 			// copy cell objects (using overloaded operator in deformableParticle2D class)
 			saveObject.cell(ci) = cell(ci);
@@ -416,35 +421,37 @@ void cellPacking2D::saveState(cellPacking2D& saveObject){
 	}
 }
 
-// load saved state from saveObject
-void cellPacking2D::loadState(cellPacking2D& saveObject){
+// load saved state from loadObject
+void cellPacking2D::loadState(cellPacking2D& loadObject){
 	// local variables
 	int ci, cj;
 
-	// test that saveObject has been initialized
-	if (saveObject.phi < 0){
-		cout << "	** ERROR: trying to load from saveObject that has no saved data, ending." << endl;
+	// test that loadObject has been initialized
+	if (loadObject.phi < 0){
+		cout << "	** ERROR: trying to load from loadObject that has no saved data, ending." << endl;
 		exit(1);
 	}
 
 	// load saved packing fraction, dt
-	dt = saveObject.dt;
-	dt0 = saveObject.dt0;
-	phi = saveObject.phi;
+	dt = loadObject.dt;
+	dt0 = loadObject.dt0;
+	phi = loadObject.phi;
 
-	sigmaXX = saveObject.sigmaXX;
-	sigmaXY = saveObject.sigmaXY;
-	sigmaYX = saveObject.sigmaYX;
-	sigmaYY = saveObject.sigmaYY;
+	sigmaXX = loadObject.sigmaXX;
+	sigmaXY = loadObject.sigmaXY;
+	sigmaYX = loadObject.sigmaYX;
+	sigmaYY = loadObject.sigmaYY;
 
-	// load cell and contact data from saveObject
+	shearStrain = loadObject.shearStrain;
+
+	// load cell and contact data from loadObject
 	for (ci=0; ci<NCELLS; ci++){
 		// copy cell objects (using overloaded operator in deformableParticle2D class)
-		cell(ci) = saveObject.cell(ci);
+		cell(ci) = loadObject.cell(ci);
 
 		// copy elements from contact matrix
 		for (cj=ci+1; cj<NCELLS; cj++){
-			if (saveObject.contacts(ci,cj))
+			if (loadObject.contacts(ci,cj))
 				addContact(ci,cj);
 		}
 	}
@@ -682,11 +689,6 @@ int cellPacking2D::cmindex(int ci, int cj){
 
 // entry in contact matrix
 int cellPacking2D::contacts(int ci, int cj){
-	// local variables
-	int index = cmindex(ci,cj);
-	int totalEntries = NCELLS*(NCELLS-1)/2;
-
-	// return entry in contactMatrix array
 	return contactMatrix[cmindex(ci,cj)];
 }
 
@@ -1090,11 +1092,7 @@ int cellPacking2D::removeRattlers(int krcrs){
 // calculate all forces, both shape and pairwise
 void cellPacking2D::calculateForces(){
 	// local variables
-	int ci,cj,d,dd,inContact;
-
-	// vector to store pairwise forces
-	vector<double> fij(NDIM,0.0);
-	vector<double> rij(NDIM,0.0);
+	int ci,cj,vi,d,dd,inContact;
 
 	// reset virial stresses to 0
 	sigmaXX = 0.0;
@@ -1102,32 +1100,43 @@ void cellPacking2D::calculateForces(){
 	sigmaYX = 0.0;
 	sigmaYY = 0.0;
 
+	// reset contacts before force calculation
+	resetContacts();
+	Ncc = 0;
+	Nvv = 0;
+
 	// reset forces
 	for (ci=0; ci<NCELLS; ci++){
+		// reset center of mass forces
 		for (d=0; d<NDIM; d++)
 			cell(ci).setCForce(d,0.0);
+
+		// reset vertex forces and interaction energy
+		for (vi=0; vi<cell(ci).getNV(); vi++){
+			// forces
+			for (d=0; d<NDIM; d++)
+				cell(ci).setVForce(vi,d,0.0);
+
+			// energies
+			cell(ci).setUInt(vi,0.0);
+		}
 	}
+
 
 	// loop over cells and cell pairs, calculate shape and interaction forces
 	for (ci=0; ci<NCELLS; ci++){
 		// loop over pairs, add info to contact matrix
 		for (cj=ci+1; cj<NCELLS; cj++){
-			// reset virial stresses
-			for (d=0; d<NDIM; d++){
-				fij.at(d) = 0.0;
-				rij.at(d) = 0.0;
-			}
-
-			// calculate forces
-			inContact = cell(ci).vertexForce(cell(cj),fij,rij);
-			if (inContact == 1)
+			// calculate forces, add to number of vertex-vertex contacts
+			inContact = cell(ci).vertexForce(cell(cj),sigmaXX,sigmaXY,sigmaYX,sigmaYY);
+			if (inContact > 0){
+				// add to cell-cell contacts
 				addContact(ci,cj);
+				Ncc++;
 
-			// compute virial stresses
-			sigmaXX += fij.at(0)*rij.at(0);
-			sigmaXY += fij.at(1)*rij.at(0);
-			sigmaYX += fij.at(0)*rij.at(1);
-			sigmaYY += fij.at(1)*rij.at(1);
+				// increment vertex-vertex contacts
+				Nvv += inContact;
+			}
 		}
 
 		// forces on vertices due to shape
@@ -1137,12 +1146,8 @@ void cellPacking2D::calculateForces(){
 
 void cellPacking2D::gelationForces(){
 	// local variables
-	int ci,cj,d,dd,inContact,numACtmp;
+	int ci,cj,vi,d,dd,inContact,numACtmp;
 	double aij;
-
-	// vector to store pairwise forces
-	vector<double> fij(NDIM,0.0);
-	vector<double> rij(NDIM,0.0);
 
 	// vector to store number of attractive contacts per cell
 	vector<int> nac(NCELLS,0);
@@ -1153,10 +1158,26 @@ void cellPacking2D::gelationForces(){
 	sigmaYX = 0.0;
 	sigmaYY = 0.0;
 
+	// reset contacts before force calculation
+	resetContacts();
+	Ncc = 0;
+	Nvv = 0;
+
 	// reset forces
 	for (ci=0; ci<NCELLS; ci++){
+		// reset center of mass forces
 		for (d=0; d<NDIM; d++)
 			cell(ci).setCForce(d,0.0);
+
+		// reset vertex forces and interaction energy
+		for (vi=0; vi<cell(ci).getNV(); vi++){
+			// forces
+			for (d=0; d<NDIM; d++)
+				cell(ci).setVForce(vi,d,0.0);
+
+			// energies
+			cell(ci).setUInt(vi,0.0);
+		}
 	}
 
 	// get number of attractive contacts
@@ -1177,32 +1198,26 @@ void cellPacking2D::gelationForces(){
 
 		// loop over pairs, add info to contact matrix
 		for (cj=ci+1; cj<NCELLS; cj++){
-			// reset virial stresses
-			for (d=0; d<NDIM; d++){
-				fij.at(d) = 0.0;
-				rij.at(d) = 0.0;
-			}
-
 			// if attractive contact engaged
 			if (nac.at(ci) > 0 && nac.at(cj) > 0){
 				// get effective attraction scale (max is 0.5*a)
 				aij = 0.25*(cell(ci).geta()/nac.at(ci) + cell(cj).geta()/nac.at(cj));
 
 				// calculate forces
-				inContact = cell(ci).vertexForce(cell(cj),fij,rij,aij);
+				inContact = cell(ci).vertexForce(cell(cj),sigmaXX,sigmaXY,sigmaYX,sigmaYY,aij);
 			}
 			// else, use normal force routine
 			else
-				inContact = cell(ci).vertexForce(cell(cj),fij,rij);
+				inContact = cell(ci).vertexForce(cell(cj),sigmaXX,sigmaXY,sigmaYX,sigmaYY);
 			
-			if (inContact == 1)
+			if (inContact > 0){
+				// add to cell-cell contacts
 				addContact(ci,cj);
+				Ncc++;
 
-			// compute virial stresses
-			sigmaXX += fij.at(0)*rij.at(0);
-			sigmaXY += fij.at(1)*rij.at(0);
-			sigmaYX += fij.at(0)*rij.at(1);
-			sigmaYY += fij.at(1)*rij.at(1);
+				// increment vertex-vertex contacts
+				Nvv += inContact;
+			}
 		}
 
 		// forces on vertices due to shape
@@ -1466,9 +1481,9 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 
 
 // FIRE 2.0 force minimization with backstepping
-void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, double& Fcheck, double& Kcheck){
+void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 	// HARD CODE IN FIRE PARAMETERS
-	const double alpha0 	= 0.2;
+	const double alpha0 	= 0.25;
 	const double finc 		= 1.1;
 	const double fdec 		= 0.5;
 	const double falpha 	= 0.99;
@@ -1481,7 +1496,6 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, double& Fcheck, doub
 	int npNeg 				= 0;
 	int npPMIN				= 0;
 	double alpha 			= alpha0;
-	double alphat 			= alpha;
 	double t 				= 0.0;
 	double P 				= 0;
 
@@ -1489,6 +1503,7 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, double& Fcheck, doub
 	int ci,vi,d,k,kmax;
 	double vstarnrm,fstarnrm,vtmp,ftmp;
 	double K, F, Pcheck;
+	double xold, xnew, vold, vnew, fold;
 
 	// variable to test for potential energy minimization
 	bool converged = false;
@@ -1497,7 +1512,6 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, double& Fcheck, doub
 	dt = dt0;
 
 	// initialize forces
-	resetContacts();
 	calculateForces();
 
 	// norm of total force vector, kinetic energy
@@ -1509,12 +1523,9 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, double& Fcheck, doub
 	Fcheck = F;
 	Kcheck = K/NCELLS;
 
-	// QUESTION: should I rescale velocities before minimization just to make sure P is not too small initially?
-
-	// iterate through MD time until system converged
+	// iterate until system converged
 	kmax = 1e6;
 	for (k=0; k<kmax; k++){
-
 		// output some information to console
 		if (k % NPRINT == 0){
 			cout << "===================================================" << endl << endl;
@@ -1527,7 +1538,6 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, double& Fcheck, doub
 			cout << "	* phi 		= " << phi << endl;
 			cout << "	* dt 		= " << dt << endl;
 			cout << "	* alpha 	= " << alpha << endl;
-			cout << "	* alphat 	= " << alphat << endl;
 			cout << "	* P 		= " << P << endl;
 			cout << endl << endl;
 		}
@@ -1564,16 +1574,11 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, double& Fcheck, doub
 			// reset neg counter
 			npNeg = 0;
 
-			// update alpha_t for next time
-			alphat = alpha;
-
 			// alter sim if enough positive steps taken
 			if (npPos > NMIN){
 				// change time step
 				if (dt*finc < dtmax)
 					dt *= finc;
-				else
-					dt = dtmax;
 
 				// decrease alpha
 				alpha *= falpha;
@@ -1595,12 +1600,9 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, double& Fcheck, doub
 				// decrease time step 
 				if (dt*fdec > dtmin)
 					dt *= fdec;
-				else
-					dt = dtmin;
 
 				// change alpha
 				alpha = alpha0;
-				alphat = alpha;
 			}
 
 			// take half step backwards
@@ -1625,26 +1627,23 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, double& Fcheck, doub
 			for (ci=0; ci<NCELLS; ci++){
 				for (vi=0; vi<cell(ci).getNV(); vi++){
 					for (d=0; d<NDIM; d++){
-						vtmp = (1 - alphat)*cell(ci).vvel(vi,d) + alphat*(cell(ci).vforce(vi,d)/fstarnrm)*vstarnrm;
+						vtmp = (1 - alpha)*cell(ci).vvel(vi,d) + alpha*(cell(ci).vforce(vi,d)/fstarnrm)*vstarnrm;
 						cell(ci).setVVel(vi,d,vtmp);
 					}
 				}
 			}
 		}
 
-		// do verlet update
+		// VV update in FIRE 2.0: position update
 		for (ci=0; ci<NCELLS; ci++){
 			cell(ci).verletPositionUpdate(dt);
 			cell(ci).updateCPos();
 		}
 
-		// reset contacts before force calculation
-		resetContacts();
-
 		// calculate forces
 		calculateForces();
 
-		// update velocities
+		// VV update in FIRE 2.0: Velocity update 2
 		for (ci=0; ci<NCELLS; ci++)
 			cell(ci).verletVelocityUpdate(dt);
 
@@ -1689,7 +1688,7 @@ void cellPacking2D::fireMinimizeF(double Ftol, double Ktol, double& Fcheck, doub
 		}
 
 		// check for convergence
-		converged = (abs(Fcheck) < Ftol && npPMIN > NMIN && Kcheck < Ktol);
+		converged = (abs(Fcheck) < Ftol && npPMIN > NMIN);
 
 		if (converged){
 			cout << "	** FIRE has converged!" << endl;
@@ -1884,24 +1883,11 @@ void cellPacking2D::cellOverDamped(){
 
 
 // compress isotropically to jamming
-void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double Ptol){
+void cellPacking2D::findJamming(double dphi0, double Ftol, double Ptol){
 	// local variables
 	double Ptest, Ktest, Ftest;
-	int NSTEPS, k, kmax, kr, nc, nr;
+	int NSTEPS, k, kmax, kr, nc, nr, ci, cj;
 	cellPacking2D savedState;
-
-	// calculate phi before initial minimization
-	phi = packingFraction();
-
-	// relax shapes (energies calculated in relax function)
-	cout << "	** IN findJamming, performing initial relaxation" << endl;
-	fireMinimizeF(Ftol, Ktol, Ftest, Ktest);
-
-	// calculate Ptest for testing
-	Ptest = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
-
-	// update number of contacts
-	nc = totalNumberOfContacts();
 
 	// get initial packing fraction
 	phi = packingFraction();
@@ -1917,7 +1903,7 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 	// compute first dr0 based on current phi (i.e. non root search)
 	dr0 = sqrt((phi+dphi0)/phi);
 
-	// initialize to unjammed
+	// initialize as unjammed
 	jammed = false;
 
 	// phiJ bounds
@@ -1925,13 +1911,17 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 	rH = -1;
 	rL = -1;
 
+	// initialize velocities
+	double Tinit = 1e-6;
+	initializeVelocities(Tinit);
+
 	// loop until phi is the correct value
 	while (!jammed && k < kmax){
 		// update iterator
 		k++;
 
 		// relax shapes (energies/forces calculated during FIRE minimization)
-		fireMinimizeF(Ftol, Ktol, Ftest, Ktest);
+		fireMinimizeF(Ftol, Ftest, Ktest);
 
 		// calculate Ptest for comparison
 		Ptest = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
@@ -1943,7 +1933,7 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 		// update number of contacts
 		nc = totalNumberOfContacts();
 
-		// boolean checks (NOTE: Ktest < Ktol NEEDS TO BE INCLUDED IN FIRE MINIMIZATION, OTHERWISE INCLUDE IT HERE)
+		// boolean checks
 		undercompressed = ((Ptest < 2.0*Ptol && rH < 0) || (Ptest < Ptol && rH > 0));
 		overcompressed = (Ptest > 2.0*Ptol && nc > 0);
 		jammed = (Ptest < 2.0*Ptol && Ptest > Ptol && nc > 0 && rH > 0);
@@ -1965,7 +1955,21 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 		cout << "	* # of rattlers = " << nr << endl;
 		cout << "	* undercompressed = " << undercompressed << endl;
 		cout << "	* overcompressed = " << overcompressed << endl;
-		cout << "	* jammed = " << jammed << endl;
+		cout << "	* jammed = " << jammed << endl << endl;
+		cout << "	* contact matrix:" << endl;
+
+		// print contact matrix to console
+		for (ci=0; ci<NCELLS; ci++){
+			for (cj=0; cj<NCELLS; cj++){
+				if (cj == ci)
+					cout << "0" << "  ";
+				else
+					cout << contacts(ci,cj) << "  ";
+			}
+			cout << endl;
+		}
+
+		// print final two lines
 		cout << endl << endl;
 
 		// update packing fraction based on jamming check
@@ -2054,7 +2058,7 @@ void cellPacking2D::findJamming(double dphi0, double Ktol, double Ftol, double P
 
 
 // compress isotropically to fixed packing fraction
-void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi, double Ftol, double Ktol){
+void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi, double Ftol){
 	// local variables
 	double phi0, phiNew, dphi, Fcheck, Kcheck;
 	int NSTEPS, k;
@@ -2100,9 +2104,553 @@ void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi, double F
 		phi = packingFraction();
 
 		// relax shapes (energies calculated in relax function)
-		fireMinimizeF(Ftol, Ktol, Fcheck, Kcheck);
+		fireMinimizeF(Ftol, Fcheck, Kcheck);
 	}
 }
+
+
+// compute instantaneous shear modulus with energy minimization
+// NOTE: ASSUME STARTING CONFIGURATION IS JAMMED
+double cellPacking2D::shearModulus(){
+	// local variables
+	int ci, vi, d, im;
+	double x0, y0, x1;
+	double sxy0, sxy, G;
+	cellPacking2D savedState;
+
+	// strain step variables
+	const int nstrains = 20;
+	double gamma = 0.0;
+	double dgamma = shearStrain;
+	int straini;
+
+	// tolerances for relaxation
+	const double Ftol = 1e-9;
+	const double Ktol = 1e-11;
+
+	// shear modulus variables
+	G = 0.0;
+	sxy0 = sigmaXY;
+
+	// check variables for relaxation
+	double Fcheck, Kcheck;
+
+	// save initial state
+	saveState(savedState);
+
+	// take small strain steps, G is average slope of shear stress
+	for (straini=0; straini < nstrains; straini++){
+		// increment strain
+		gamma += dgamma;
+
+		// set strain parameter in individual cells, will activate LEbc
+		for (ci=0; ci<NCELLS; ci++){
+			// set shear strain parameter for each cell for bc's
+			cell(ci).setstrain(gamma);
+
+			// implement first shear step
+			for (vi=0; vi<NCELLS; vi++){
+				// initial particle positions
+				x0 = cell(ci).vpos(vi,0);
+				y0 = cell(ci).vpos(vi,1);
+
+				// affine displacement in shear profile
+				x1 = x0 + gamma*y0;
+
+				// update xposition
+				cell(ci).setVPos(vi,0,x1);
+			}
+		}
+
+		// relax using fire minimization
+		fireMinimizeF(Ftol, Fcheck, Kcheck);
+
+		// add to shear modulus average
+		sxy 	= sigmaXY;
+		G 		+= -(sxy - sxy0)/dgamma;
+		sxy0 	= sxy;
+	}
+
+	// reset positions back to initial unsheared state
+	for (ci=0; ci<NCELLS; ci++)
+		cell(ci).setstrain(0);
+
+	// load initial state
+	loadState(savedState);
+
+	// take average of G
+	G /= (double)nstrains;
+
+	// return shear modulus
+	return G;
+}
+
+
+// compute the vibrational density of states of a given configuration of cells
+void cellPacking2D::vdos(){
+	// first check to see if stat object is open; if not, do not compute VDOS
+	if (!statPrintObject.is_open()) {
+		std::cout << "	ERROR: statPrintObject is not open in VDOS function, ending. " << endl;
+		exit(1);
+	}
+
+	// LOCAL VARIABLES
+
+	// integers
+	int ci, cj, vi, vj, nv, k, l;
+	int vim2, vim1, vip1, vip2, vjm1, vjp1;
+	int kx, kxp1, kxp2, ky, kyp1, kyp2, lx, ly;
+	int mxi, myi, mxj, myj;
+	int NDOF = 0;
+	vector<int> Mu(NCELLS,0);
+
+	// doubles
+	double calA0, l0, fl, kl, kb, eb, fb;
+	double lim1, li, delim1, deli, delA;
+	double lim2x, lim1x, lix, lip1x;
+	double lim2y, lim1y, liy, lip1y;
+	double dlim1_dxi, dlim1_dyi, dli_dxi, dli_dyi, dli_dxip1, dli_dyip1;
+	double da_dxi, da_dyi, da_dxj, da_dyj;
+	double kapim1, kapi, kapip1;
+	double dkapi_dxi, dkapi_dyi, dkapip1_dxi, dkapip1_dyi, dkapim1_dxi, dkapim1_dyi;
+	double dkapi_dxip1, dkapi_dyip1, dkapip1_dxip1, dkapip1_dyip1, dkapip1_dxip2, dkapip1_dyip2;
+	double eij, kij, sij, dr, dx, dy, h;
+	double dr_dxi, dr_dyi;
+
+	// compute total number of degrees of freedom
+	for (ci=0; ci<NCELLS; ci++){
+		// save cumulative number of vertices
+		if (ci == 0)		
+			Mu.at(ci) = 0;
+		else
+			Mu.at(ci) = Mu.at(ci-1) + cell(ci-1).getNV();
+
+		// total number of degrees of freedom
+		NDOF += cell(ci).getNV()*NDIM;
+	}
+
+
+	// initialize matrices
+	// NOTE: surface tension VDOS not yet supported
+	Eigen::MatrixXd Ha(NDOF,NDOF);	// stiffness matrix for area term
+	Eigen::MatrixXd Sa(NDOF,NDOF);	// stress matrix for area term
+	Eigen::MatrixXd Hl(NDOF,NDOF);	// stiffness matrix for perimeter term
+	Eigen::MatrixXd Sl(NDOF,NDOF);	// stress matrix for perimeter term
+	Eigen::MatrixXd Hb(NDOF,NDOF);	// stiffness matrix for bending energy
+	Eigen::MatrixXd Sb(NDOF,NDOF);	// stress matrix for bending term
+	Eigen::MatrixXd Dvv(NDOF,NDOF);	// dynamical matrix for vertex-vertex interactions only
+	Eigen::MatrixXd D(NDOF,NDOF);	// full dynamical matrix
+
+	// initialize all matrices to be 0 initially
+	for (k=0; k<NDOF; k++){
+		for (l=0; l<NDOF; l++){
+			Ha(k,l) = 0.0;
+			Sa(k,l) = 0.0;
+			Hl(k,l) = 0.0;
+			Sl(k,l) = 0.0;
+			Hb(k,l) = 0.0;
+			Sb(k,l) = 0.0;
+			Dvv(k,l) = 0.0;
+			D(k,l) = 0.0;
+		}
+	}
+
+	// compute initial forces to have upodate contact network
+	calculateForces();
+
+	// Loop over cells, compute shape forces for each individual cell and contributions from
+	// vertex-vertex interactions
+	for (ci=0; ci<NCELLS; ci++){
+
+		// print statement
+		cout << "	-- Computing dynamical matrix elements for cell ci = " << ci << endl;
+		
+
+		// ------------------------------------------
+		// 
+		// 				SHAPE
+		// 					CONTRIBUTIONS
+		//
+		// ------------------------------------------
+
+		// number of vertices of cell ci
+		nv 			= cell(ci).getNV();
+
+		// interaction constants
+		calA0 		= cell(ci).calA0();
+		l0 			= cell(ci).getl0();
+		fl 			= cell(ci).getkl();
+		kl 			= fl/l0;
+		kb 			= cell(ci).getkb();
+		eb 			= (kb*nv*calA0)/(2.0*PI*PI);
+		fb 			= eb/(l0*l0);
+		delA 		= cell(ci).polygonArea() - cell(ci).geta0();
+
+		// loop over vertices, compute each DM element
+		for (vi=0; vi<nv; vi++){
+
+			// wrap vertices
+			vip2 		= (vi + 2) % nv;
+			vip1 		= (vi + 1) % nv;
+			vim1 		= (vi - 1 + nv) % nv;
+			vim2 		= (vi - 2 + nv) % nv;
+
+			// dof elements
+			kx 			= NDIM*(Mu.at(ci) + vi);
+			ky 			= NDIM*(Mu.at(ci) + vi) + 1;
+
+			kxp1 		= NDIM*(Mu.at(ci) + vip1);
+			kyp1 		= NDIM*(Mu.at(ci) + vip1) + 1;
+
+			kxp2 		= NDIM*(Mu.at(ci) + vip2);
+			kyp2 		= NDIM*(Mu.at(ci) + vip2) + 1;
+
+			// segment length vector components
+			lim2x 		= cell(ci).segment(vim2,0);
+			lim2y 		= cell(ci).segment(vim2,1);
+
+			lim1x 		= cell(ci).segment(vim1,0);
+			lim1y 		= cell(ci).segment(vim1,1);
+
+			lix 		= cell(ci).segment(vi,0);
+			liy 		= cell(ci).segment(vi,1);
+
+			lip1x 		= cell(ci).segment(vip1,0);
+			lip1y 		= cell(ci).segment(vip1,1);
+
+			// segment lengths
+			lim1 		= sqrt(lim1x*lim1x + lim1y*lim1y);
+			li 			= sqrt(lix*lix + liy*liy);
+
+
+			// -- PERIMETER SPRINGS
+
+			// derivatives of lim1
+			dlim1_dxi 	= lim1x/lim1;
+			dlim1_dyi 	= lim1y/lim1;
+
+			// derivatives of li
+			dli_dxip1 	= lix/li;
+			dli_dyip1 	= liy/li;
+
+			dli_dxi 	= -dli_dxip1;
+			dli_dyi 	= -dli_dyip1;
+
+			// spring strains
+			delim1 		= (lim1/l0) - 1.0;
+			deli 		= (li/l0) - 1.0;
+
+			// 	STIFFNESS MATRIX
+
+			// main diagonal
+		    Hl(kx,kx)       = kl*(dlim1_dxi*dlim1_dxi + dli_dxi*dli_dxi);
+		    Hl(ky,ky)       = kl*(dlim1_dyi*dlim1_dyi + dli_dyi*dli_dyi);
+		    
+		    Hl(kx,ky)       = kl*(dlim1_dxi*dlim1_dyi + dli_dxi*dli_dyi);
+		    Hl(ky,kx)       = Hl(kx,ky);
+		    
+		    // 1off diagonal
+		    Hl(kx,kxp1)     = kl*dli_dxi*dli_dxip1;
+		    Hl(ky,kyp1)     = kl*dli_dyi*dli_dyip1;
+		    
+		    Hl(kx,kyp1)     = kl*dli_dxi*dli_dyip1;
+		    Hl(ky,kxp1)     = kl*dli_dyi*dli_dxip1;
+		    
+		    // enforce symmetry in lower triangle
+		    Hl(kxp1,kx)     = Hl(kx,kxp1);
+		    Hl(kyp1,ky)     = Hl(ky,kyp1);
+		    
+		    Hl(kyp1,kx)     = Hl(kx,kyp1);
+		    Hl(kxp1,ky)     = Hl(ky,kxp1);
+
+
+		    // 	STRESS MATRIX
+
+		    // main diagonal block
+		    Sl(kx,kx) 		= fl*( (delim1/lim1)*(1.0 - (dlim1_dxi*dlim1_dxi)) + (deli/li)*(1.0 - (dli_dxi*dli_dxi)) );
+		    Sl(ky,ky) 		= fl*( (delim1/lim1)*(1.0 - (dlim1_dyi*dlim1_dyi)) + (deli/li)*(1.0 - (dli_dyi*dli_dyi)) );
+
+		    Sl(kx,ky) 		= -fl*( (delim1/lim1)*dlim1_dxi*dlim1_dyi + (deli/li)*dli_dxi*dli_dyi );
+		    Sl(ky,kx) 		= Sl(kx,ky);
+
+		    // 1off diagonal
+		    Sl(kx,kxp1) 	= fl*(deli/li)*((dli_dxip1*dli_dxip1) - 1.0);
+		    Sl(ky,kyp1)		= fl*(deli/li)*((dli_dyip1*dli_dyip1) - 1.0);
+
+		    Sl(kx,kyp1) 	= fl*(deli/li)*dli_dxip1*dli_dyip1;
+		    Sl(ky,kxp1)		= fl*(deli/li)*dli_dyip1*dli_dxip1;
+
+		    // enforce symmetry in lower triangle
+		    Sl(kxp1,kx)     = Sl(kx,kxp1);
+    		Sl(kyp1,ky)     = Sl(ky,kyp1);
+    
+    		Sl(kyp1,kx)     = Sl(kx,kyp1);
+    		Sl(kxp1,ky)     = Sl(ky,kxp1);
+
+
+
+
+    		// -- CURVATURE SPRINGS
+
+
+    		// dimensionless curvatures
+    		kapim1 			= sqrt(pow(lim1x - lim2x,2.0) + pow(lim1y - lim2y,2.0))/l0;
+    		kapi 			= sqrt(pow(lix - lim1x,2.0) + pow(liy - lim1y,2.0))/l0;
+    		kapip1 			= sqrt(pow(lip1x - lix,2.0) + pow(lip1y - liy,2.0))/l0;
+
+    		// curvature derivatives
+
+    		// derivatives of kapim1
+    		dkapim1_dxi 	= (lim1x - lim2x)/(kapim1*l0*l0);
+    		dkapim1_dyi 	= (lim1y - lim2y)/(kapim1*l0*l0);
+
+    		// derivatives of kapi
+    		dkapi_dxip1 	= (lix - lim1x)/(kapi*l0*l0);
+    		dkapi_dyip1 	= (liy - lim1y)/(kapi*l0*l0);
+    		dkapi_dxi 		= -2.0*dkapi_dxip1;
+    		dkapi_dyi 		= -2.0*dkapi_dyip1;	
+
+    		// derivatives of kapip1
+    		dkapip1_dxi 	= (lip1x - lix)/(kapip1*l0*l0);
+    		dkapip1_dyi 	= (lip1y - liy)/(kapip1*l0*l0);
+    		dkapip1_dxip1 	= -2.0*dkapip1_dxi;
+    		dkapip1_dyip1 	= -2.0*dkapip1_dyi;
+    		dkapip1_dxip2	= dkapip1_dxi;
+    		dkapip1_dyip2 	= dkapip1_dyi;
+
+
+    		// 	STIFFNESS MATRIX
+
+    		// block-diagonal terms
+		    Hb(kx,kx)       = eb*(dkapim1_dxi*dkapim1_dxi + dkapi_dxi*dkapi_dxi + dkapip1_dxi*dkapip1_dxi);
+		    Hb(ky,ky)       = eb*(dkapim1_dyi*dkapim1_dyi + dkapi_dyi*dkapi_dyi + dkapip1_dyi*dkapip1_dyi);
+		    
+		    Hb(kx,ky)       = eb*(dkapim1_dxi*dkapim1_dyi + dkapi_dxi*dkapi_dyi + dkapip1_dxi*dkapip1_dyi);
+		    Hb(ky,kx)       = Hb(kx,ky);
+		    
+		    // 1off block-diagonal terms
+		    Hb(kx,kxp1)     = eb*(dkapi_dxi*dkapi_dxip1 + dkapip1_dxi*dkapip1_dxip1);
+		    Hb(ky,kyp1)     = eb*(dkapi_dyi*dkapi_dyip1 + dkapip1_dyi*dkapip1_dyip1);
+		    
+		    Hb(kx,kyp1)     = eb*(dkapi_dxi*dkapi_dyip1 + dkapip1_dxi*dkapip1_dyip1);
+		    Hb(ky,kxp1)     = eb*(dkapi_dyi*dkapi_dxip1 + dkapip1_dyi*dkapip1_dxip1);
+		    
+		    // 2off block-diagonal terms
+		    Hb(kx,kxp2)     = eb*dkapip1_dxi*dkapip1_dxip2;
+		    Hb(ky,kyp2)     = eb*dkapip1_dyi*dkapip1_dyip2;
+		    
+		    Hb(kx,kyp2)     = eb*dkapip1_dxi*dkapip1_dyip2;
+		    Hb(ky,kxp2)     = eb*dkapip1_dyi*dkapip1_dxip2;
+		    
+		    // enforce symmetry in lower triangle
+		    Hb(kxp1,kx)     = Hb(kx,kxp1);
+		    Hb(kyp1,ky)     = Hb(ky,kyp1);
+		    
+		    Hb(kxp1,ky)     = Hb(ky,kxp1);
+		    Hb(kyp1,kx)     = Hb(kx,kyp1);
+		    
+		    Hb(kxp2,kx)     = Hb(kx,kxp2);
+		    Hb(kyp2,ky)     = Hb(ky,kyp2);
+		    
+		    Hb(kyp2,kx)     = Hb(kx,kyp2);
+		    Hb(kxp2,ky)     = Hb(ky,kxp2);
+		    
+		    
+		    // 	STRESS MATRIX
+		    
+		    // block diagonal
+		    Sb(kx,kx)       = fb*(6.0 - (l0*dkapim1_dxi)*(l0*dkapim1_dxi) - (l0*dkapi_dxi)*(l0*dkapi_dxi) - (l0*dkapip1_dxi)*(l0*dkapip1_dxi));
+		    Sb(ky,ky)       = fb*(6.0 - (l0*dkapim1_dyi)*(l0*dkapim1_dyi) - (l0*dkapi_dyi)*(l0*dkapi_dyi) - (l0*dkapip1_dyi)*(l0*dkapip1_dyi));
+		    
+		    Sb(kx,ky)       = -eb*(dkapim1_dxi*dkapim1_dyi + dkapi_dxi*dkapi_dyi + dkapip1_dxi*dkapip1_dyi);
+		    Sb(ky,kx)       = Sb(kx,ky);
+		    
+		    // 1off block diagonal
+		    Sb(kx,kxp1)     = -2*fb*(2.0 - (l0*dkapi_dxip1)*(l0*dkapi_dxip1) - (l0*dkapip1_dxi)*(l0*dkapip1_dxi));
+		    Sb(ky,kyp1)     = -2*fb*(2.0 - (l0*dkapi_dyip1)*(l0*dkapi_dyip1) - (l0*dkapip1_dyi)*(l0*dkapip1_dyi));
+		    
+		    Sb(kx,kyp1)     = -eb*(dkapi_dxi*dkapi_dyip1 + dkapip1_dxi*dkapip1_dyip1);
+		    Sb(ky,kxp1)     = -eb*(dkapi_dyi*dkapi_dxip1 + dkapip1_dyi*dkapip1_dxip1);
+		    
+		    // 2off block diagonal
+		    Sb(kx,kxp2)     = fb*(1.0 - (l0*dkapip1_dxi)*(l0*dkapip1_dxi));
+		    Sb(ky,kyp2)     = fb*(1.0 - (l0*dkapip1_dyi)*(l0*dkapip1_dyi));
+		    
+		    Sb(kx,kyp2)     = -eb*dkapip1_dxi*dkapip1_dyip2;
+		    Sb(ky,kxp2)     = -eb*dkapip1_dyi*dkapip1_dxip2;
+		    
+		    // enforce symmetry in lower triangle
+		    Sb(kxp1,kx)     = Sb(kx,kxp1);
+		    Sb(kyp1,ky)     = Sb(ky,kyp1);
+		    
+		    Sb(kxp1,ky)     = Sb(ky,kxp1);
+		    Sb(kyp1,kx)     = Sb(kx,kyp1);
+		    
+		    Sb(kxp2,kx)     = Sb(kx,kxp2);
+		    Sb(kyp2,ky)     = Sb(ky,kyp2);
+		    
+		    Sb(kxp2,ky)     = Sb(ky,kxp2);
+		    Sb(kyp2,kx)     = Sb(kx,kyp2);
+
+
+    		
+
+		    // -- AREA SPRING (stress matrix)
+		    Sa(kx,kyp1) = 0.5*delA;
+    		Sa(ky,kxp1) = -0.5*delA;
+
+    		Sa(kyp1,kx) = Sa(kx,kyp1);
+    		Sa(kxp1,ky) = Sa(ky,kxp1);
+
+    		// area derivatives (for stiffness matrix)
+    		da_dxi      = 0.5*(cell(ci).vrel(vim1,1) - cell(ci).vrel(vip1,1));
+    		da_dyi      = 0.5*(cell(ci).vrel(vip1,0) - cell(ci).vrel(vim1,0));
+
+    		// loop over other vertices, for area elasticity stiffness matrix
+    		for (vj=vi; vj<nv; vj++){
+
+    			// wrap jp1 and jm1
+    			vjp1 		= (vj + 1) % nv;
+    			vjm1 		= (vj - 1 + nv) % nv;
+
+    			// dof elements
+    			lx 			= NDIM*(Mu.at(ci) + vj);
+    			ly 			= NDIM*(Mu.at(ci) + vj) + 1;
+
+    			// area derivatives
+    			da_dxj      = 0.5*(cell(ci).vrel(vjm1,1) - cell(ci).vrel(vjp1,1));
+    			da_dyj      = 0.5*(cell(ci).vrel(vjp1,0) - cell(ci).vrel(vjm1,0));
+
+    			// 	STIFFNESS MATRIX
+    			Ha(kx,lx) = da_dxi*da_dxj;
+		        Ha(kx,ly) = da_dxi*da_dyj;
+		        
+		        Ha(ky,lx) = da_dyi*da_dxj;
+		        Ha(ky,ly) = da_dyi*da_dyj;
+		        
+		        Ha(lx,kx) = Ha(kx,lx);
+		        Ha(ly,kx) = Ha(kx,ly);
+		        
+		        Ha(lx,ky) = Ha(ky,lx);
+		        Ha(ly,ky) = Ha(ky,ly);
+    		}
+		}
+
+
+
+
+
+
+		// ------------------------------------------
+		// 
+		// 			INTERACTION
+		// 					CONTRIBUTIONS
+		//
+		// ------------------------------------------
+
+		// off-diagonal components
+
+		for (cj=ci+1; cj<NCELLS; cj++){
+
+			// only compute interactions if vertices where contacting before
+			if (contacts(ci,cj) == 1){
+
+				// interaction energy scale
+				eij = 0.5*(cell(ci).getkint() + cell(cj).getkint());
+
+				// loop over pairs of vertices on both cells, check for overlap, compute matrix elements
+				for (vi=0; vi<nv; vi++){
+
+					// matrix element indices (cell ci, vertex vi)
+					mxi = NDIM*(Mu.at(ci) + vi);
+					myi = NDIM*(Mu.at(ci) + vi) + 1;
+
+					for (vj=0; vj<cell(cj).getNV(); vj++){
+
+						// contact distance
+						sij = 0.5*(cell(ci).getdel()*l0 + cell(ci).getdel()*cell(cj).getl0());
+
+						// get y distance between vertices
+						dy = cell(ci).distance(cell(cj),vj,vi,1);
+
+						// if close, check x distance
+						if (dy < sij){
+
+							// get x distance 
+							dx = cell(ci).distance(cell(cj),vj,vi,0);
+
+							// compute true distance
+							dr = sqrt(dx*dx + dy*dy);
+
+							// check for overlap
+							if (dr < sij){
+
+								// spring constant
+								kij = eij/(sij*dr);
+
+								// dimensionless overlap
+								h = dr/sij;
+
+								// matrix element indices (cell cj, vertex vj)
+								mxj = NDIM*(Mu.at(cj) + vj);
+								myj = NDIM*(Mu.at(cj) + vj) + 1;
+
+								// derivatives of distance w.r.t. coordinates
+								dr_dxi = -dx/dr;
+								dr_dyi = -dy/dr;
+
+								// set off diagonals, enforce symmetry in lower triangle
+								Dvv(mxi,mxj) = -kij*(dr_dxi*dr_dxi + h - 1.0);
+				                Dvv(myi,myj) = -kij*(dr_dyi*dr_dyi + h - 1.0);
+				                Dvv(mxi,myj) = -kij*dr_dxi*dr_dyi;
+				                Dvv(myi,mxj) = -kij*dr_dxi*dr_dyi;
+				                
+				                Dvv(mxj,mxi) = Dvv(mxi,mxj);
+				                Dvv(myj,myi) = Dvv(myi,myj);
+				                Dvv(mxj,myi) = Dvv(myi,mxj);
+				                Dvv(myj,mxi) = Dvv(mxi,myj);
+				                
+				                // add to diagonal, using off diagonals and reciprocity
+				                Dvv(mxi,mxi) -= Dvv(mxi,mxj);
+				                Dvv(myi,myi) -= Dvv(myi,myj);
+				                Dvv(mxi,myi) -= Dvv(mxi,myj);
+				                Dvv(myi,mxi) -= Dvv(myi,mxj);
+				                
+				                Dvv(mxj,mxj) -= Dvv(mxi,mxj);
+				                Dvv(myj,myj) -= Dvv(myi,myj);
+				                Dvv(mxj,myj) -= Dvv(mxi,myj);
+				                Dvv(myj,mxj) -= Dvv(myi,mxj);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// compute D from sum of other dynamical matrices
+	// initialize all matrices to be 0 initially
+	for (k=0; k<NDOF; k++){
+		for (l=0; l<NDOF; l++)
+			D(k,l) = Ha(k,l) + Sa(k,l) + Hl(k,l) + Sl(k,l) + Hb(k,l) + Sb(k,l) + Dvv(k,l);
+	}
+
+	// compute eigenvalues
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> normalModes(D);
+
+	// print eigenvalues to print object
+	statPrintObject << NDOF << endl;
+	statPrintObject << normalModes.eigenvalues() << endl;
+	statPrintObject << normalModes.eigenvectors() << endl;
+}
+
+
+
+
+
+
+
+
 
 
 // GELATION FUNCTIONS
@@ -2898,11 +3446,9 @@ void cellPacking2D::printJammedConfig(){
 	jamPrintObject << endl;	
 
 	// print contact information
-	jamPrintObject << setw(w1) << left << "CTCTS";
-	for (int ci=0; ci<NCELLS; ci++){
-		for (int cj=ci+1; cj<NCELLS; cj++)
-			jamPrintObject << setw(w2) << contacts(ci,cj);
-	}
+	jamPrintObject << setw(w1) << left << "NCONTS";
+	jamPrintObject << setw(w1) << right << Ncc;
+	jamPrintObject << setw(w1) << right << Nvv;
 	jamPrintObject << endl;
 
 	// print info for rest of the cells

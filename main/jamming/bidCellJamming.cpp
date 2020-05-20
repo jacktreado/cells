@@ -19,8 +19,8 @@ const double PI = 4.0*atan(1);
 // simulation constants
 const int NT 					= 1e7; 			// number of time steps
 const int NPRINT 				= 2e3;			// number of time steps between prints
-const double timeStepMag 		= 0.01;			// time step in MD unit
-const double phiDisk 			= 0.1;			// initial phi of SP disks
+const double timeStepMag 		= 0.02;		// time step in MD unit
+const double phiDisk 			= 0.5;			// initial phi of SP disks
 const double deltaPhi0 			= 5e-4;			// initial delta phi
 const double sizeRatio 			= 1.4;			// ratio between small and large particles
 const double sizeFraction		= 0.5;			// fraction of small particles
@@ -28,21 +28,21 @@ const double sizeFraction		= 0.5;			// fraction of small particles
 // force parameters
 const double ka 			= 1.0;			// area force constant (should be = 1)
 const double gam 			= 0.0;			// surface tension force constant
-const double kint 			= 0.1;			// interaction energy constant
+const double kint 			= 0.01;			// interaction energy constant
 const double a 				= 0.0;			// attraction parameter 
 const double del 			= 1.0;			// radius of vertices in units of l0
 
 // tolerances
-const double Ftol 			= 1e-10;			// force tolerance (for FIRE min)
-const double Ktol 			= 1e-16;		// kinetic energy tolerance
-const double Ptol 			= 1e-6;			// pressure tolerance
+const double Ftol 			= 1e-9;			// force tolerance (for FIRE min)
+const double Ktol 			= 1e-11;		// kinetic energy tolerance
+const double Ptol 			= 1e-7;			// pressure tolerance
 
 // int main
 int main(int argc, char const *argv[])
 {
 	// local variables
-	int NCELLS, NV, seed, plotIt;
-	double a, sizeDisp, calA0, kl, ka, kb;
+	int NCELLS, NV, seed;
+	double calA0, kl, kb;
 
 	// inputs from command line
 	string NCELLS_str 			= argv[1];
@@ -69,13 +69,10 @@ int main(int argc, char const *argv[])
 	kbss 			>> kb;
 	seedss 			>> seed;
 
-	// temporary box length; will be modified in initialization
-	double Ltmp 	= 1.0;
-
 	// instantiate main packing object
 	cout << "	** Instantiating object for initial disk packing to be turned into a cell packing" << endl;
 	cout << "	** NCELLS = " << NCELLS << endl;
-	cellPacking2D packingObject(NCELLS,NT,NPRINT,Ltmp,seed);
+	cellPacking2D packingObject(NCELLS,NT,NPRINT,1.0,seed);
 
 	// set initial conditions as if disks in box with given packing fraction (sets boundary size)
 	cout << "	** Initializing gel at phiDisk = " << phiDisk << " using SP model" << endl;
