@@ -97,7 +97,7 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         vdosf=$specificdir/$filestr.vdos
 
         # append to runString
-        runString="$runString ; ./$binf $NCELLS $NV $calA0 $kl $kb $runseed $enf $jamf $vdos"
+        runString="$runString ; ./$binf $NCELLS $NV $calA0 $kl $kb $runseed $enf $jamf $vdosf"
     done
 
     # finish off run string
