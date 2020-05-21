@@ -473,8 +473,8 @@ void cellPacking2D::initializeBidisperse(int NV, double phiDisk, double sizeRati
 	double calA0tmp;
 	double xpos, ypos, dx, dy;
 	double xmin, xmax, ymin, ymax;
-	double r1, r2, g1, areaSum;
-	double rtmp, a0tmp, l0tmp, p0tmp;
+	double areaSum;
+	double rtmp, a0tmp, l0tmp;
 
 	// minimum number of vertices
 	const int nvmin = 12;
@@ -482,7 +482,7 @@ void cellPacking2D::initializeBidisperse(int NV, double phiDisk, double sizeRati
 	// output to console
 	cout << "		-- In bidisperse initialization, initializing cells and relaxing initial overlaps as repulsive SP particles" << endl;
 
-	// initialize length scales as gaussian random variables (will becomes area square roots)
+	// initialize length scales
 	areaSum = 0.0;
 	vector<double> lenscales(NCELLS,0.0);
 	vector<double> diskradii(NCELLS,0.0);
@@ -514,7 +514,7 @@ void cellPacking2D::initializeBidisperse(int NV, double phiDisk, double sizeRati
 	srand48(56835698*seed);
 
 	// initialize cell information
-	cout << "		-- Ininitializing plant cell objects" << endl;
+	cout << "		-- Ininitializing cell objects" << endl;
 	for (ci=0; ci<NCELLS; ci++){
 		// boundary information ( SET PBCS TO 1 for plant cells )
 		for (d=0; d<NDIM; d++){
@@ -2282,7 +2282,7 @@ void cellPacking2D::vdos(){
 		fl 			= cell(ci).getkl();
 		kl 			= fl/l0;
 		kb 			= cell(ci).getkb();
-		eb 			= (kb*nv*calA0)/(2.0*PI*PI);
+		eb 			= (kb*nv*calA0)/(4.0*PI*PI);
 		fb 			= eb/(l0*l0);
 		delA 		= cell(ci).polygonArea() - cell(ci).geta0();
 
