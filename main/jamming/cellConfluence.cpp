@@ -23,7 +23,7 @@ const double PI = 4.0*atan(1);
 const int NT 					= 1e7; 			// number of time steps
 const int NPRINT 				= 2e3;			// number of time steps between prints
 const double timeStepMag 		= 0.02;			// time step in MD unit
-const double phiDisk 			= 0.5;			// initial phi of SP disks
+const double phiDisk 			= 0.55;			// initial phi of SP disks
 const double deltaPhi0 			= 5e-4;			// initial delta phi
 const double sizeRatio 			= 1.4;			// ratio between small and large particles
 const double sizeFraction		= 0.5;			// fraction of small particles
@@ -39,8 +39,8 @@ const double a 					= 0.0;			// attraction parameter
 const double del 				= 1.0;			// radius of vertices in units of l0
 
 // tolerances
-const double Ftol 				= 1e-12;		// force tolerance (for FIRE min)
-const double Ptol 				= 1e-8;			// pressure tolerance
+const double Ftol 				= 1e-14;		// force tolerance (for FIRE min)
+const double Ptol 				= 1e-6;			// pressure tolerance
 
 // int main
 int main(int argc, char const *argv[])
@@ -115,26 +115,31 @@ int main(int argc, char const *argv[])
 	// step 3: save configurationa and vdos of configuration at phi target
 
 	// variables for compression to confluence
-	int NSTEPS;
-	double phiRange;
+	int NSTEPS, NDPHIDECADES;
+	double phiRange, dphi0;
 	int PRINTSTEPS = 20;
 	int NSKIP;
 
+	// initial increment parameters
+	NDPHIDECADES = 5;
+	dphi0 = 1e-8;
 
 	// check vs phiTarget
 	if (phiJ < phiTarget){
 
 		// initial dphi
-		deltaPhiTmp = 1e-8;
+		deltaPhiTmp = dphi0;
 
 		// initial jammed packing fraction
 		phiTmp = phiJ;
 
 		// print to console
-		cout << "	** Beginning compression protocol, first compressing by dphi = 1e-8 from phiJ = " << phiTmp << endl; 
+		cout << "	~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ *" << endl << endl;
+		cout << "	** Beginning compression protocol, first compressing by dphi = 1e-8 from phiJ = " << phiTmp << endl << endl; 
+		cout << "	~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ *" << endl << endl;
 
 		// compress packing in nlogpts logarithmically spaced steps to 1e-2 over phiJ
-		for (int i=0; i<5; i++){
+		for (int i=0; i<NDPHIDECADES; i++){
 			// get new phi target
 			phiTargetTmp = phiTmp + 10*deltaPhiTmp;
 
@@ -151,6 +156,11 @@ int main(int argc, char const *argv[])
 			packingObject.printJammedConfig();
 			packingObject.vdos();
 		}
+
+		// print to console
+		cout << "	~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ *" << endl << endl;
+		cout << "	** Finished incremental decade compression, now compressing from phi = " << phiTmp <<  " to phiTarget = " << phiTarget << endl << endl; 
+		cout << "	~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ * ~ *" << endl << endl;
 
 		// if still not confluent, compress to confluency
 		if (phiTmp < phiTarget){

@@ -1898,7 +1898,7 @@ void cellPacking2D::findJamming(double dphi0, double Ftol, double Ptol){
 
 	// jamming variables
 	bool jammed, overcompressed, undercompressed;
-	double rH, rH0, rL, dr0, scaleFactor;
+	double rH, r0, rL, dr0, scaleFactor;
 
 	// compute first dr0 based on current phi (i.e. non root search)
 	dr0 = sqrt((phi+dphi0)/phi);
@@ -1907,7 +1907,6 @@ void cellPacking2D::findJamming(double dphi0, double Ftol, double Ptol){
 	jammed = false;
 
 	// phiJ bounds
-	rH0 = -1;
 	rH = -1;
 	rL = -1;
 
@@ -1922,6 +1921,9 @@ void cellPacking2D::findJamming(double dphi0, double Ftol, double Ptol){
 
 		// relax shapes (energies/forces calculated during FIRE minimization)
 		fireMinimizeF(Ftol, Ftest, Ktest);
+
+		// update new phi after minimization
+		phi = packingFraction();
 
 		// calculate Ptest for comparison
 		Ptest = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
@@ -1945,7 +1947,7 @@ void cellPacking2D::findJamming(double dphi0, double Ftol, double Ptol){
 		cout << "	* k 			= " << k << endl;
 		cout << "	* dphi 			= " << dphi0 << endl;
 		cout << "	* phi 			= " << phi << endl;
-		cout << "	* rH0 			= " << rH0 << endl;
+		cout << "	* r0 			= " << r0 << endl;
 		cout << "	* rH 			= " << rH << endl;
 		cout << "	* rL 			= " << rL << endl;
 		cout << "	* Ftest 		= " << Ftest << endl;
@@ -1978,23 +1980,24 @@ void cellPacking2D::findJamming(double dphi0, double Ftol, double Ptol){
 			if (undercompressed){
 				// set scale to normal compression
 				scaleFactor = dr0;
+
+				// save state
+				r0 = sqrt(cell(0).geta0());
+				saveState(savedState);
 			}
 			// if first overcompressed, return to pre-overcompression state, to midpoint between phi and phiH
 			else if (overcompressed){
 				// current = upper bound length scale r
 	            rH = sqrt(cell(0).geta0());
 	            
-	            // save this length scale
-	            rH0 = rH;
-	            
 	            // old = old length scale
-	            rL = rH/scaleFactor;
+	            rL = r0;
 
 	            // save overcompressed state
-	            saveState(savedState);
+	            loadState(savedState);
 
 	            // compute new scale factor
-	            scaleFactor = 0.5*(rH + rL)/rH0;
+	            scaleFactor = 0.5*(rH + rL)/r0;
 
 	            // print to console
 				cout << "	-- -- overcompressed for first time, scaleFactor = " << scaleFactor << endl;
@@ -2010,7 +2013,7 @@ void cellPacking2D::findJamming(double dphi0, double Ftol, double Ptol){
 				loadState(savedState);
 
 				// compute new scale factor
-	            scaleFactor = 0.5*(rH + rL)/rH0;
+	            scaleFactor = 0.5*(rH + rL)/r0;
 
 				// print to console
 				cout << "	-- -- undercompressed, scaleFactor = " << scaleFactor << endl;
@@ -2024,7 +2027,7 @@ void cellPacking2D::findJamming(double dphi0, double Ftol, double Ptol){
 				loadState(savedState);
 
 				// compute new scale factor
-	            scaleFactor = 0.5*(rH + rL)/rH0;
+	            scaleFactor = 0.5*(rH + rL)/r0;
 
 				// print to console
 				cout << "	-- -- overcompressed, scaleFactor = " << scaleFactor << endl;
@@ -2045,9 +2048,6 @@ void cellPacking2D::findJamming(double dphi0, double Ftol, double Ptol){
 
 		// grow or shrink particles by scale factor
 		scaleLengths(scaleFactor);
-
-		// update new phi (only update here, do NOT calculate relaxed phi value)
-		phi = packingFraction();
 	}
 
 	if (k == kmax){
@@ -2057,54 +2057,52 @@ void cellPacking2D::findJamming(double dphi0, double Ftol, double Ptol){
 }
 
 
-// compress isotropically to fixed packing fraction
+// compress isotropically to fixed packing fraction by ~deltaPhi steps (use length scaler instead for robustness)
 void cellPacking2D::qsIsoCompression(double phiTarget, double deltaPhi, double Ftol){
 	// local variables
-	double phi0, phiNew, dphi, Fcheck, Kcheck;
-	int NSTEPS, k;
+	double dr, phiNew, dphi, Fcheck, Kcheck;
+	int kmax, k;
 
 	// get initial packing fraction
 	phi = packingFraction();
-	phi0 = phi;
 
-	// determine number of steps to target
-	NSTEPS = floor((phiTarget - phi0)/deltaPhi);
-	if (NSTEPS == 0)
-		NSTEPS = 1;
-
-	// update new dphi to make steps even
-	dphi = (phiTarget - phi)/NSTEPS;
+	// compute length scaler based on deltaPhi
+	dr = sqrt((phi + deltaPhi)/phi);
 
 	// iterator
 	k = 0;
+	kmax = 1e6;
 
 	// loop until phi is the correct value
-	while (k < NSTEPS){
+	while (phi < phiTarget && k < kmax){
 		// update iterator
 		k++;
 
-		// output to console
-		cout << "===================================================" << endl << endl << endl;
-		cout << " 	quasistatic isotropic compression with NSTEPS = " << NSTEPS << " and dphi = " << dphi << endl << endl;
-		cout << "===================================================" << endl;
-		cout << "	* k 			= " << k << endl;
-		cout << "	* NSTEPS 		= " << NSTEPS << endl;		
-		cout << "	* dphi 			= " << dphi << endl << endl;
-		cout << "	AFTER LAST MINIMIZATION:" << endl;
-		cout << "	* phi 			= " << phi << endl;
-		cout << "	* Fcheck 		= " << Fcheck << endl;
-		cout << "	* Kcheck 		= " << Kcheck << endl;
-		cout << endl << endl;
-
-		// increase packing fraction to new phi value
-		phiNew = phi0 + k*dphi;
-		setPackingFraction(phiNew);
-
-		// calculate phi before minimization
-		phi = packingFraction();
+		// scale lengths
+		scaleLengths(dr);
 
 		// relax shapes (energies calculated in relax function)
 		fireMinimizeF(Ftol, Fcheck, Kcheck);
+
+		// update packing fraction
+		phi = packingFraction();
+
+		// output to console
+		cout << "===================================================" << endl << endl << endl;
+		cout << " 	quasistatic isotropic compression " << endl;
+		cout << "===================================================" << endl;
+		cout << "	* k 			= " << k << endl;
+		cout << "	* dphi 			= " << deltaPhi << endl;
+		cout << "	* phi 			= " << phi << endl;
+		cout << "	* Fcheck 		= " << Fcheck << endl;
+		cout << "	* Kcheck 		= " << Kcheck << endl;
+		cout << endl;
+		cout << "	* * distance to target : " << "phiTarget = " << phiTarget << ", distance = " << phiTarget - phi << endl;
+		cout << endl << endl;
+	}
+	if (k == kmax){
+		cout << "	** IN qsIsoCompression, compression iteration did not converge in kmax = " << kmax << " iterations. Ending. " << endl;
+		exit(1);
 	}
 }
 
