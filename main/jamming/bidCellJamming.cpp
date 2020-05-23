@@ -87,7 +87,7 @@ int main(int argc, char const *argv[])
 	packingObject.openJamObject(jammingFile);
 
 	// compress to set packing fraction using FIRE, pressure relaxation
-	cout << "	** jamming protocol with Ptol = " << Ptol << " and Ktol = " << Ktol << endl;
+	cout << "	** jamming protocol with Ptol = " << Ptol << " and Ftol = " << Ftol << endl;
 	packingObject.findJamming(deltaPhi0, Ftol, Ptol);
 
 	cout << "	** FINISHED COMPRESSING TO JAMMING, ENDING MAIN FILE" << endl;
