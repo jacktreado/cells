@@ -6,7 +6,7 @@ srcdir=$cellsdir/src
 maindir=$cellsdir/main
 
 # directory for all output for cell simulations
-outputdir=~/project/cells
+outputdir=/gpfs/project/fas/ohern/jdt45/cells
 
 # directory for simulations specific to jamming
 simtypedir=$outputdir/bidcells
