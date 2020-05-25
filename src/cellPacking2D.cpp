@@ -870,7 +870,7 @@ double cellPacking2D::forceRMS(){
 	}
 
 	// get force scale
-	frms = sqrt(frms/(NDIM*NVTOTAL));
+	frms = sqrt(frms)/(NDIM*NVTOTAL);
 
 	// return
 	return frms;
@@ -1888,6 +1888,12 @@ void cellPacking2D::findJamming(double dphi0, double Ftol, double Ptol){
 	double Ptest, Ktest, Ftest;
 	int NSTEPS, k, kmax, kr, nc, nr, ci, cj;
 	cellPacking2D savedState;
+	int NDOF;
+
+	// get total number of degrees of freedom
+	NDOF = 0;
+	for (ci=0; ci<NCELLS; ci++)
+		NDOF += NDIM*cell(ci).getNV();
 
 	// get initial packing fraction
 	phi = packingFraction();
@@ -1926,7 +1932,7 @@ void cellPacking2D::findJamming(double dphi0, double Ftol, double Ptol){
 		phi = packingFraction();
 
 		// calculate Ptest for comparison
-		Ptest = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
+		Ptest = 0.5*(sigmaXX + sigmaYY)/(NDOF*L.at(0)*L.at(1));
 
 		// remove rattlers
 		kr = 0;
