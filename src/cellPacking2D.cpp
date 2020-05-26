@@ -2553,7 +2553,6 @@ void cellPacking2D::vdos(){
 		// ------------------------------------------
 
 		// off-diagonal components
-
 		for (cj=ci+1; cj<NCELLS; cj++){
 
 			// only compute interactions if vertices where contacting before
