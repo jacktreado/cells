@@ -209,44 +209,74 @@ cellPacking2D::cellPacking2D(int ncells, int ntumor, int tumorNV, int adiposeNV,
 }
 
 // overloaded constructor with file stream object as argument
-cellPacking2D::cellPacking2D(ifstream& inputFileObject, double asphericity, double s){
+cellPacking2D::cellPacking2D(string& inputFile, double T0, double s){
 	// set initial seed
 	seed = s;
+	srand(seed);
 
 	// set variables to default
 	defaultvars();
 
 	// local variables
 	int NC, ci, vi, nv, d;
-	double ltmp, l0tmp, l0, a0, posTmp;
+	double lxtmp, lytmp, x, y;
+	double l0tmp, a0tmp, deltmp;
+
+	// open input file
+	ifstream inputFileObject;
+	inputFileObject.open(inputFile.c_str());
+	if (!inputFileObject.is_open()) {
+		cout << "	ERROR: inputFileObject could not open " << inputFile << "..." << endl;
+		exit(1);
+	}
+
+	// string readin
+	string inputStr;
+
+	// LINE 1: should be NEWFR
+	getline(inputFileObject, inputStr);
+	if (inputStr.compare(0,5,"NEWFR") != 0){
+		cout << "	** first line of input file NOT NEWFR, inputStr = " << inputStr << ". Ending." << endl;
+		exit(1);
+	}
 
 	// read in simulation information
-	inputFileObject >> NCELLS;
-	inputFileObject >> ltmp;
-	inputFileObject >> l0tmp;
+	getline(inputFileObject, inputStr);
+	sscanf(inputStr.c_str(),"NUMCL %d",&NCELLS);
+	
+	getline(inputFileObject, inputStr);
+	sscanf(inputStr.c_str(),"PACKF %lf",&phi);
 
-	cout << "NCELLS = " << NCELLS << endl;
-	cout << "L = " << ltmp << endl;
+	getline(inputFileObject, inputStr);
+	sscanf(inputStr.c_str(),"BOXSZ %lf %lf",&lxtmp,&lytmp);
+
+	getline(inputFileObject, inputStr);
+	sscanf(inputStr.c_str(),"NCONTS %d %d",&Ncc,&Nvv);
+
+
+	cout << "Finished reading header in read-in operator, values so far are: " << endl;
+	cout << "	** NCELLS = " << NCELLS << endl;
+	cout << "	** phi = " << phi << endl;
+	cout << "	** L = " << lxtmp << endl;
+	cout << "	** Ncc = " << Ncc << ", Nvv = " << Nvv << endl;
 
 	// set box lengths to be square, reset lengths to be in units of l0
-	for (d=0; d<NDIM; d++){
-		L.at(d) = ltmp;
-		L.at(d) /= l0tmp;
-	}
+	L.at(0) = lxtmp;
+	L.at(1) = lytmp;
 
 	// test for error in inputs
 	if (NCELLS <= 0){
-		cout << "	ERROR: in overloaded operator, NCELLS <= 0 so cannot initialize arrays, ending code here." << endl;
+		cout << "	ERROR: in overloaded read-in operator, NCELLS <= 0 so cannot initialize arrays, ending code here." << endl;
 		exit(1);
 	}
 	else if (L.at(0) <= 0.0 || L.at(1) <= 0.0){
-		cout << "	ERROR: in overloaded operator, L <= 0.0 so cannot run simulations, ending code here." << endl;
+		cout << "	ERROR: in overloaded read-in operator, L <= 0.0 so cannot run simulations, ending code here." << endl;
 		exit(1);
 	}
 
 	// test that memory has not yet been initialized
 	if (contactMatrix){
-		cout << "	ERROR: in overloaded operator, contactMatrix ptr already initialized, ending code here." << endl;
+		cout << "	ERROR: in overloaded read-in operator, contactMatrix ptr already initialized, ending code here." << endl;
 		exit(1);
 	}
 
@@ -255,8 +285,9 @@ cellPacking2D::cellPacking2D(ifstream& inputFileObject, double asphericity, doub
 
 	// loop over cells
 	for (ci=0; ci<NCELLS; ci++){
-		// number of vertices
-		inputFileObject >> nv;
+		// first read number of vertices
+		getline(inputFileObject, inputStr);
+		sscanf(inputStr.c_str(),"NVERT %d",&nv);
 
 		// initialize cell objects ( set PBCs = 1 )
 		for (d=0; d<NDIM; d++){
@@ -264,31 +295,45 @@ cellPacking2D::cellPacking2D(ifstream& inputFileObject, double asphericity, doub
 			cell(ci).setpbc(d,1);
 		}
 
+		// initialize cell object
 		cell(ci).setNV(nv);
 		cell(ci).initializeVertices();
 		cell(ci).initializeCell();
 
+		// read in cell com information
+		getline(inputFileObject, inputStr);
+		sscanf(inputStr.c_str(),"CELLP %*d %lf %lf %lf %lf %lf %*lf %*lf %*lf", &x, &y, &l0tmp, &a0tmp, &deltmp);
+
 		// set cell com position
-		for (d=0; d<NDIM; d++){
-			inputFileObject >> posTmp;
-			cell(ci).setCPos(d,posTmp/l0tmp);
-		}
+		cell(ci).setCPos(0,x);
+		cell(ci).setCPos(1,y);
+
+		// set cell shape information
+		cell(ci).seta0(a0tmp);
+		cell(ci).setl0(l0tmp);
+		cell(ci).setdel(deltmp);
+
+		// print to console
+		cout << "	** on cell " << ci << ", NV = " << nv << ";\t com at x = " << x << ", y = " << y;
+		cout << ";\t l0 = " << l0tmp << ", a0 = " << a0tmp << ", so calA0 = " << (nv*nv*l0tmp*l0tmp)/(4.0*PI*a0tmp) << endl;
+
+		// read in descriptive string
+		getline(inputFileObject, inputStr);
+		cout << "header check : " << inputStr << endl;
 
 		// set vertex positions
 		for (vi=0; vi<nv; vi++){
-			for (d=0; d<NDIM; d++){
-				inputFileObject >> posTmp;
-				cell(ci).setVPos(vi,d,posTmp/l0tmp);
-			}
+			// read info for each vertex
+			getline(inputFileObject, inputStr);
+			sscanf(inputStr.c_str(),"VERTP %*d %lf %lf %*lf %*lf %*lf %*lf", &x, &y);
+
+			// set vertex positions
+			cell(ci).setVPos(vi,0,x);
+			cell(ci).setVPos(vi,1,y);
+
+			// print to console
+			cout << "	-- -- cell " << ci << ", vertex " << vi << ": x = " << x << ", y = " << y << endl;
 		}
-
-		// determine new l0 for given area
-		l0 = (1.0/nv)*sqrt(4*PI*cell(ci).polygonArea()*asphericity);
-		a0 = (nv*nv*l0*l0)/(4*PI*asphericity);
-
-		// set a0 to enforce asphericity in cell i
-		cell(ci).seta0(a0);
-		cell(ci).setl0(l0);
 	}
 
 	// initialize contact matrix
@@ -298,6 +343,31 @@ cellPacking2D::cellPacking2D(ifstream& inputFileObject, double asphericity, doub
 	// intialize contact matrix to 0
 	for (ci=0; ci<NC; ci++)
 		contactMatrix[ci] = 0;
+
+	// initialize velocities
+	initializeVelocities(T0);
+
+	// initialize forces
+	calculateForces();
+
+	// print cell information
+	for (ci=0; ci<NCELLS; ci++){
+		cout << "CELLP\t" << ": NV = " << cell(ci).getNV() << setw(6) << "; cx = " << cell(ci).cpos(0) << setw(6) << "; cy = " << cell(ci).cpos(1) << endl;
+		for (vi=0; vi<cell(ci).getNV(); vi++){
+			cout << "VERTP\t";
+			cout << cell(ci).vpos(vi,0) << "; ";
+			cout << cell(ci).vpos(vi,1) << "; ";
+			cout << cell(ci).vvel(vi,0) << "; ";
+			cout << cell(ci).vvel(vi,1) << "; ";
+			cout << cell(ci).vforce(vi,0) << "; ";
+			cout << cell(ci).vforce(vi,1);
+			cout << endl;
+		}
+		cout << endl << endl << endl;
+	}
+
+	// close inputFile object
+	inputFileObject.close();
 }
 
 
@@ -534,13 +604,13 @@ void cellPacking2D::initializeBidisperse(int NV, double phiDisk, double sizeRati
 		cell(ci).initializeCell();
 
 		// initialize cells as regular polygons
-		calA0tmp = nvtmp*tan(PI/NV)/PI;
+		calA0tmp = nvtmp*tan(PI/nvtmp)/PI;
 
 		// preferred area is lenscales squared
 		a0tmp = lenscales.at(ci)*lenscales.at(ci);
 
 		// initial length of polygon side
-		l0tmp = 2.0*lenscales.at(ci)*sqrt(PI*calA0tmp)/NV;
+		l0tmp = 2.0*lenscales.at(ci)*sqrt(PI*calA0tmp)/nvtmp;
 
 		// set preferred area and length 
 		cell(ci).seta0(a0tmp);
@@ -609,6 +679,7 @@ void cellPacking2D::initializeVelocities(double tmp0){
 
 			cell(ci).setCVel(d,rv);
 			vmean.at(d) += rv;
+			cout << "rv = " << rv << endl;
 		}
 
 	}
@@ -622,7 +693,8 @@ void cellPacking2D::initializeVelocities(double tmp0){
 	for (ci=0; ci<NCELLS; ci++){
 		for (d=0; d<NDIM; d++){
 			// subtract of com motion
-			cell(ci).setCVel(d,cell(ci).cvel(d) - vmean.at(d));
+			if (NCELLS > 1)
+				cell(ci).setCVel(d,cell(ci).cvel(d) - vmean.at(d));
 
 			// calc ek
 			ek += 0.5*pow(cell(ci).cvel(d),2);
@@ -1488,7 +1560,7 @@ void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 	const double fdec 		= 0.5;
 	const double falpha 	= 0.99;
 	const double dtmax 		= 10*dt0;
-	const double dtmin 		= 0.01*dt0;
+	const double dtmin 		= 1e-16*dt0;
 	const int NMIN 			= 20;
 	const int NNEGMAX 		= 2000;
 	const int NDELAY 		= 1000;
@@ -1498,7 +1570,7 @@ void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 	double alpha 			= alpha0;
 	double t 				= 0.0;
 	double P 				= 0;
-	const double Trescale 	= 1e-6*NCELLS;
+	const double Trescale 	= 1e-8*NCELLS;
 
 	// local variables
 	int ci,vi,d,k,kmax;
@@ -1521,7 +1593,7 @@ void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 	// norm of total force vector, kinetic energy
 	F = forceRMS();
 	K = totalKineticEnergy();
-	Pcheck = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
+	Pcheck = 0.5*(sigmaXX + sigmaYY)/(NCELLS*L.at(0)*L.at(1));
 
 	// scale P and K for convergence checking
 	Fcheck = F;
@@ -1657,7 +1729,7 @@ void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 		// track energy and forces
 		F = forceRMS();
 		K = totalKineticEnergy();
-		Pcheck = 0.5*(sigmaXX + sigmaYY)/(L.at(0)*L.at(1));
+		Pcheck = 0.5*(sigmaXX + sigmaYY)/(NCELLS*L.at(0)*L.at(1));
 
 		// scale P and K for convergence checking
 		Fcheck = F;
@@ -1696,10 +1768,8 @@ void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 
 		if (converged){
 			cout << "	** FIRE has converged!" << endl;
-			cout << "	** F = " << F << endl;
-			cout << "	** K = " << K << endl;
-			cout << "	** Kcheck = " << Kcheck << endl;
 			cout << "	** Fcheck = " << Fcheck << endl;
+			cout << "	** Kcheck = " << Kcheck << endl;
 			cout << "	** Pcheck = " << Pcheck << endl;
 			cout << "	** k = " << k << ", t = " << t << endl;
 			cout << "	** Breaking out of FIRE protocol." << endl;
@@ -1912,6 +1982,10 @@ void cellPacking2D::findJamming(double dphi0, double Ftol, double Ptol){
 
 	// compute first dr0 based on current phi (i.e. non root search)
 	dr0 = sqrt((phi+dphi0)/phi);
+
+	// save initial state
+	r0 = sqrt(cell(0).geta0());
+	saveState(savedState);
 
 	// initialize as unjammed
 	jammed = false;
@@ -2292,7 +2366,7 @@ void cellPacking2D::vdos(){
 		kb 			= cell(ci).getkb();
 		eb 			= (kb*nv*calA0)/(4.0*PI*PI);
 		fb 			= eb/(l0*l0);
-		delA 		= cell(ci).polygonArea() - cell(ci).geta0();
+		delA 		= (cell(ci).polygonArea()/cell(ci).geta0()) - 1.0;
 
 		// loop over vertices, compute each DM element
 		for (vi=0; vi<nv; vi++){
@@ -2559,76 +2633,64 @@ void cellPacking2D::vdos(){
 		// off-diagonal components
 		for (cj=ci+1; cj<NCELLS; cj++){
 
-			// only compute interactions if vertices where contacting before
-			if (contacts(ci,cj) == 1){
+			// interaction energy scale
+			eij = 0.5*(cell(ci).getkint() + cell(cj).getkint());
 
-				// interaction energy scale
-				eij = 0.5*(cell(ci).getkint() + cell(cj).getkint());
+			// loop over pairs of vertices on both cells, check for overlap, compute matrix elements
+			for (vi=0; vi<nv; vi++){
 
-				// loop over pairs of vertices on both cells, check for overlap, compute matrix elements
-				for (vi=0; vi<nv; vi++){
+				// matrix element indices (cell ci, vertex vi)
+				mxi = NDIM*(Mu.at(ci) + vi);
+				myi = NDIM*(Mu.at(ci) + vi) + 1;
 
-					// matrix element indices (cell ci, vertex vi)
-					mxi = NDIM*(Mu.at(ci) + vi);
-					myi = NDIM*(Mu.at(ci) + vi) + 1;
+				// contact distance
+				sij = 0.5*(cell(ci).getdel()*l0 + cell(cj).getdel()*cell(cj).getl0());
 
-					for (vj=0; vj<cell(cj).getNV(); vj++){
+				for (vj=0; vj<cell(cj).getNV(); vj++){
 
-						// contact distance
-						sij = 0.5*(cell(ci).getdel()*l0 + cell(ci).getdel()*cell(cj).getl0());
+					// get distance between vertices
+					dx = cell(ci).distance(cell(cj),vj,vi,0);
+					dy = cell(ci).distance(cell(cj),vj,vi,1);
+					dr = sqrt(dx*dx + dy*dy);
 
-						// get y distance between vertices
-						dy = cell(ci).distance(cell(cj),vj,vi,1);
+					// check for overlap
+					if (dr < sij){
 
-						// if close, check x distance
-						if (dy < sij){
+						// spring constant
+						kij = eij/(sij*dr);
 
-							// get x distance 
-							dx = cell(ci).distance(cell(cj),vj,vi,0);
+						// dimensionless overlap
+						h = dr/sij;
 
-							// compute true distance
-							dr = sqrt(dx*dx + dy*dy);
+						// matrix element indices (cell cj, vertex vj)
+						mxj = NDIM*(Mu.at(cj) + vj);
+						myj = NDIM*(Mu.at(cj) + vj) + 1;
 
-							// check for overlap
-							if (dr < sij){
+						// derivatives of distance w.r.t. coordinates
+						dr_dxi = -dx/dr;
+						dr_dyi = -dy/dr;
 
-								// spring constant
-								kij = eij/(sij*dr);
-
-								// dimensionless overlap
-								h = dr/sij;
-
-								// matrix element indices (cell cj, vertex vj)
-								mxj = NDIM*(Mu.at(cj) + vj);
-								myj = NDIM*(Mu.at(cj) + vj) + 1;
-
-								// derivatives of distance w.r.t. coordinates
-								dr_dxi = -dx/dr;
-								dr_dyi = -dy/dr;
-
-								// set off diagonals, enforce symmetry in lower triangle
-								Dvv(mxi,mxj) = -kij*(dr_dxi*dr_dxi + h - 1.0);
-				                Dvv(myi,myj) = -kij*(dr_dyi*dr_dyi + h - 1.0);
-				                Dvv(mxi,myj) = -kij*dr_dxi*dr_dyi;
-				                Dvv(myi,mxj) = -kij*dr_dxi*dr_dyi;
-				                
-				                Dvv(mxj,mxi) = Dvv(mxi,mxj);
-				                Dvv(myj,myi) = Dvv(myi,myj);
-				                Dvv(mxj,myi) = Dvv(myi,mxj);
-				                Dvv(myj,mxi) = Dvv(mxi,myj);
-				                
-				                // add to diagonal, using off diagonals and reciprocity
-				                Dvv(mxi,mxi) -= Dvv(mxi,mxj);
-				                Dvv(myi,myi) -= Dvv(myi,myj);
-				                Dvv(mxi,myi) -= Dvv(mxi,myj);
-				                Dvv(myi,mxi) -= Dvv(myi,mxj);
-				                
-				                Dvv(mxj,mxj) -= Dvv(mxi,mxj);
-				                Dvv(myj,myj) -= Dvv(myi,myj);
-				                Dvv(mxj,myj) -= Dvv(mxi,myj);
-				                Dvv(myj,mxj) -= Dvv(myi,mxj);
-							}
-						}
+						// set off diagonals, enforce symmetry in lower triangle
+						Dvv(mxi,mxj) = -kij*(dr_dxi*dr_dxi + h - 1.0);
+		                Dvv(myi,myj) = -kij*(dr_dyi*dr_dyi + h - 1.0);
+		                Dvv(mxi,myj) = -kij*dr_dxi*dr_dyi;
+		                Dvv(myi,mxj) = -kij*dr_dxi*dr_dyi;
+		                
+		                Dvv(mxj,mxi) = Dvv(mxi,mxj);
+		                Dvv(myj,myi) = Dvv(myi,myj);
+		                Dvv(mxj,myi) = Dvv(myi,mxj);
+		                Dvv(myj,mxi) = Dvv(mxi,myj);
+		                
+		                // add to diagonal, using off diagonals and reciprocity
+		                Dvv(mxi,mxi) -= Dvv(mxi,mxj);
+		                Dvv(myi,myi) -= Dvv(myi,myj);
+		                Dvv(mxi,myi) -= Dvv(mxi,myj);
+		                Dvv(myi,mxi) -= Dvv(myi,mxj);
+		                
+		                Dvv(mxj,mxj) -= Dvv(mxi,mxj);
+		                Dvv(myj,myj) -= Dvv(myi,myj);
+		                Dvv(mxj,myj) -= Dvv(mxi,myj);
+		                Dvv(myj,mxj) -= Dvv(myi,mxj);
 					}
 				}
 			}

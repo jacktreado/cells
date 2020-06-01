@@ -19,9 +19,9 @@ const double PI = 4.0*atan(1);
 // simulation constants
 const int NT 					= 1e7; 			// number of time steps
 const int NPRINT 				= 5e2;			// number of time steps between prints
-const double timeStepMag 		= 0.02;			// time step in MD unit
+const double timeStepMag 		= 0.01;			// time step in MD unit
 const double phiDisk 			= 0.4;			// initial phi of SP disks
-const double deltaPhi0 			= 5e-3;			// initial delta phi
+const double deltaPhi0 			= 5e-4;			// initial delta phi
 const double sizeRatio 			= 1.4;			// ratio between small and large particles
 const double sizeFraction		= 0.5;			// fraction of small particles
 
@@ -33,8 +33,8 @@ const double a 				= 0.0;			// attraction parameter
 const double del 			= 1.0;			// radius of vertices in units of l0
 
 // tolerances
-const double Ftol 			= 1e-12;		// force tolerance (for FIRE min)
-const double Ptol 			= 1e-6;			// pressure tolerance
+const double Ftol 			= 1e-9;		// force tolerance (for FIRE min)
+const double Ptol 			= 1e-8;			// pressure tolerance
 
 // main function
 int main()

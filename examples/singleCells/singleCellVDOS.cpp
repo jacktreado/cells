@@ -45,6 +45,7 @@ int main(){
 	int NV = 32;
 	double sizeRatio = 1.0;
 	double sizeFraction = 1.0;
+	double T0 = 1e-6;
 
 	// instantiate object
 	cellPacking2D packingObject(NCELLS,NT,NPRINT,Ltmp,seed);
@@ -61,6 +62,7 @@ int main(){
 	// use FIRE to relax particle shape to desired force tolerance
 	cout << "	** Relaxing single cell" << endl;
 	double Ktest, Ftest;
+	packingObject.initializeVelocities(T0);
 	packingObject.fireMinimizeF(Ftol,Ftest,Ktest);
 	cout << "	** Particle relaxed, Ftest = " << Ftest << ", Ktest = " << Ktest << endl;
 

@@ -75,7 +75,7 @@ public:
 	cellPacking2D();
 	cellPacking2D(int ncells, int nt, int nprint, double l, double s);
 	cellPacking2D(int ncells, int ntumor, int tumorNV, int adiposeNV, double tumorCalA, double adiposeCalA, int s);
-	cellPacking2D(std::ifstream& inputFileObject, double asphericity, double s);
+	cellPacking2D(std::string& inputFile, double T0, double s);
 	~cellPacking2D();
 
 	// operators
@@ -215,7 +215,7 @@ public:
 	void cellNVE();
 	void cellOverDamped();
 
-	// Find jammed state from initially dilute configuration
+	// Find jammed states
 	void findJamming(double dphi0, double Ftol, double Ptol);
 
 	// compress isotropically to a target packing fraction

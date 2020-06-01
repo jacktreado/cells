@@ -42,7 +42,7 @@ const double PI = 4*atan(1);
 void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double w, double th, double Lmin, int NV){
 	// local variables
 	int ci, vi, d, nvtmp;
-	double calA;
+	double a0tmp, l0tmp, calA0tmp;
 	double xpos, ypos;
 	double xmin, xmax, ymin, ymax;
 
@@ -90,9 +90,19 @@ void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double 
 		cell(ci).initializeVertices();
 		cell(ci).initializeCell();
 
-		// calculate a0 based on fact that they are regular polygons
-		calA = nvtmp*tan(PI/nvtmp)/PI;
-		cell(ci).setAsphericity(calA);
+		// initialize cells as regular polygons
+		calA0tmp = nvtmp*tan(PI/nvtmp)/PI;
+
+		// preferred area is disk area
+		a0tmp = PI*radii.at(ci)*radii.at(ci);
+
+		// initial length of polygon side
+		l0tmp = sqrt(4.0*PI*a0tmp*calA0tmp)/NV;
+
+		// set preferred area and length 
+		cell(ci).seta0(a0tmp);
+		cell(ci).setl0(l0tmp);
+		cell(ci).setdel(1.0);
 	}
 
 	// initialize particle positions
@@ -188,18 +198,6 @@ void cellPacking2D::fireMinimizeHopperSP(vector<double>& radii, double w0, doubl
 			cout << "===================================================" << endl << endl;
 			cout << " 	FIRE MINIMIZATION, itr = " << itr << endl << endl;
 			cout << "===================================================" << endl;
-
-			// print if object has been opened already
-			if (packingPrintObject.is_open()){
-				cout << "	* Printing SP center positions to file" << endl;
-				printHopperSP(radii,w0,w,th,0.0);
-			}
-			
-			if (energyPrintObject.is_open()){
-				cout << "	* Printing SP energy to file" << endl;
-				printSystemEnergy(itr,Pvirial,Knew);
-			}
-			
 			cout << "	* Run data:" << endl;
 			cout << "	* K 		= " << Knew/Ktol << endl;
 			cout << "	* Pvirial 	= " << Pvirial/Ptol << endl;
@@ -899,7 +897,7 @@ void cellPacking2D::flowHopperSP(vector<double>& radii, double w0, double w, dou
 	// flow until max x is near orifice
 	itr = 0;
 	itrMax = 1e6;
-	while (xmax < L.at(0) - 1.0 && itr < itrMax){
+	while (xmax < L.at(0) - 2.5*radii.at(0) && itr < itrMax){
 		// update virial pressure
 		Pvirial = 0.5*(sigmaXX + sigmaYY);
 

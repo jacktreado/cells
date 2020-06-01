@@ -52,6 +52,9 @@ int main()
 	double Ndbl = 2.0*phi0*(3.0*w0)*(w0-w)/(PI*tan(th));
 	int NCELLS = round(Ndbl);
 
+	// determine scale of reservoir size to make sure that phi \approx 2 given width
+	double Lmin = (NCELLS*PI)/(L*w0*3.0);
+
 	// initialize radii as gaussian random variables
 	vector<double> radii(NCELLS,0.0);
 	for (ci=0; ci<NCELLS; ci++){
@@ -77,7 +80,7 @@ int main()
 
 	// initialize positions in hopper reservoir
 	cout << "	** Relaxing particle positions using SP model" << endl;
-	packingObject.initializeHopperSP(radii,w0,w,th,NV);
+	packingObject.initializeHopperSP(radii,w0,w,th,Lmin,NV);
 
 
 	// flow particles through hopper with force strength g
