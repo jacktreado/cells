@@ -166,11 +166,11 @@ public:
 	void setL(int d, double val) { L.at(d) = val; };
 	void setdt(double val) { dt0 = val; dt = dt0; };
 	void setShearStrain(double val) { shearStrain = val; };
+	void updatePackingFraction() { phi = packingFraction(); };
 
 	// set force values for all cells to be the same
 	void forceVals(double calA0, double ka, double kl, double gam, double kb, double kint, double del, double a);
 
-	
 	void vertexDPMTimeScale(double timeStepMag);
 	void addContact(int ci, int cj);
 	void deleteContact(int ci, int cj);

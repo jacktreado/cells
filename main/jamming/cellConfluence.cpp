@@ -19,25 +19,22 @@ const double PI = 4.0*atan(1);
 // simulation constants
 const int NT 					= 1e7; 			// number of time steps
 const int NPRINT 				= 2e3;			// number of time steps between prints
-const double timeStepMag 		= 0.02;			// time step in MD unit
-const double phiDisk 			= 0.55;			// initial phi of SP disks
-const double dphi 				= 5e-4;			// packing fraction increase
-const double sizeRatio 			= 1.4;			// ratio between small and large particles
-const double sizeFraction		= 0.5;			// fraction of small particles
+const double timeStepMag 		= 0.01;			// time step in MD unit
+const double dphi 				= 1e-4;			// packing fraction increase
 const double T0 				= 1e-8;			// initial velocities for read-in cells
 
 // target packing fraction (confluence)
-const double phiTarget 			= 1.0;
+const double phiTarget 			= 0.95;
 
 // force parameters
 const double ka 				= 1.0;			// area force constant (should be = 1)
 const double gam 				= 0.0;			// surface tension force constant
-const double kint 				= 1.0;			// interaction energy constant
+const double kint 				= 0.5;			// interaction energy constant
 const double a 					= 0.0;			// attraction parameter 
 const double del 				= 1.0;			// radius of vertices in units of l0
 
 // tolerances
-const double Ftol 				= 1e-11;		// force tolerance (for FIRE min)
+const double Ftol 				= 1e-12;		// force tolerance (for FIRE min)
 
 // int main
 int main(int argc, char const *argv[])
@@ -133,6 +130,7 @@ int main(int argc, char const *argv[])
 
 		// updated packing fraction
 		phi = packingObject.packingFraction();
+		packingObject.updatePackingFraction();
 
 		// updated pressure/cell
 		Pcheck = 0.5*(packingObject.getSigmaXX() + packingObject.getSigmaYY())/(packingObject.getNCELLS()*packingObject.getL(0)*packingObject.getL(0));
