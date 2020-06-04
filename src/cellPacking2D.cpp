@@ -679,7 +679,6 @@ void cellPacking2D::initializeVelocities(double tmp0){
 
 			cell(ci).setCVel(d,rv);
 			vmean.at(d) += rv;
-			cout << "rv = " << rv << endl;
 		}
 
 	}
@@ -1570,7 +1569,7 @@ void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 	double alpha 			= alpha0;
 	double t 				= 0.0;
 	double P 				= 0;
-	const double Trescale 	= 1e-8*NCELLS;
+	const double Trescale 	= 1e-10*NCELLS;
 
 	// local variables
 	int ci,vi,d,k,kmax;

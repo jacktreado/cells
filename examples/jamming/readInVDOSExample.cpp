@@ -19,18 +19,18 @@ const double PI = 4.0*atan(1);
 // simulation constants
 const int NT 					= 1e7; 			// number of time steps
 const int NPRINT 				= 5e2;			// number of time steps between prints
-const double timeStepMag 		= 0.01;		// time step in MD unit
-const double deltaPhi0 			= 5e-5;			// initial delta phi
+const double timeStepMag 		= 0.01;			// time step in MD unit
+const double deltaPhi0 			= 1e-4;			// initial delta phi
 
 // force parameters
-const double ka 			= 1.0;			// area force constant (should be = 1)
-const double gam 			= 0.0;			// surface tension force constant
-const double kint 			= 0.5;			// interaction energy constant
-const double a 				= 0.0;			// attraction parameter 
-const double del 			= 1.0;			// radius of vertices in units of l0
+const double ka 			= 1.0;				// area force constant (should be = 1)
+const double gam 			= 0.0;				// surface tension force constant
+const double kint 			= 0.5;				// interaction energy constant
+const double a 				= 0.0;				// attraction parameter 
+const double del 			= 1.0;				// radius of vertices in units of l0
 
 // tolerances
-const double Ftol 			= 1e-11;		// force tolerance (for FIRE min)
+const double Ftol 			= 1e-11;			// force tolerance (for FIRE min)
 const double Ptol 			= 1e-8;			// pressure tolerance
 
 // main function
@@ -39,20 +39,20 @@ int main()
 	// local variables
 
 	// input file
-	string inputFile = "/Users/JackTreado/Jamming/CellSim/viz/jamming/data/bidcells_N16_NV16_calA1.02_kl1.0_kb0/bidcells_N16_NV16_calA1.02_kl1.0_kb0_seed1.jam";
+	string inputFile = "/Users/JackTreado/Jamming/CellSim/viz/jamming/data/bidcells_N16_NV16_calA1.02_kl1.0_kb0_seed1.jam";
 
 	// output files
-	string vdosFile = "vdos.test";
-	string jamFile = "jam.test";
-	string enFile = "en.test";
+	string vdosFile = "vdos_comp.test";
+	string jamFile = "jam_comp.test";
+	string enFile = "en_comp.test";
 
 	// system details
 	double seed 	= 1;
-	double T0 		= 1e-6;
+	double T0 		= 1e-10;
 
 	// mechanical parameters
 	double kl = 1.0;
-	double kb = 0.0;
+	double kb = 0;
 	double calA0 = 1.02;
 	double Fcheck, Kcheck;
 
@@ -86,27 +86,23 @@ int main()
 	cout << "Pcheck = " << Pcheck << endl;
 
 	// if Pcheck > 2*Ptol, compute VDOS, else, find nearest jammed state
-	if (Pcheck < 2.0*Ptol){
-		cout << "** Pcheck < 2*Ptol, so finding jammed state before VDOS computation. " << endl;
-		packingObject.findJamming(deltaPhi0, Ftol, Ptol);
-	}
-	else
-		packingObject.printJammedConfig();
+	double dphi = deltaPhi0;
+	packingObject.printJammedConfig();
 
 	cout << "	** computing VDOS, printing to " << vdosFile << endl;
 	packingObject.vdos();
 
 	// decrease packing fraction by small steps until unjamming
 	double phi = packingObject.packingFraction();
-	double rscale = sqrt((phi - deltaPhi0)/phi);
+	double rscale = sqrt((phi + deltaPhi0)/phi);
 	int itmax = 1e3;
 	int it = 0;
-	while(Pcheck > 1e-16 && it < itmax){
+	while(Pcheck < 1e-6 && it < itmax){
 		// iterator
 		it++;
 
 		// decrease by packing fraction
-		cout << "	** DEcompression protocol it = " << it << " from phi = " << phi << " to phi - dphi = " << phi - deltaPhi0 << " by dphi = " << deltaPhi0 << endl;
+		cout << "	** Compression protocol it = " << it << " from phi = " << phi << " to phi + dphi = " << phi + deltaPhi0 << " by dphi = " << deltaPhi0 << endl;
 		packingObject.scaleLengths(rscale);
 
 		// minimize
@@ -115,7 +111,7 @@ int main()
 		// updated packing fraction
 		phi = packingObject.packingFraction();
 
-		// updated pressure
+		// updated pressure/cell
 		Pcheck = 0.5*(packingObject.getSigmaXX() + packingObject.getSigmaYY())/(packingObject.getNCELLS()*packingObject.getL(0)*packingObject.getL(0));
 
 		// print vdos and config
