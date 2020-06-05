@@ -23,9 +23,6 @@ const double timeStepMag 		= 0.01;			// time step in MD unit
 const double dphi 				= 1e-4;			// packing fraction increase
 const double T0 				= 1e-8;			// initial velocities for read-in cells
 
-// target packing fraction (confluence)
-const double phiTarget 			= 0.95;
-
 // force parameters
 const double ka 				= 1.0;			// area force constant (should be = 1)
 const double gam 				= 0.0;			// surface tension force constant
@@ -49,10 +46,11 @@ int main(int argc, char const *argv[])
 	string kl_str 				= argv[3];
 	string kb_str 				= argv[4];
 	string NOUTPUTS_str 		= argv[5];
-	string seed_str				= argv[6];
-	string energyFile 			= argv[7];
-	string jammingFile 			= argv[8];
-	string vdosFile 			= argv[9];
+	string phiTarget_str 		= argv[6]
+	string seed_str				= argv[7];
+	string energyFile 			= argv[8];
+	string jammingFile 			= argv[9];
+	string vdosFile 			= argv[10];
 
 	// load strings into sstream
 	stringstream calA0ss(calA0_str);
