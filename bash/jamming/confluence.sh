@@ -28,10 +28,11 @@ kb=$5
 partition=$6
 time=$7
 seedStart=$8
-seedMax=$9
+seedNum=$9
 
 # other inputs
 NOUTPUTS=60
+let seedMax=$seedStart+$seedNum-1
 
 # name strings
 basestr=bidcells_N"$NCELLS"_NV"$NV"_calA"$calA0"_kl"$kl"_kb"$kb"
@@ -99,18 +100,13 @@ for f in $flist; do
     then
         echo seed = $seed too small, skipping...
         continue
-    elif [[ $seed -ge $seedStart ]] 
+    elif [[ $seed -gt $seedMax ]]
     then    
+        echo seed = $seed too large, skipping
+        continue
+    else    
         # increment file count
         let fcount=$fcount+1
-
-        # check if too many
-        if [[ $fcount -gt $seedMax ]]
-        then
-            echo seed = $seed exceeds number of seeds, ending.
-            break
-        fi
-
         echo seed = $seed is ready for primetime, adding to task file.
     fi
 
