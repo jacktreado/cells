@@ -25,21 +25,23 @@ NV=$2
 calA0=$3
 kl=$4
 kb=$5
-partition=$6
-time=$7
-seedStart=$8
-seedNum=$9
+phiTarget=$6
+partition=$7
+time=$8
+seedStart=$9
+seedNum="${10}"
 
 # other inputs
 NOUTPUTS=60
 let seedMax=$seedStart+$seedNum-1
 
 # name strings
-basestr=bidcells_N"$NCELLS"_NV"$NV"_calA"$calA0"_kl"$kl"_kb"$kb"
+inputstr=bidcells_N"$NCELLS"_NV"$NV"_calA"$calA0"_kl"$kl"_kb"$kb"
+basestr=bidconf_N"$NCELLS"_NV"$NV"_calA"$calA0"_kl"$kl"_kb"$kb"_pt"$phiTarget"
 runstr="$basestr"_seedStart"$seedStart"_seedMax"$seedMax"
 
 # make directory specific for this simulation
-simdatadir=$simtypedir/$basestr
+simdatadir=$simtypedir/$inputstr
 
 # compile into binary using packing.h
 binf=bin/"$runstr".o
@@ -66,7 +68,7 @@ rm -f $taskf
 let fcount=0
 
 # list of files
-flist="$simdatadir"/"$basestr"_seed*.jam
+flist="$simdatadir"/"$inputstr"_seed*.jam
 
 # loop over files initially to count
 for f in $flist; do
@@ -114,9 +116,9 @@ for f in $flist; do
     runString="cd `pwd`"
 
     # append executable to run string
-    enf="$simdatadir"/$baseid.en
-    posf="$simdatadir"/$baseid.pos
-    vdosf="$simdatadir"/$baseid.vdos
+    enf="$simdatadir"/$basestr.en
+    posf="$simdatadir"/$basestr.pos
+    vdosf="$simdatadir"/$basestr.vdos
 
     # append to runString
     runString="$runString ; ./$binf $f $calA0 $kl $kb $NOUTPUTS $seed $enf $posf $vdosf"
@@ -161,7 +163,7 @@ cat $slurmf
 
 # run sbatch file
 echo -- running on slurm in partition $partition
-sbatch -t $time $slurmf
+echo sbatch -t $time $slurmf
 
 
 # ====================
@@ -172,10 +174,11 @@ sbatch -t $time $slurmf
 # 3. calA0
 # 4. perimeter force scale (kl)
 # 5. bending energy scale (kb)
-# 6. partition
-# 7. time
-# 8. start seed (from list of files)
-# 9. number of seeds
+# 6. target phi
+# 7. partition
+# 8. time
+# 9. start seed (from list of files)
+# 10. number of seeds
 
 
 
