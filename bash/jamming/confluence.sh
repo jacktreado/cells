@@ -114,9 +114,9 @@ for f in $flist; do
     runString="cd `pwd`"
 
     # append executable to run string
-    enf="$simdatadir"/$filestr.en
-    posf="$simdatadir"/$filestr.pos
-    vdosf="$simdatadir"/$filestr.vdos
+    enf="$simdatadir"/$baseid.en
+    posf="$simdatadir"/$baseid.pos
+    vdosf="$simdatadir"/$baseid.vdos
 
     # append to runString
     runString="$runString ; ./$binf $f $calA0 $kl $kb $NOUTPUTS $seed $enf $posf $vdosf"
