@@ -123,7 +123,7 @@ for f in $flist; do
     vdosf="$simdatadir"/$filestr.vdos
 
     # append to runString
-    runString="$runString ; ./$binf $f $calA0 $kl $kb $NOUTPUTS $seed $enf $jamf $vdosf"
+    runString="$runString ; ./$binf $f $calA0 $kl $kb $NOUTPUTS $seed $enf $posf $vdosf"
 
     # finish off run string
     runString="$runString ;"

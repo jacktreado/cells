@@ -34,7 +34,7 @@ const double a 					= 0.0;			// attraction parameter
 const double del 				= 1.0;			// radius of vertices in units of l0
 
 // tolerances
-const double Ftol 				= 1e-12;		// force tolerance (for FIRE min)
+const double Ftol 				= 1e-11;		// force tolerance (for FIRE min)
 
 // int main
 int main(int argc, char const *argv[])
