@@ -8,8 +8,8 @@ maindir=$cellsdir/main
 # directory for all output for cell simulations
 outputdir=/gpfs/project/fas/ohern/jdt45/cells
 
-# directory for simulations specific to jamming
-simtypedir=$outputdir/confluence
+# directory for simulations specific to bidisperse cell jamming (add confluence simulations to jamming directory)
+simtypedir=$outputdir/bidcells
 
 # make directories, unless they already exist
 mkdir -p $outputdir
@@ -27,25 +27,23 @@ kl=$4
 kb=$5
 partition=$6
 time=$7
-numSeedsPerRun=$8
-numRuns=$9
-startSeed="${10}"
+seedStart=$8
+seedMax=$9
 
-let numSeeds=$numSeedsPerRun*$numRuns
-let endSeed=$startSeed+$numSeeds-1
+# other inputs
+NOUTPUTS=60
 
 # name strings
-basestr=dpconf_N"$NCELLS"_NV"$NV"_calA"$calA0"_kl"$kl"_kb"$kb"
-runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
+basestr=bidcells_N"$NCELLS"_NV"$NV"_calA"$calA0"_kl"$kl"_kb"$kb"
+runstr="$basestr"_seedStart"$seedStart"_seedMax"$seedMax"
 
 # make directory specific for this simulation
 simdatadir=$simtypedir/$basestr
-mkdir -p $simdatadir
 
 # compile into binary using packing.h
 binf=bin/"$runstr".o
 mainf=$maindir/jamming/cellConfluence.cpp
-echo Running $numSeeds confluence sims of $NCELLS cells with $NV verts, calA0 = $calA0 , perimeter energy kl = $kl, and bending energy kb = $kb
+echo Running $numSeeds compression to confluence sims of $NCELLS cells with $NV verts, calA0 = $calA0 , perimeter energy kl = $kl, and bending energy kb = $kb
 
 # run compiler
 rm -f $binf
@@ -66,39 +64,66 @@ rm -f $taskf
 # loop over files
 let fcount=0
 
-# LOOP OVER FILES. 
-for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
-    # count files
+# list of files
+flist="$simdatadir"/"$basestr"_seed*.jam
+
+# loop over files initially to count
+for f in $flist; do
     let fcount=$fcount+1
+done
+
+if [[ $fcount -eq 0 ]]
+then
+    echo no files found in flist, ending.
+    exit 1
+else
+    echo $fcount files found in flist, looping...
+fi
+
+# reset fcount to 0
+let fcount=0
+
+# LOOP OVER FILES. 
+for f in $flist; do
+    # parse file name
+    file=${f##*/}
+    baseid=${file%%.jam}
+    seed=${baseid#*seed*}
+    echo seed = $seed, file = $file
 
     # echo to console
     echo On base seed $seed
 
+    # check if seed is in correct range
+    if [[ $seed -lt $seedStart ]]
+    then
+        echo seed = $seed too small, skipping...
+        continue
+    elif [[ $seed -ge $seedStart ]] 
+    then    
+        # increment file count
+        let fcount=$fcount+1
+
+        # check if too many
+        if [[ $fcount -gt $seedMax ]]
+        then
+            echo seed = $seed exceeds number of seeds, ending.
+            break
+        fi
+
+        echo seed = $seed is ready for primetime, adding to task file.
+    fi
+
     # echo string of numSeedPerRun commands to task file
     runString="cd `pwd`"
 
-    # loop over seeds to go into runString
-    let ssMax=$numSeedsPerRun-1
+    # append executable to run string
+    enf="$simdatadir"/$filestr.en
+    posf="$simdatadir"/$filestr.pos
+    vdosf="$simdatadir"/$filestr.vdos
 
-    for ss in `seq 0 $ssMax`; do
-        # get seed for actual run
-        let runseed=$seed+ss
-
-        # get file str
-        filestr="$basestr"_seed"$seed"
-
-        # make output directory
-        specificdir=$simdatadir/"$filestr"
-        mkdir -p $specificdir
-
-        # create output files
-        enf=$specificdir/$filestr.en
-        jamf=$specificdir/$filestr.jam
-        vdosf=$specificdir/$filestr.vdos
-
-        # append to runString
-        runString="$runString ; ./$binf $NCELLS $NV $calA0 $kl $kb $runseed $enf $jamf $vdosf"
-    done
+    # append to runString
+    runString="$runString ; ./$binf $f $calA0 $kl $kb $NOUTPUTS $seed $enf $jamf $vdosf"
 
     # finish off run string
     runString="$runString ;"
@@ -140,7 +165,7 @@ cat $slurmf
 
 # run sbatch file
 echo -- running on slurm in partition $partition
-sbatch -t $time $slurmf
+echo sbatch -t $time $slurmf
 
 
 # ====================
@@ -153,9 +178,8 @@ sbatch -t $time $slurmf
 # 5. bending energy scale (kb)
 # 6. partition
 # 7. time
-# 8. num seeds per run (for each entry in array)
-# 9. number of runs (number of array entries, i.e. arraynum)
-# 10. start seed (end seed determined by number of runs)
+# 8. start seed (from list of files)
+# 9. number of seeds
 
 
 
