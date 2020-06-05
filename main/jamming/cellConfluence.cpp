@@ -38,7 +38,7 @@ int main(int argc, char const *argv[])
 {
 	// input variables
 	int NOUTPUTS, seed;
-	double calA0, kl, kb;
+	double calA0, kl, kb, phiTarget;
 
 	// inputs from command line
 	string inputFile 			= argv[1];
@@ -57,6 +57,7 @@ int main(int argc, char const *argv[])
 	stringstream klss(kl_str);
 	stringstream kbss(kb_str);
 	stringstream NOUTPUTSss(NOUTPUTS_str);
+	stringstream phiTargetss(phiTarget_str);
 	stringstream seedss(seed_str);
 
 	// parse values from strings
@@ -64,6 +65,7 @@ int main(int argc, char const *argv[])
 	klss 			>> kl;
 	kbss 			>> kb;
 	NOUTPUTSss 		>> NOUTPUTS;
+	phiTargetss		>> phiTarget;
 	seedss 			>> seed;
 
 	// instantiate main packing object
