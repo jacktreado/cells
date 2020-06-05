@@ -46,7 +46,7 @@ int main(int argc, char const *argv[])
 	string kl_str 				= argv[3];
 	string kb_str 				= argv[4];
 	string NOUTPUTS_str 		= argv[5];
-	string phiTarget_str 		= argv[6]
+	string phiTarget_str 		= argv[6];
 	string seed_str				= argv[7];
 	string energyFile 			= argv[8];
 	string jammingFile 			= argv[9];
