@@ -116,9 +116,9 @@ for f in $flist; do
     runString="cd `pwd`"
 
     # append executable to run string
-    enf="$simdatadir"/$basestr.en
-    posf="$simdatadir"/$basestr.pos
-    vdosf="$simdatadir"/$basestr.vdos
+    enf="$simdatadir"/"$basestr"_seed"$seed".en
+    posf="$simdatadir"/"$basestr"_seed"$seed".pos
+    vdosf="$simdatadir"/"$basestr"_seed"$seed".vdos
 
     # append to runString
     runString="$runString ; ./$binf $f $calA0 $kl $kb $NOUTPUTS $seed $enf $posf $vdosf"
@@ -128,6 +128,7 @@ for f in $flist; do
 
     # echo to task file
     echo "$runString" >> $taskf
+    echo running with vdos file: $vdosf
 done
 
 # test if task file was created
