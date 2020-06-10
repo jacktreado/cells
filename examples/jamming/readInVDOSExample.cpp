@@ -18,19 +18,19 @@ const double PI = 4.0*atan(1);
 
 // simulation constants
 const int NT 					= 1e7; 			// number of time steps
-const int NPRINT 				= 5e2;			// number of time steps between prints
+const int NPRINT 				= 2e3;			// number of time steps between prints
 const double timeStepMag 		= 0.01;			// time step in MD unit
 const double deltaPhi0 			= 1e-4;			// initial delta phi
 
 // force parameters
 const double ka 			= 1.0;				// area force constant (should be = 1)
 const double gam 			= 0.0;				// surface tension force constant
-const double kint 			= 0.5;				// interaction energy constant
+const double kint 			= 0.1;				// interaction energy constant
 const double a 				= 0.0;				// attraction parameter 
 const double del 			= 1.0;				// radius of vertices in units of l0
 
 // tolerances
-const double Ftol 			= 1e-11;			// force tolerance (for FIRE min)
+const double Ftol 			= 1e-12;			// force tolerance (for FIRE min)
 const double Ptol 			= 1e-8;			// pressure tolerance
 
 // main function
@@ -48,7 +48,7 @@ int main()
 
 	// system details
 	double seed 	= 1;
-	double T0 		= 1e-10;
+	double T0 		= 1e-6;
 
 	// mechanical parameters
 	double kl = 1.0;
@@ -97,7 +97,7 @@ int main()
 	double rscale = sqrt((phi + deltaPhi0)/phi);
 	int itmax = 1e3;
 	int it = 0;
-	while(Pcheck < 1e-6 && it < itmax){
+	while(Pcheck < 1e-5 && it < itmax){
 		// iterator
 		it++;
 

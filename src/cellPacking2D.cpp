@@ -1554,22 +1554,22 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 // FIRE 2.0 force minimization with backstepping
 void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 	// HARD CODE IN FIRE PARAMETERS
-	const double alpha0 	= 0.25;
+	const double alpha0 	= 0.3;
 	const double finc 		= 1.1;
 	const double fdec 		= 0.5;
 	const double falpha 	= 0.99;
 	const double dtmax 		= 10*dt0;
-	const double dtmin 		= 1e-16*dt0;
+	const double dtmin 		= 1e-8*dt0;
+	const double Trescale 	= 1e-8*NCELLS;
 	const int NMIN 			= 20;
 	const int NNEGMAX 		= 2000;
 	const int NDELAY 		= 1000;
 	int npPos				= 0;
 	int npNeg 				= 0;
 	int npPMIN				= 0;
-	double alpha 			= alpha0;
+	double alpha 			= 0.0;
 	double t 				= 0.0;
-	double P 				= 0;
-	const double Trescale 	= 1e-10*NCELLS;
+	double P 				= 0.0;
 
 	// local variables
 	int ci,vi,d,k,kmax;
@@ -1601,22 +1601,6 @@ void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 	// iterate until system converged
 	kmax = 1e6;
 	for (k=0; k<kmax; k++){
-		// output some information to console
-		if (k % NPRINT == 0){
-			cout << "===================================================" << endl << endl;
-			cout << " 	FIRE MINIMIZATION, k = " << k << endl << endl;
-			cout << "===================================================" << endl;			
-			cout << "	* Run data:" << endl;
-			cout << "	* Kcheck 	= " << Kcheck << endl;
-			cout << "	* Fcheck 	= " << Fcheck << endl;
-			cout << "	* Pcheck 	= " << Pcheck << endl;
-			cout << "	* phi 		= " << phi << endl;
-			cout << "	* dt 		= " << dt << endl;
-			cout << "	* alpha 	= " << alpha << endl;
-			cout << "	* P 		= " << P << endl;
-			cout << endl << endl;
-		}
-
 		// Step 1. calculate P and norms
 		P = 0.0;
 		vstarnrm = 0.0;
@@ -1636,9 +1620,27 @@ void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 			}
 		}
 
+
 		// get norms
 		vstarnrm = sqrt(vstarnrm);
 		fstarnrm = sqrt(fstarnrm);
+
+		// output some information to console
+		if (k % NPRINT == 0){
+			cout << "===================================================" << endl << endl;
+			cout << " 	FIRE MINIMIZATION, k = " << k << endl << endl;
+			cout << "===================================================" << endl;			
+			cout << "	* Run data:" << endl;
+			cout << "	* Kcheck 	= " << Kcheck << endl;
+			cout << "	* Fcheck 	= " << Fcheck << endl;
+			cout << "	* Pcheck 	= " << Pcheck << endl;
+			cout << "	* phi 		= " << phi << endl;
+			cout << "	* dt 		= " << dt << endl;
+			cout << "	* alpha 	= " << alpha << endl;
+			cout << "	* P 		= " << P << endl;
+			cout << "	* Pdir 		= " << P/(vstarnrm*fstarnrm) << endl;
+			cout << endl << endl;
+		}
 
 
 		// Step 2. Adjust simulation based on net motion of system
@@ -1671,7 +1673,7 @@ void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 				break;
 
 			// decrease time step if past initial delay
-			if (k > NMIN){
+			if (k > NDELAY){
 				// decrease time step 
 				if (dt*fdec > dtmin)
 					dt *= fdec;
@@ -2284,6 +2286,7 @@ void cellPacking2D::vdos(){
 	int mxi, myi, mxj, myj;
 	int NDOF = 0;
 	vector<int> Mu(NCELLS,0);
+	cellPacking2D relaxedState;
 
 	// doubles
 	double calA0, l0, fl, kl, kb, eb, fb;
@@ -2710,6 +2713,77 @@ void cellPacking2D::vdos(){
 	statPrintObject << NDOF << endl;
 	statPrintObject << normalModes.eigenvalues() << endl;
 	statPrintObject << normalModes.eigenvectors() << endl;
+	Eigen::MatrixXd evecs = normalModes.eigenvectors();
+
+	// print to console
+	double U0 = totalPotentialEnergy();
+	cout << "	** Finished printing evals and evecs, now printing change from U0 = " << U0 << " along evecs" << endl;
+
+	// loop over eigenvectors, perturb by small increments along eigenvector, compute change in potential energy
+	int NSTEPS = 70;
+	double p0 = 1e-6;
+	double p1 = 1e0;
+	vector<double> deList(NSTEPS,0.0);
+	double dp = (log10(p1) - log10(p0))/(NSTEPS - 1);
+	double logp, linp;
+	logp = log10(p0);
+	deList.at(0) = p0;
+
+	// print number of steps
+	statPrintObject << NSTEPS << endl;
+	statPrintObject << setw(30) << setprecision(12) << U0 << endl;
+
+	// loop over vector, populate with points
+	statPrintObject << setw(30) << setprecision(12) << deList.at(0);
+	for (k=1; k<NSTEPS; k++){
+		// add to vector
+		logp = logp + dp;
+		linp = pow(10.0,logp);
+		deList.at(k) = linp;
+
+		// print vector value to file
+		statPrintObject << setw(30) << setprecision(12) << deList.at(k);
+	}
+	statPrintObject << endl;
+
+	// store packing in relaxed state
+	saveState(relaxedState);
+
+	// loop over modes
+	int m, s, d;
+	double de, ptmp;
+	for (m=0; m<NDOF; m++){
+		// loop over steps
+		for (s=0; s<NSTEPS; s++){
+			// load step size
+			de = deList.at(s);
+
+			// move system along eigenvector (note: always start from jammed packing)
+			k = 0;
+			for (ci=0; ci<NCELLS; ci++){
+				for (vi=0; vi<cell(ci).getNV(); vi++){
+					for (d=0; d<NDIM; d++){
+						// initial position
+						ptmp = cell(ci).vpos(vi,d);
+
+						// increment from initial jammed state to perturbed state
+						ptmp += de*evecs(k,m);
+						k++;
+
+						// store new position
+						cell(ci).setVPos(vi,d,ptmp);
+					}
+				}
+			}
+
+			// output energy after all degrees of freedom have been perturbed
+			statPrintObject << setw(30) << setprecision(12) << totalPotentialEnergy();
+
+			// load relaxed state for next iteration (and next compression)
+			loadState(relaxedState);
+		}
+		statPrintObject << endl;
+	}
 }
 
 
