@@ -40,7 +40,7 @@ const double dlogpTol 			= 0.25;			// log difference between pressures of differ
 int main(int argc, char const *argv[])
 {
 	// input variables
-	int NOUTPUTS, seed;
+	int seed;
 	double calA0, kl, kb, pTarget;
 
 	// inputs from command line
@@ -48,18 +48,16 @@ int main(int argc, char const *argv[])
 	string calA0_str 			= argv[2];
 	string kl_str 				= argv[3];
 	string kb_str 				= argv[4];
-	string NOUTPUTS_str 		= argv[5];
-	string pTarget_str 			= argv[6];
-	string seed_str				= argv[7];
-	string energyFile 			= argv[8];
-	string jammingFile 			= argv[9];
-	string vdosFile 			= argv[10];
+	string pTarget_str 			= argv[5];
+	string seed_str				= argv[6];
+	string energyFile 			= argv[7];
+	string jammingFile 			= argv[8];
+	string vdosFile 			= argv[9];
 
 	// load strings into sstream
 	stringstream calA0ss(calA0_str);
 	stringstream klss(kl_str);
 	stringstream kbss(kb_str);
-	stringstream NOUTPUTSss(NOUTPUTS_str);
 	stringstream pTargetss(pTarget_str);
 	stringstream seedss(seed_str);
 
@@ -67,7 +65,6 @@ int main(int argc, char const *argv[])
 	calA0ss 		>> calA0;
 	klss 			>> kl;
 	kbss 			>> kb;
-	NOUTPUTSss 		>> NOUTPUTS;
 	pTargetss		>> pTarget;
 	seedss 			>> seed;
 

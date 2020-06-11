@@ -31,8 +31,7 @@ time=$8
 seedStart=$9
 seedNum="${10}"
 
-# other inputs
-NOUTPUTS=20
+# seed controller
 let seedMax=$seedStart+$seedNum-1
 
 # name strings
@@ -121,7 +120,7 @@ for f in $flist; do
     vdosf="$simdatadir"/"$basestr"_seed"$seed".vdos
 
     # append to runString
-    runString="$runString ; ./$binf $f $calA0 $kl $kb $NOUTPUTS $pTarget $seed $enf $posf $vdosf"
+    runString="$runString ; ./$binf $f $calA0 $kl $kb $pTarget $seed $enf $posf $vdosf"
 
     # finish off run string
     runString="$runString ;"
