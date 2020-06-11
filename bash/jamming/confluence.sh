@@ -32,7 +32,7 @@ seedStart=$9
 seedNum="${10}"
 
 # other inputs
-NOUTPUTS=60
+NOUTPUTS=20
 let seedMax=$seedStart+$seedNum-1
 
 # name strings
