@@ -20,7 +20,7 @@ const double PI = 4.0*atan(1);
 const int NT 					= 1e7; 			// number of time steps
 const int NPRINT 				= 2e3;			// number of time steps between prints
 const double timeStepMag 		= 0.01;			// time step in MD unit
-const double dphi 				= 1e-4;			// packing fraction increase
+const double dphi 				= 5e-5;			// packing fraction increase
 const double T0 				= 1e-8;			// initial velocities for read-in cells
 
 // force parameters
@@ -31,14 +31,17 @@ const double a 					= 0.0;			// attraction parameter
 const double del 				= 1.0;			// radius of vertices in units of l0
 
 // tolerances
-const double Ftol 				= 1e-12;		// force tolerance (for FIRE min)
+const double Ftol 				= 7e-13;		// force tolerance (for FIRE min)
+
+// ouputs
+const double dlogpTol 			= 0.25;			// log difference between pressures of different frames
 
 // int main
 int main(int argc, char const *argv[])
 {
 	// input variables
 	int NOUTPUTS, seed;
-	double calA0, kl, kb, phiTarget;
+	double calA0, kl, kb, pTarget;
 
 	// inputs from command line
 	string inputFile 			= argv[1];
@@ -46,7 +49,7 @@ int main(int argc, char const *argv[])
 	string kl_str 				= argv[3];
 	string kb_str 				= argv[4];
 	string NOUTPUTS_str 		= argv[5];
-	string phiTarget_str 		= argv[6];
+	string pTarget_str 			= argv[6];
 	string seed_str				= argv[7];
 	string energyFile 			= argv[8];
 	string jammingFile 			= argv[9];
@@ -57,7 +60,7 @@ int main(int argc, char const *argv[])
 	stringstream klss(kl_str);
 	stringstream kbss(kb_str);
 	stringstream NOUTPUTSss(NOUTPUTS_str);
-	stringstream phiTargetss(phiTarget_str);
+	stringstream pTargetss(pTarget_str);
 	stringstream seedss(seed_str);
 
 	// parse values from strings
@@ -65,7 +68,7 @@ int main(int argc, char const *argv[])
 	klss 			>> kl;
 	kbss 			>> kb;
 	NOUTPUTSss 		>> NOUTPUTS;
-	phiTargetss		>> phiTarget;
+	pTargetss		>> pTarget;
 	seedss 			>> seed;
 
 	// instantiate main packing object
@@ -102,22 +105,27 @@ int main(int argc, char const *argv[])
 	cout << "	** computing VDOS, printing to " << vdosFile << endl << endl;
 	packingObject.printJammedConfig();
 	packingObject.vdos();
-	
-	// grow cells to confluence, only print NOUTPUTS frames during compression
+
+	// IDEA: compress by small packing fraction steps, 
+	// only output when difference between pressures exceeds increasing scale
+
+	// determine thresholds for output based on difference in pressure between frames
+	double pCurrent = Pcheck;
+	double pLast = currp;
+	double dlogp = 0.0;
+	int NFRAMES = 
+
+	// output to console
+	cout << "	** Compressing to confluence, printing " << NFRAMES << " frames, starting from pressure " << pCurrent << " to final pressure " << pTarget << endl;
+
+	// compute degree to which size should be increased
 	double phi = packingObject.packingFraction();
 	double rscale = sqrt((phi + dphi)/phi);
 
-	// determine number of frames to skip based on current packing fraction
-	int NSTEPS = round(abs(phiTarget - phi)/dphi);
-	int PLOTSKIP = NSTEPS/NOUTPUTS;
-
-	// output to console
-	cout << "	** Compressing to confluence over " << NSTEPS << " steps, outputting over " << NOUTPUTS << " frames every " << PLOTSKIP << " steps. " << endl;
-
-	// compress to jamming
+	// compress to target pressure
 	int itmax = 1e3;
 	int it = 0;
-	while(phi < phiTarget && it < itmax){
+	while(Pcheck < pTarget && it < itmax){
 		// iterator
 		it++;
 
@@ -134,14 +142,26 @@ int main(int argc, char const *argv[])
 
 		// updated pressure/cell
 		Pcheck = 0.5*(packingObject.getSigmaXX() + packingObject.getSigmaYY())/(packingObject.getNCELLS()*packingObject.getL(0)*packingObject.getL(0));
+		pCurrent = Pcheck;
 
-		// print vdos and config
-		if (it % PLOTSKIP == 0){
+		// compute difference in pressure since last output
+		dlogp = log10(pCurrent) - log10(pLast);
+
+		// print vdos and config when difference in pressures is large enough
+		if (dlogp > dlogpTol){
 			cout << "	** at it = " << it << ", outputting vdos and config to files..." << endl;
 			packingObject.vdos();
 			packingObject.printJammedConfig();
+
+			// reset pLast
+			pLast = pCurrent;
 		}
 	}
+
+	// print final configuration
+	cout << "	** at it = " << it << ", outputting FINAL vdos and config to files..." << endl;
+	packingObject.vdos();
+	packingObject.printJammedConfig();
 
 	cout << "	** FINISHED COMPRESSING ABOVE JAMMING, ENDING MAIN FILE" << endl;
 	return 0;

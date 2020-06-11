@@ -25,7 +25,7 @@ NV=$2
 calA0=$3
 kl=$4
 kb=$5
-phiTarget=$6
+pTarget=$6
 partition=$7
 time=$8
 seedStart=$9
@@ -37,7 +37,7 @@ let seedMax=$seedStart+$seedNum-1
 
 # name strings
 inputstr=bidcells_N"$NCELLS"_NV"$NV"_calA"$calA0"_kl"$kl"_kb"$kb"
-basestr=bidconf_N"$NCELLS"_NV"$NV"_calA"$calA0"_kl"$kl"_kb"$kb"_pt"$phiTarget"
+basestr=bidconf_N"$NCELLS"_NV"$NV"_calA"$calA0"_kl"$kl"_kb"$kb"_pt"$pTarget"
 runstr="$basestr"_seedStart"$seedStart"_seedMax"$seedMax"
 
 # make directory specific for this simulation
@@ -46,7 +46,7 @@ simdatadir=$simtypedir/$inputstr
 # compile into binary using packing.h
 binf=bin/"$runstr".o
 mainf=$maindir/jamming/cellConfluence.cpp
-echo Running $numSeeds compression to confluence sims of $NCELLS cells with $NV verts, calA0 = $calA0 , perimeter energy kl = $kl, and bending energy kb = $kb
+echo Running $numSeeds compression to target pressure sims of $NCELLS cells with $NV verts, pTarget = $pTarget, calA0 = $calA0 , perimeter energy kl = $kl, and bending energy kb = $kb
 
 # run compiler
 rm -f $binf
@@ -121,7 +121,7 @@ for f in $flist; do
     vdosf="$simdatadir"/"$basestr"_seed"$seed".vdos
 
     # append to runString
-    runString="$runString ; ./$binf $f $calA0 $kl $kb $NOUTPUTS $phiTarget $seed $enf $posf $vdosf"
+    runString="$runString ; ./$binf $f $calA0 $kl $kb $NOUTPUTS $pTarget $seed $enf $posf $vdosf"
 
     # finish off run string
     runString="$runString ;"
@@ -175,7 +175,7 @@ sbatch -t $time $slurmf
 # 3. calA0
 # 4. perimeter force scale (kl)
 # 5. bending energy scale (kb)
-# 6. target phi
+# 6. target pressure
 # 7. partition
 # 8. time
 # 9. start seed (from list of files)
