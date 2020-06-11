@@ -2720,9 +2720,9 @@ void cellPacking2D::vdos(){
 	cout << "	** Finished printing evals and evecs, now printing change from U0 = " << U0 << " along evecs" << endl;
 
 	// loop over eigenvectors, perturb by small increments along eigenvector, compute change in potential energy
-	int NSTEPS = 40;
+	int NSTEPS = 30;
 	double p0 = 1e-6;
-	double p1 = 1e-1;
+	double p1 = 1e0;
 	vector<double> deList(NSTEPS,0.0);
 	double dp = (log10(p1) - log10(p0))/(NSTEPS - 1);
 	double logp, linp;
