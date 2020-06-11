@@ -113,7 +113,7 @@ int main(int argc, char const *argv[])
 	double pCurrent = Pcheck;
 	double pLast = pCurrent;
 	double dlogp = 0.0;
-	int NFRAMES = 
+	int NFRAMES = ceil((log10(pTarget) - log10(pCurrent))/dlogp);
 
 	// output to console
 	cout << "	** Compressing to confluence, printing " << NFRAMES << " frames, starting from pressure " << pCurrent << " to final pressure " << pTarget << endl;
