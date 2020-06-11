@@ -111,7 +111,7 @@ int main(int argc, char const *argv[])
 
 	// determine thresholds for output based on difference in pressure between frames
 	double pCurrent = Pcheck;
-	double pLast = currp;
+	double pLast = pCurrent;
 	double dlogp = 0.0;
 	int NFRAMES = 
 
