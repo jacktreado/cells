@@ -26,7 +26,7 @@ const double T0 				= 1e-8;			// initial velocities for read-in cells
 // force parameters
 const double ka 				= 1.0;			// area force constant (should be = 1)
 const double gam 				= 0.0;			// surface tension force constant
-const double kint 				= 0.5;			// interaction energy constant
+const double kint 				= 1.0;			// interaction energy constant
 const double a 					= 0.0;			// attraction parameter 
 const double del 				= 1.0;			// radius of vertices in units of l0
 
