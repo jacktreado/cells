@@ -41,6 +41,9 @@ runstr="$basestr"_seedStart"$seedStart"_seedMax"$seedMax"
 
 # make directory specific for this simulation
 simdatadir=$simtypedir/$inputstr
+bidconfdir=$simdatadir/bidconf
+
+mkdir -p $bidconfdir
 
 # compile into binary using packing.h
 binf=bin/"$runstr".o
@@ -115,9 +118,9 @@ for f in $flist; do
     runString="cd `pwd`"
 
     # append executable to run string
-    enf="$simdatadir"/"$basestr"_seed"$seed".en
-    posf="$simdatadir"/"$basestr"_seed"$seed".pos
-    vdosf="$simdatadir"/"$basestr"_seed"$seed".vdos
+    enf="$bidconfdir"/"$basestr"_seed"$seed".en
+    posf="$bidconfdir"/"$basestr"_seed"$seed".pos
+    vdosf="$bidconfdir"/"$basestr"_seed"$seed".vdos
 
     # append to runString
     runString="$runString ; ./$binf $f $calA0 $kl $kb $pTarget $seed $enf $posf $vdosf"
