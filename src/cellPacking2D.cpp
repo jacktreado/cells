@@ -2316,14 +2316,18 @@ void cellPacking2D::vdos(){
 
 	// initialize matrices
 	// NOTE: surface tension VDOS not yet supported
-	Eigen::MatrixXd Ha(NDOF,NDOF);	// stiffness matrix for area term
-	Eigen::MatrixXd Sa(NDOF,NDOF);	// stress matrix for area term
-	Eigen::MatrixXd Hl(NDOF,NDOF);	// stiffness matrix for perimeter term
-	Eigen::MatrixXd Sl(NDOF,NDOF);	// stress matrix for perimeter term
-	Eigen::MatrixXd Hb(NDOF,NDOF);	// stiffness matrix for bending energy
-	Eigen::MatrixXd Sb(NDOF,NDOF);	// stress matrix for bending term
-	Eigen::MatrixXd Dvv(NDOF,NDOF);	// dynamical matrix for vertex-vertex interactions only
-	Eigen::MatrixXd D(NDOF,NDOF);	// full dynamical matrix
+	Eigen::MatrixXd Ha(NDOF,NDOF);		// stiffness matrix for area term
+	Eigen::MatrixXd Sa(NDOF,NDOF);		// stress matrix for area term
+	Eigen::MatrixXd Hl(NDOF,NDOF);		// stiffness matrix for perimeter term
+	Eigen::MatrixXd Sl(NDOF,NDOF);		// stress matrix for perimeter term
+	Eigen::MatrixXd Hb(NDOF,NDOF);		// stiffness matrix for bending energy
+	Eigen::MatrixXd Sb(NDOF,NDOF);		// stress matrix for bending term
+	Eigen::MatrixXd Hvv(NDOF,NDOF);		// stiffness matrix for interaction terms
+	Eigen::MatrixXd Svv(NDOF,NDOF);		// stress matrix for interaction terms
+	Eigen::MatrixXd Hshape(NDOF,NDOF); 	// stiffness matrix for shape terms
+	Eigen::MatrixXd H(NDOF,NDOF);		// stiffness matrix
+	Eigen::MatrixXd S(NDOF,NDOF);		// stress matrix
+	Eigen::MatrixXd D(NDOF,NDOF);		// full dynamical matrix
 
 	// initialize all matrices to be 0 initially
 	for (k=0; k<NDOF; k++){
@@ -2334,7 +2338,11 @@ void cellPacking2D::vdos(){
 			Sl(k,l) = 0.0;
 			Hb(k,l) = 0.0;
 			Sb(k,l) = 0.0;
-			Dvv(k,l) = 0.0;
+			Hvv(k,l) = 0.0;
+			Svv(k,l) = 0.0;
+			Hshape(k,l) = 0.0;
+			S(k,l) = 0.0;
+			H(k,l) = 0.0;
 			D(k,l) = 0.0;
 		}
 	}
@@ -2672,27 +2680,58 @@ void cellPacking2D::vdos(){
 						dr_dxi = -dx/dr;
 						dr_dyi = -dy/dr;
 
-						// set off diagonals, enforce symmetry in lower triangle
-						Dvv(mxi,mxj) = -kij*(dr_dxi*dr_dxi + h - 1.0);
-		                Dvv(myi,myj) = -kij*(dr_dyi*dr_dyi + h - 1.0);
-		                Dvv(mxi,myj) = -kij*dr_dxi*dr_dyi;
-		                Dvv(myi,mxj) = -kij*dr_dxi*dr_dyi;
-		                
-		                Dvv(mxj,mxi) = Dvv(mxi,mxj);
-		                Dvv(myj,myi) = Dvv(myi,myj);
-		                Dvv(mxj,myi) = Dvv(myi,mxj);
-		                Dvv(myj,mxi) = Dvv(mxi,myj);
+						// compute stiffness and stress matrices (off diagonal, enforce symmetry in lower triangles)
+
+						// -- stiffness matrix
+						Hvv(mxi,mxj) = -eij*(dr_dxi*dr_dxi);
+						Hvv(myi,myj) = -eij*(dr_dyi*dr_dyi);
+						Hvv(mxi,myj) = -eij*(dr_dxi*dr_dyi);
+						Hvv(myi,mxj) = -eij*(dr_dyi*dr_dxi);
+
+						Hvv(mxj,mxi) = Hvv(mxi,mxj);
+						Hvv(myj,myi) = Hvv(myi,myj);
+						Hvv(mxj,myi) = Hvv(myi,mxj);
+						Hvv(myj,mxi) = Hvv(mxi,myj);
+
+
+
+						// -- stress matrix
+						Svv(mxi,mxj) = kij*(1.0 - h)*(dr_dyi*dr_dyi);
+						Svv(myi,myj) = kij*(1.0 - h)*(dr_dxi*dr_dxi);
+						Svv(mxi,myj) = -kij*(1.0 - h)*(dr_dxi*dr_dyi);
+						Svv(myi,mxj) = -kij*(1.0 - h)*(dr_dxi*dr_dyi);
+
+						Svv(mxj,mxi) = Svv(mxi,mxj);
+		                Svv(myj,myi) = Svv(myi,myj);
+		                Svv(mxj,myi) = Svv(myi,mxj);
+		                Svv(myj,mxi) = Svv(mxi,myj);
+
+
 		                
 		                // add to diagonal, using off diagonals and reciprocity
-		                Dvv(mxi,mxi) -= Dvv(mxi,mxj);
-		                Dvv(myi,myi) -= Dvv(myi,myj);
-		                Dvv(mxi,myi) -= Dvv(mxi,myj);
-		                Dvv(myi,mxi) -= Dvv(myi,mxj);
+
+		                // -- stiffness matrix
+		                Hvv(mxi,mxi) -= Hvv(mxi,mxj);
+		                Hvv(myi,myi) -= Hvv(myi,myj);
+		                Hvv(mxi,myi) -= Hvv(mxi,myj);
+		                Hvv(myi,mxi) -= Hvv(myi,mxj);
 		                
-		                Dvv(mxj,mxj) -= Dvv(mxi,mxj);
-		                Dvv(myj,myj) -= Dvv(myi,myj);
-		                Dvv(mxj,myj) -= Dvv(mxi,myj);
-		                Dvv(myj,mxj) -= Dvv(myi,mxj);
+		                Hvv(mxj,mxj) -= Hvv(mxi,mxj);
+		                Hvv(myj,myj) -= Hvv(myi,myj);
+		                Hvv(mxj,myj) -= Hvv(mxi,myj);
+		                Hvv(myj,mxj) -= Hvv(myi,mxj);
+
+
+		                // -- stress matrix
+		                Svv(mxi,mxi) -= Svv(mxi,mxj);
+		                Svv(myi,myi) -= Svv(myi,myj);
+		                Svv(mxi,myi) -= Svv(mxi,myj);
+		                Svv(myi,mxi) -= Svv(myi,mxj);
+		                
+		                Svv(mxj,mxj) -= Svv(mxi,mxj);
+		                Svv(myj,myj) -= Svv(myi,myj);
+		                Svv(mxj,myj) -= Svv(mxi,myj);
+		                Svv(myj,mxj) -= Svv(myi,mxj);
 					}
 				}
 			}
@@ -2702,18 +2741,33 @@ void cellPacking2D::vdos(){
 	// compute D from sum of other dynamical matrices
 	// initialize all matrices to be 0 initially
 	for (k=0; k<NDOF; k++){
-		for (l=0; l<NDOF; l++)
-			D(k,l) = Ha(k,l) + Sa(k,l) + Hl(k,l) + Sl(k,l) + Hb(k,l) + Sb(k,l) + Dvv(k,l);
+		for (l=0; l<NDOF; l++){
+			Hshape(k,l) = Ha(k,l) + Hl(k,l) + Hb(k,l);
+			H(k,l) = Hshape(k,l) + Hvv(k,l);
+			S(k,l) = -1.0*Sa(k,l) - Sl(k,l) - Sb(k,l) - Svv(k,l);
+			D(k,l) = H(k,l) - S(k,l);
+		}
 	}
 
 	// compute eigenvalues
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> normalModes(D);
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> shapeStiffness(Hshape);
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> contactsStiffness(Hvv);
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> totalStiffness(H);
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> allModes(D);
 
 	// print eigenvalues to print object
 	statPrintObject << NDOF << endl;
-	statPrintObject << normalModes.eigenvalues() << endl;
-	statPrintObject << normalModes.eigenvectors() << endl;
-	Eigen::MatrixXd evecs = normalModes.eigenvectors();
+	statPrintObject << shapeStiffness.eigenvalues() << endl;
+	statPrintObject << contactsStiffness.eigenvalues() << endl;
+	statPrintObject << totalStiffness.eigenvalues() << endl;
+	statPrintObject << allModes.eigenvalues() << endl;
+	statPrintObject << allModes.eigenvectors() << endl;
+
+	/* 
+
+	TRY TO NOT OUTPUT ENERGY CHANGE TO SAVE MEMORY
+
+	Eigen::MatrixXd evecs = allModes.eigenvectors();
 
 	// print to console
 	double U0 = totalPotentialEnergy();
@@ -2784,6 +2838,8 @@ void cellPacking2D::vdos(){
 		}
 		statPrintObject << endl;
 	}
+
+	*/
 }
 
 

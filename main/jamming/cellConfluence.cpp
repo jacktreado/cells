@@ -19,19 +19,19 @@ const double PI = 4.0*atan(1);
 // simulation constants
 const int NT 					= 1e7; 			// number of time steps
 const int NPRINT 				= 2e3;			// number of time steps between prints
-const double timeStepMag 		= 0.01;			// time step in MD unit
-const double dphi 				= 5e-5;			// packing fraction increase
+const double timeStepMag 		= 0.03;			// time step in MD unit
+const double dphi 				= 1e-4;			// packing fraction increase
 const double T0 				= 1e-8;			// initial velocities for read-in cells
 
 // force parameters
 const double ka 				= 1.0;			// area force constant (should be = 1)
 const double gam 				= 0.0;			// surface tension force constant
-const double kint 				= 1.0;			// interaction energy constant
+const double kint 				= 0.5;			// interaction energy constant
 const double a 					= 0.0;			// attraction parameter 
 const double del 				= 1.0;			// radius of vertices in units of l0
 
 // tolerances
-const double Ftol 				= 7e-13;		// force tolerance (for FIRE min)
+const double Ftol 				= 1e-13;		// force tolerance (for FIRE min)
 
 // ouputs
 const double dlogpTol 			= 0.25;			// log difference between pressures of different frames
