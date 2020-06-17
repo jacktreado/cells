@@ -134,13 +134,9 @@ for ss = 1:NSIM
         % assuming more energy frames than jamming frames
         jframes = false(NENFRAMES,1);
         jframes(1) = true;
-        for ff = 2:NENFRAMES
-            matchInds = abs(phiEn(ff) - phiC) < 5e-6;
-            if sum(matchInds) == 1
-                jframes(ff) = true;
-            elseif sum(matchInds) > 1
-                error('multiple matching frames exist, ending');
-            end
+        for ff = 2:NFRAMES
+            [~,matchInd] = min(abs(phiC(ff) - phiEn));
+            jframes(matchInd) = ff;
         end 
 
         if (sum(jframes) ~= NFRAMES)
