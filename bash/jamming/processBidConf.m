@@ -133,11 +133,21 @@ for ss = 1:NSIM
 
         % assuming more energy frames than jamming frames
         jframes = false(NENFRAMES,1);
-        jframes(1) = true;
-        for ff = 2:NFRAMES
-            [~,matchInd] = min(abs(phiC(ff) - phiEn));
-            jframes(matchInd) = ff;
-        end 
+        rmvphi = false(NFRAMES,1);
+        for ff = 1:NFRAMES
+            [dmin,matchInd] = min(abs(phiC(ff) - phiEn));
+            if ~jframes(matchInd)
+                jframes(matchInd) = true;
+            else
+                if dmin > 1e-10
+                    error('tried to double align a large difference, ending.');
+                else
+                    rmvphi(ff) = true;
+                end
+            end
+        end
+        phiC(rmvphi) = [];
+        NFRAMES = length(phiC);
 
         if (sum(jframes) ~= NFRAMES)
             error('Frame alignment incorrect, ending.');
