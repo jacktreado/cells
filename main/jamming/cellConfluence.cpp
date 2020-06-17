@@ -20,7 +20,7 @@ const double PI = 4.0*atan(1);
 const int NT 					= 1e7; 			// number of time steps
 const int NPRINT 				= 2e3;			// number of time steps between prints
 const double timeStepMag 		= 0.03;			// time step in MD unit
-const double dphi 				= 1e-4;			// packing fraction increase
+const double dphi 				= 5e-5;			// packing fraction increase
 const double T0 				= 1e-8;			// initial velocities for read-in cells
 
 // force parameters
@@ -34,7 +34,7 @@ const double del 				= 1.0;			// radius of vertices in units of l0
 const double Ftol 				= 1e-13;		// force tolerance (for FIRE min)
 
 // ouputs
-const double dlogpTol 			= 0.25;			// log difference between pressures of different frames
+const double dlogpTol 			= 0.2;			// log difference between pressures of different frames
 
 // int main
 int main(int argc, char const *argv[])
@@ -110,7 +110,7 @@ int main(int argc, char const *argv[])
 	double pCurrent = Pcheck;
 	double pLast = pCurrent;
 	double dlogp = 0.0;
-	int NFRAMES = ceil((log10(pTarget) - log10(pCurrent))/dlogp);
+	int NFRAMES = ceil((log10(pTarget) - log10(pCurrent))/dlogpTol);
 
 	// output to console
 	cout << "	** Compressing to confluence, printing " << NFRAMES << " frames, starting from pressure " << pCurrent << " to final pressure " << pTarget << endl;
