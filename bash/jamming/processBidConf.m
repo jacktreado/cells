@@ -135,7 +135,7 @@ for ss = 1:NSIM
         jframes = false(NENFRAMES,1);
         jframes(1) = true;
         for ff = 2:NENFRAMES
-            matchInds = abs(phiEn(ff) - phiC) < 1e-6;
+            matchInds = abs(phiEn(ff) - phiC) < 5e-6;
             if sum(matchInds) == 1
                 jframes(ff) = true;
             elseif sum(matchInds) > 1
