@@ -202,7 +202,7 @@ for ss = 1:NSIM
     % compute number of quartic modes from stiffness matrix
     nq = zeros(NPOSFRAMES,1);
     for pp = 1:NPOSFRAMES
-        nq(pp) = sum(stiffEPos{pp} < 1e-10) - 2;
+        nq(pp) = sum(stiffEPos{pp} < 1e-8) - 2;
     end
     
     fprintf('\t ** -- Participation ratios...\n');
@@ -249,7 +249,7 @@ for ss = 1:NSIM
             vertexPR(ww,pp) = prnum/(NVTOT*prdenom);
             
             % compute cell participation ratio
-            cellPR(ww,pp) = prnum^2/(NCELLS*cellprdenom);
+            cellPR(ww,pp) = (cellprnum^2)/(NCELLS*cellprdenom);
         end
     end
     
