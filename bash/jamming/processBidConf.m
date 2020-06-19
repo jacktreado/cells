@@ -25,6 +25,7 @@ NvvList         = cell(NSIM,1);         % # of vertex-vertex contacts
 NccList         = cell(NSIM,1);         % # of cell-cell contacts
 NqList          = cell(NSIM,1);         % # of quartic modes, counted by stiffness matrix
 lambdaMatList   = cell(NSIM,1);         % matrix of lambda values as a function of pressure
+stiffEVMatList  = cell(NSIM,1);         % matrix of eigenvalues from stiffness matrix
 vertexPrList    = cell(NSIM,1);         % vertex participation ratio as a function of pressure
 cellPrList      = cell(NSIM,1);         % cell participation ratio as a function of pressure     
 projList        = cell(NSIM,3);         % mode projection as a function of pressure
@@ -197,6 +198,12 @@ for ss = 1:NSIM
         lambdaMatrix(:,pp) = lambdaPos{pp};
     end
     
+    % make matrix of eigenvalues from stiffness matrix
+    stiffEVMatrix = zeros(NDOF,NPOSFRAMES);
+    for pp = 1:NPOSFRAMES
+        stiffEVMatrix(:,pp) = stiffEPos{pp};
+    end
+    
     fprintf('\t ** -- Quartic modes...\n');
     
     % compute number of quartic modes from stiffness matrix
@@ -306,6 +313,7 @@ for ss = 1:NSIM
 
     % number of quartic modes
     lambdaMatList{ss}       = lambdaMatrix;
+    stiffEVMatList{ss}      = stiffEVMatrix;
     NqList{ss}              = nq;
     vertexPrList{ss}        = vertexPR;
     cellPrList{ss}          = cellPR;
@@ -337,6 +345,7 @@ NvvList(simSkip)            = [];
 NccList(simSkip)            = [];
 NqList(simSkip)             = [];
 lambdaMatList(simSkip)      = [];
+stiffEVMatList(simSkip)     = [];
 vertexPrList(simSkip)       = [];
 cellPrList(simSkip)         = [];
 projList(simSkip)           = [];
@@ -356,7 +365,7 @@ fprintf('\t ** saving to %s\n',saveStr);
 save(saveStr,...
     'NSIMS','simStr','NCELLSList','NDOFList','NvList','LList',...
     'NFRAMEList','pList','NvvList','NccList','NqList',...
-    'lambdaMatList','vertexPrList','cellPrList','projList',...
+    'lambdaMatList','stiffEVMatList','vertexPrList','cellPrList','projList',...
     'jFrameList','enPList','enPhiList','enCalAList');
 
 end
