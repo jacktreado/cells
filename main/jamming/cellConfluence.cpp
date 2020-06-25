@@ -20,7 +20,7 @@ const double PI = 4.0*atan(1);
 const int NT 					= 1e7; 			// number of time steps
 const int NPRINT 				= 2e3;			// number of time steps between prints
 const double timeStepMag 		= 0.03;			// time step in MD unit
-const double dphi 				= 1e-4;			// initial packing fraction increase
+const double dphi 				= 2e-4;			// initial packing fraction increase
 const double dphiFast			= 10*dphi; 		// second packing fraction incremenet, to get to larger pressures faster
 const double T0 				= 1e-8;			// initial velocities for read-in cells
 

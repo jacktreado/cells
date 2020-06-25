@@ -2167,8 +2167,8 @@ void cellPacking2D::enthalpyMin(double dphi0, double Ftol, double Ptol){
 	double rH, r0, rL, drgrow, drshrink, scaleFactor, check;
 
 	// compute scale factors for expansion and contraction
-	drgrow = sqrt((phi + dphi0)/phi);
-	drshrink = sqrt((phi - 0.5*dphi0)/phi);
+	drgrow = sqrt((phi + 2.0*dphi0)/phi);
+	drshrink = sqrt((phi - dphi0)/phi);
 
 	// save initial state
 	r0 = sqrt(cell(0).geta0());
