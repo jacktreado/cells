@@ -1750,6 +1750,22 @@ void cellPacking2D::printHopperDP(double w0, double w, double th){
 	packingPrintObject << setw(w3) << right << sigmaYY;
 	packingPrintObject << endl;
 
+	// print contact information
+	packingPrintObject << setw(w1) << left << "NCONTS";
+	packingPrintObject << setw(w1) << right << Ncc;
+	packingPrintObject << setw(w1) << right << Nvv;
+	packingPrintObject << endl;
+
+	// print contact matrix
+	packingPrintObject << setw(w1) << left << "CMMAT";
+
+	// print contact matrix
+	for (int ci=0; ci<NCELLS; ci++){
+		for (int cj=ci+1; cj<NCELLS; cj++)
+			packingPrintObject << setw(w2) << contacts(ci,cj);
+	}
+	packingPrintObject << endl;
+
 	// print info for rest of the cells
 	for (int ci=0; ci<NCELLS; ci++)
 		cell(ci).printVertexPositions(packingPrintObject,ci);
