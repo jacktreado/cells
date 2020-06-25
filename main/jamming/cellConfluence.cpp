@@ -20,7 +20,7 @@ const double PI = 4.0*atan(1);
 const int NT 					= 1e7; 			// number of time steps
 const int NPRINT 				= 2e3;			// number of time steps between prints
 const double timeStepMag 		= 0.03;			// time step in MD unit
-const double dphi 				= 1e-4;			// initial packing fraction increase
+const double dphi 				= 5e-4;			// initial packing fraction increase
 const double dphiFast			= 10*dphi; 		// second packing fraction incremenet, to get to larger pressures faster
 const double T0 				= 1e-8;			// initial velocities for read-in cells
 
@@ -32,7 +32,7 @@ const double a 					= 0.0;			// attraction parameter
 const double del 				= 1.0;			// radius of vertices in units of l0
 
 // tolerances
-const double Ftol 				= 1e-12;		// force tolerance (for FIRE min)
+const double Ftol 				= 1e-13;		// force tolerance (for FIRE min)
 const double Ptol 				= 1e-8;			// pressure tolerance
 
 // ouputs

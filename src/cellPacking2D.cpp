@@ -2211,7 +2211,7 @@ void cellPacking2D::enthalpyMin(double dphi0, double Ftol, double Ptol){
 
 		// boolean checks
 		undercompressed = ((Pcheck < 1.1*Ptol && rH < 0) || (Pcheck < Ptol && rH > 0));
-		overcompressed = (Pcheck > 1.1*Ptol && nc > 0);
+		overcompressed = (Pcheck > 1.1*Ptol);
 		target = (Pcheck < 1.1*Ptol && Pcheck > Ptol && nc > 0 && rH > 0);
 
 		// output to console
