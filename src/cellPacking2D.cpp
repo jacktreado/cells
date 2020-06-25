@@ -2343,7 +2343,7 @@ void cellPacking2D::enthalpyMin(double dphi0, double Ftol, double Ptol){
 					cout << "	** P = " << Pcheck << endl;
 					cout << "	** K = " << Kcheck << endl;
 					cout << "	** nc = " << nc << endl;
-					cout << " WRITING JAMMED CONFIG TO .jam FILE" << endl;
+					cout << " WRITING ENTHALPY-MINIMIZED CONFIG TO .jam FILE" << endl;
 					cout << " ENDING COMPRESSION SIMULATION" << endl;
 					printJammedConfig();
 					break;

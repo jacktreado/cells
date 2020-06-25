@@ -20,7 +20,7 @@ const double PI = 4.0*atan(1);
 const int NT 					= 1e7; 			// number of time steps
 const int NPRINT 				= 2e3;			// number of time steps between prints
 const double timeStepMag 		= 0.03;			// time step in MD unit
-const double dphi 				= 2e-4;			// initial packing fraction increase
+const double dphi 				= 1e-4;			// initial packing fraction increase
 const double dphiFast			= 10*dphi; 		// second packing fraction incremenet, to get to larger pressures faster
 const double T0 				= 1e-8;			// initial velocities for read-in cells
 
@@ -150,7 +150,7 @@ int main(int argc, char const *argv[])
 
 		// print vdos and config when difference in pressures is large enough
 		if (dlogp > dlogpTol){
-			cout << "	** at it = " << it << ", outputting vdos and config to files..." << endl;
+			cout << "	** at it = " << it << ", dlogp = " << dlogp << " which is > " dlogpTol << ", so outputting vdos and config to files..." << endl;
 			packingObject.vdos();
 			packingObject.printJammedConfig();
 
