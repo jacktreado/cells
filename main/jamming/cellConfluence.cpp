@@ -150,7 +150,7 @@ int main(int argc, char const *argv[])
 
 		// print vdos and config when difference in pressures is large enough
 		if (dlogp > dlogpTol){
-			cout << "	** at it = " << it << ", dlogp = " << dlogp << " which is > " dlogpTol << ", so outputting vdos and config to files..." << endl;
+			cout << "	** at it = " << it << ", dlogp = " << dlogp << " which is > " << dlogpTol << ", so outputting vdos and config to files..." << endl;
 			packingObject.vdos();
 			packingObject.printJammedConfig();
 
