@@ -1554,20 +1554,20 @@ void cellPacking2D::fireMinimizeP(double Ptol, double Ktol){
 // FIRE 2.0 force minimization with backstepping
 void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 	// HARD CODE IN FIRE PARAMETERS
-	const double alpha0 	= 0.3;
+	const double alpha0 	= 0.1;
 	const double finc 		= 1.1;
 	const double fdec 		= 0.5;
 	const double falpha 	= 0.99;
 	const double dtmax 		= 10*dt0;
 	const double dtmin 		= 1e-8*dt0;
-	const double Trescale 	= 1e-8*NCELLS;
+	const double Trescale 	= 1e-5*NCELLS;
 	const int NMIN 			= 20;
 	const int NNEGMAX 		= 2000;
 	const int NDELAY 		= 1000;
 	int npPos				= 0;
 	int npNeg 				= 0;
 	int npPMIN				= 0;
-	double alpha 			= 0.0;
+	double alpha 			= alpha0;
 	double t 				= 0.0;
 	double P 				= 0.0;
 
@@ -1586,8 +1586,9 @@ void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 	// initialize forces
 	calculateForces();
 
-	// rescale velocities
-	rescaleVelocities(Trescale);
+	// do preliminary update of velocities
+	for (ci=0; ci<NCELLS; ci++)	
+		cell(ci).verletVelocityUpdate(dt);
 
 	// norm of total force vector, kinetic energy
 	F = forceRMS();
@@ -1597,6 +1598,9 @@ void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 	// scale P and K for convergence checking
 	Fcheck = F;
 	Kcheck = K/NCELLS;
+
+	// rescale velocities
+	rescaleVelocities(Trescale);
 
 	// iterate until system converged
 	kmax = 1e6;
@@ -1673,7 +1677,7 @@ void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 				break;
 
 			// decrease time step if past initial delay
-			if (k > NDELAY){
+			if (k > NMIN){
 				// decrease time step 
 				if (dt*fdec > dtmin)
 					dt *= fdec;
@@ -1686,7 +1690,7 @@ void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 			for (ci=0; ci<NCELLS; ci++){
 				for (vi=0; vi<cell(ci).getNV(); vi++){
 					for (d=0; d<NDIM; d++)
-						cell(ci).setVPos(vi,d,cell(ci).vpos(vi,d) - 0.5*dt*cell(ci).vvel(vi,d));
+						cell(ci).setVPos(vi,d,cell(ci).vpos(vi,d) - 0.5*dt*cell(ci).vvel(vi,d) - 0.25*cell(ci).vacc(vi,d)*dt*dt);
 				}
 			}
 
@@ -2140,6 +2144,224 @@ void cellPacking2D::findJamming(double dphi0, double Ftol, double Ptol){
 		exit(1);
 	}
 }
+
+
+
+// enthalpy minimzation to target pressure
+void cellPacking2D::enthalpyMin(double dphi0, double Ftol, double Ptol){
+	// local variables
+	double Pcheck, Kcheck, Fcheck;
+	int NSTEPS, k, kmax, kr, nc, nr, ci, cj;
+	cellPacking2D savedState;
+	int NDOF;
+
+	// get initial packing fraction
+	phi = packingFraction();
+
+	// iterator
+	k = 0;
+	kmax = 1e5;
+
+	// root search variables
+	bool target, overcompressed, undercompressed;
+	double rH, r0, rL, drgrow, drshrink, scaleFactor, check;
+
+	// compute scale factors for expansion and contraction
+	drgrow = sqrt((phi + dphi0)/phi);
+	drshrink = sqrt((phi - 0.5*dphi0)/phi);
+
+	// save initial state
+	r0 = sqrt(cell(0).geta0());
+	saveState(savedState);
+
+	// initialize as not at target p (pressure / number of particles)
+	target = false;
+
+	// phiJ bounds
+	rH = -1;
+	rL = -1;
+
+	// pressure check
+	check = 10*Ptol;
+
+	// initialize velocities
+	double Tinit = 1e-8;
+	initializeVelocities(Tinit);
+
+	// loop until phi is the correct value
+	while (check > Ptol && k < kmax){
+		// update iterator
+		k++;
+
+		// relax shapes (energies/forces calculated during FIRE minimization)
+		fireMinimizeF(Ftol, Fcheck, Kcheck);
+
+		// update new phi after minimization
+		phi = packingFraction();
+
+		// calculate Pcheck for comparison
+		Pcheck = 0.5*(sigmaXX + sigmaYY)/(NCELLS*L.at(0)*L.at(1));
+
+		// remove rattlers
+		kr = 0;
+		nr = removeRattlers(kr);
+
+		// update number of contacts
+		nc = totalNumberOfContacts();
+
+		// boolean checks
+		undercompressed = ((Pcheck < 1.1*Ptol && rH < 0) || (Pcheck < Ptol && rH > 0));
+		overcompressed = (Pcheck > 1.1*Ptol && nc > 0);
+		target = (Pcheck < 1.1*Ptol && Pcheck > Ptol && nc > 0 && rH > 0);
+
+		// output to console
+		cout << "===================================================" << endl << endl << endl;
+		cout << " 	quasistatic isotropic compression to target pressure " << endl << endl;
+		cout << "===================================================" << endl;
+		cout << "	* k 			= " << k << endl;
+		cout << "	* dphi 			= " << dphi0 << endl;
+		cout << "	* phi 			= " << phi << endl;
+		cout << "	* r0 			= " << r0 << endl;
+		cout << "	* rH 			= " << rH << endl;
+		cout << "	* rL 			= " << rL << endl;
+		cout << "	* Fcheck 		= " << Fcheck << endl;
+		cout << "	* Kcheck 		= " << Kcheck << endl;
+		cout << "	* Pcheck 		= " << Pcheck << endl;
+		cout << "	* # of contacts = " << nc << endl;
+		cout << "	* # of rattlers = " << nr << endl;
+		cout << "	* undercompressed = " << undercompressed << endl;
+		cout << "	* overcompressed = " << overcompressed << endl;
+		cout << "	* target = " << target << endl << endl;
+		cout << "	* contact matrix:" << endl;
+
+		// print contact matrix to console
+		for (ci=0; ci<NCELLS; ci++){
+			for (cj=0; cj<NCELLS; cj++){
+				if (cj == ci)
+					cout << "0" << "  ";
+				else
+					cout << contacts(ci,cj) << "  ";
+			}
+			cout << endl;
+		}
+
+		// print final two lines
+		cout << endl << endl;
+
+		// update particle sizes based on target check
+		if (rH < 0){
+			// if still undercompressed, then grow until overcompressed found
+			if (undercompressed){
+				// set scale to normal compression
+				scaleFactor = drgrow;
+
+				// save state
+				r0 = sqrt(cell(0).geta0());
+				saveState(savedState);
+			}
+			// if first overcompressed, decompress by dphi/2 until unjamming
+			else if (overcompressed){
+				// current = upper bound length scale r
+	            rH = sqrt(cell(0).geta0());
+
+	            // save overcompressed state
+				r0 = rH;
+				saveState(savedState);
+
+	            // compute new scale factor
+	            scaleFactor = drshrink;
+
+	            // print to console
+				cout << "	-- -- overcompressed for the first time, scaleFactor = " << scaleFactor << endl;
+			}
+		}
+		else{
+			if (rL < 0){
+				// if first undercompressed, save last overcompressed state, beging root search
+				if (undercompressed){
+					// current = new lower bound length scale r
+					rL = sqrt(cell(0).geta0());
+
+					// load state
+					loadState(savedState);
+
+					// compute new scale factor by root search
+		            scaleFactor = 0.5*(rH + rL)/r0;
+
+					// print to console
+					cout << "	-- -- undercompressed for the first time, scaleFactor = " << scaleFactor << endl;
+					cout << "	-- -- BEGINNING ROOT SEARCH IN ENTHALPY MIN PROTOCOL..." << endl;
+				}
+				// if still overcompressed, decrement again
+				else if (overcompressed){
+					// current = upper bound length scale r
+		            rH = sqrt(cell(0).geta0());
+
+		            // save overcompressed state
+					r0 = rH;
+					saveState(savedState);
+
+		            // keep shrinking at same rate until unjamming
+		            scaleFactor = drshrink;
+
+		            // print to console
+					cout << "	-- -- overcompressed, still no unjamming, scaleFactor = " << scaleFactor << endl;
+				}
+			}
+			else{
+				// if found undercompressed state, go to state between undercompressed and last overcompressed states (from saved state)
+				if (undercompressed){
+					// current = new lower bound length scale r
+					rL = sqrt(cell(0).geta0());
+
+					// load state
+					loadState(savedState);
+
+					// compute new scale factor
+		            scaleFactor = 0.5*(rH + rL)/r0;
+
+					// print to console
+					cout << "	-- -- undercompressed, scaleFactor = " << scaleFactor << endl;
+
+				}
+				else if (overcompressed){
+					// current = new upper bound length scale r
+		            rH = sqrt(cell(0).geta0());
+
+					// load state
+					loadState(savedState);
+
+					// compute new scale factor
+		            scaleFactor = 0.5*(rH + rL)/r0;
+
+					// print to console
+					cout << "	-- -- overcompressed, scaleFactor = " << scaleFactor << endl;
+				}
+				else if (target){
+					cout << "	** At k = " << k << ", target pressure found!" << endl;
+					cout << "	** F = " << Fcheck << endl;
+					cout << "	** P = " << Pcheck << endl;
+					cout << "	** K = " << Kcheck << endl;
+					cout << "	** nc = " << nc << endl;
+					cout << " WRITING JAMMED CONFIG TO .jam FILE" << endl;
+					cout << " ENDING COMPRESSION SIMULATION" << endl;
+					printJammedConfig();
+					break;
+				}
+			}
+			
+		}
+
+		// grow or shrink particles by scale factor
+		scaleLengths(scaleFactor);
+	}
+
+	if (k == kmax){
+		cout << "	** ERROR: IN 2d cell jamming finding, k reached kmax without finding jamming. Ending." << endl;
+		exit(1);
+	}
+}
+
 
 
 // compress isotropically to fixed packing fraction by ~deltaPhi steps (use length scaler instead for robustness)

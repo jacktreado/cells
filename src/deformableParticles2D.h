@@ -167,11 +167,13 @@ public:
 
 	// force functions
 	void shapeForces();
+	void gravityForces(double g, int dir);
 	int segmentForce(deformableParticles2D& onTheRight); // return 0 or 1, depending on contact
 	int vertexForce(deformableParticles2D& onTheRight, double& sigmaXX, double& sigmaXY, double& sigmaYX, double& sigmaYY);
 	int vertexForce(deformableParticles2D &onTheRight, double& sigmaXX, double& sigmaXY, double& sigmaYX, double& sigmaYY, double aij);
 	int pwAttractiveContacts(deformableParticles2D &onTheRight);
-	int radialForce(deformableParticles2D& onTheRight, double bscale); 
+	int radialForce(deformableParticles2D& onTheRight, double bscale);
+
 
 	// energy functions
 	double perimeterEnergy();

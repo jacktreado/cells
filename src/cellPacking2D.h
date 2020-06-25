@@ -217,6 +217,7 @@ public:
 
 	// Find jammed states
 	void findJamming(double dphi0, double Ftol, double Ptol);
+	void enthalpyMin(double dphi0, double Ftol, double Ptol);
 
 	// compress isotropically to a target packing fraction
 	void qsIsoCompression(double phiTarget, double deltaPhi, double Ftol);
@@ -304,6 +305,7 @@ public:
 	void hopperWallForcesSP(std::vector<double>& radii, double w0, double w, double th, int closed);
 	void hopperWallForcesDP(double w0, double w, double th, int closed);
 	void hopperSPNVE(std::vector<double>& radii, double w0, double w, double th, double T0);
+	void hopperDPNVE(double w0, double w, double th, double g, double T0);
 	void flowHopperSP(std::vector<double>& radii, double w0, double w, double th, double g);
 	void flowHopperDP(double w0, double w, double th, double g);
 	double hopperPackingFraction(std::vector<double>& radii, double w0, double w, double th);
@@ -311,7 +313,7 @@ public:
 	void hopperPosVerletSP();
 	void hopperVelVerletSP(std::vector<double>& radii);
 	void printHopperSP(std::vector<double>& radii, double w0, double w, double th, double g);
-	void printHopperDP(double w0, double w, double th, double g);
+	void printHopperDP(double w0, double w, double th);
 
 	// printers
 	void printSystemPositions();

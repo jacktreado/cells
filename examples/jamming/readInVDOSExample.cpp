@@ -30,7 +30,7 @@ const double a 				= 0.0;				// attraction parameter
 const double del 			= 1.0;				// radius of vertices in units of l0
 
 // tolerances
-const double Ftol 			= 1e-13;			// force tolerance (for FIRE min)
+const double Ftol 			= 1e-12;			// force tolerance (for FIRE min)
 const double Ptol 			= 1e-8;				// pressure tolerance
 
 // main function
@@ -67,22 +67,20 @@ int main()
 	packingObject.vertexDPMTimeScale(timeStepMag);
 
 	// open files
+	packingObject.openEnergyObject(enFile);
 	packingObject.openJamObject(jamFile);
 	packingObject.openStatObject(vdosFile);
-	packingObject.openEnergyObject(enFile);
 
 	// set NT and NPRINT
 	packingObject.setNT(NT);
 	packingObject.setNPRINT(NPRINT);
 
 	// compress to set packing fraction using FIRE, pressure relaxation
-	cout << "	** relaxing system with Ftol = " << Ftol << endl;
-	packingObject.fireMinimizeF(Ftol, Fcheck, Kcheck);
-	cout << "Fcheck = " << Fcheck << endl;
-	cout << "Kcheck = " << Kcheck << endl;
+	cout << "	** relaxing system using enthalpy min, Ftol = " << Ftol << endl;
+	packingObject.enthalpyMin(deltaPhi0, Ftol, Ptol);
 
 	// compute pressure
-	double Pcheck = 0.5*(packingObject.getSigmaXX() + packingObject.getSigmaYY())/(packingObject.getNCELLS()*packingObject.getL(0)*packingObject.getL(0));
+	double Pcheck = 0.5*(packingObject.getSigmaXX() + packingObject.getSigmaYY())/(packingObject.getNCELLS()*packingObject.getL(0)*packingObject.getL(1));
 	cout << "Pcheck = " << Pcheck << endl;
 
 	// if Pcheck > 2*Ptol, compute VDOS, else, find nearest jammed state
