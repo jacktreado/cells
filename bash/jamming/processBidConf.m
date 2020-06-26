@@ -18,6 +18,8 @@ NDOFList        = zeros(NSIM,1);        % total # of degrees of freedom in each 
 NFRAMEList      = zeros(NSIM,1);        % total # of frames for each sim
 NvList          = cell(NSIM,1);         % # of vertices on each particle
 LList           = zeros(NSIM,2);        % box lengths
+a0List          = zeros(NSIM,1);        % particle preferred area list
+l0List          = zeros(NSIM,1);        % vertex size list
 
 % containers for extracted VDOS data
 pList           = cell(NSIM,1);         % list of positive pressures
@@ -104,6 +106,10 @@ for ss = 1:NSIM
     NCELLS                  = cellJamData.NCELLS;
     L                       = cellJamData.L;
     nv                      = cellJamData.nv(1,:);
+    
+    % particle size information
+    a0List{ss}              = cellJamData.a0;
+    l0List{ss}              = cellJamData.l0;
         
     % total number of degrees of freedom
     NVTOT                   = sum(nv);
@@ -340,6 +346,8 @@ NCELLSList(simSkip)         = [];
 NDOFList(simSkip)           = [];
 NvList(simSkip)             = [];
 LList(simSkip)              = [];
+a0List(simSkip)             = [];
+l0List(simSkip)             = [];
 pList(simSkip)              = [];
 NvvList(simSkip)            = [];
 NccList(simSkip)            = [];
@@ -363,7 +371,7 @@ NSIMS = sum(~simSkip);
 fprintf('\t ** saving to %s\n',saveStr);
 
 save(saveStr,...
-    'NSIMS','simStr','NCELLSList','NDOFList','NvList','LList',...
+    'NSIMS','simStr','NCELLSList','NDOFList','NvList','LList','a0List','l0List',...
     'NFRAMEList','pList','NvvList','NccList','NqList',...
     'lambdaMatList','stiffEVMatList','vertexPrList','cellPrList','projList',...
     'jFrameList','enPList','enPhiList','enCalAList');

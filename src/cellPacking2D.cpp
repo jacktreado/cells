@@ -1563,7 +1563,7 @@ void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 	const double Trescale 	= 1e-5*NCELLS;
 	const int NMIN 			= 20;
 	const int NNEGMAX 		= 2000;
-	const int NDELAY 		= 1000;
+	const int NDELAY 		= 500;
 	int npPos				= 0;
 	int npNeg 				= 0;
 	int npPMIN				= 0;
@@ -1769,7 +1769,7 @@ void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 		}
 
 		// check for convergence
-		converged = (abs(Fcheck) < Ftol && npPMIN > NMIN);
+		converged = (abs(Fcheck) < Ftol && npPMIN > NDELAY);
 
 		if (converged){
 			cout << "	** FIRE has converged!" << endl;
