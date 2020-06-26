@@ -307,7 +307,7 @@ public:
 	void hopperSPNVE(std::vector<double>& radii, double w0, double w, double th, double T0);
 	void hopperDPNVE(double w0, double w, double th, double g, double T0);
 	void flowHopperSP(std::vector<double>& radii, double w0, double w, double th, double g);
-	void flowHopperDP(double w0, double w, double th, double g);
+	void flowHopperDP(double w0, double w, double th, double g, double b);
 	double hopperPackingFraction(std::vector<double>& radii, double w0, double w, double th);
 	void setHopperPackingFraction(std::vector<double>& radii, double phiNew, double w0, double w, double th);
 	void hopperPosVerletSP();

@@ -352,7 +352,7 @@ projList(simSkip)           = [];
 jFrameList(simSkip)         = [];
 enPList(simSkip)            = [];
 enPhiList(simSkip)          = [];
-enCalAList(simSkip)         = [];
+enCalAList(simSkip,:)         = [];
 
 % total number of sims after removing empties
 NSIMS = sum(~simSkip);

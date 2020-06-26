@@ -1230,15 +1230,15 @@ void deformableParticles2D::gravityForces(double g, int dir){
 
 		// compute force on i
 		if (dir == 0){
-			fxtmp = (g/6.0)*((xip1 - xim1)*yi - (2.0*xi + xip1)*yip1 + (2.0*xi + xim1)*yim1);
-			fytmp = (g/6.0)*((xi + xip1)*xip1 - (xim1 + xi)*xim1);
+			fxtmp = -(g/6.0)*((xip1 - xim1)*yi - (2.0*xi + xip1)*yip1 + (2.0*xi + xim1)*yim1);
+			fytmp = -(g/6.0)*((xi + xip1)*xip1 - (xim1 + xi)*xim1);
 		}
 		else{
 			fxtmp = -(g/6.0)*((yi + yip1)*yip1 - (yim1 + yi)*yim1);
 			fytmp = -(g/6.0)*((yip1 - yim1)*xi - (2.0*yi + yip1)*xip1 + (2.0*yi + yim1)*xim1);
 		}
 
-		// add to total force
+		// add to total force (factor of NV is to take mass into account)
 		setVForce(i,0,vforce(i,0) + fxtmp);
 		setVForce(i,1,vforce(i,1) + fytmp);
 	}

@@ -94,10 +94,10 @@ void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double 
 		calA0tmp = nvtmp*tan(PI/nvtmp)/PI;
 
 		// preferred area is regular polygon area
-		a0tmp = nvtmp*pow(radii.at(ci),2.0)*sin(2.0*PI/nvtmp);
+		a0tmp = 0.5*nvtmp*pow(radii.at(ci),2.0)*sin(2.0*PI/nvtmp);
 
 		// initial length of polygon side
-		l0tmp = sqrt(4.0*PI*a0tmp*calA0tmp)/NV;
+		l0tmp = sqrt(4.0*PI*a0tmp*calA0tmp)/nvtmp;
 
 		// set preferred area and length 
 		cell(ci).seta0(a0tmp);
@@ -121,9 +121,6 @@ void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double 
 		// set as initial position of com
 		cell(ci).setCPos(0,xpos);
 		cell(ci).setCPos(1,ypos);
-
-		// initialize vertices as a regular polygon
-		cell(ci).regularPolygon();
 	}
 
 	// initialize phi
@@ -131,14 +128,27 @@ void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double 
 	phi = hopperPackingFraction(radii,w0,w,th);
 	cout << "which is phi = " << phi << endl;
 
-	// initial time scales (t_0^2 = mass*sigma/f_0, mass = 0.25*PI*sigma^2)
+	// initial time scales
 	cout << "		-- Ininitializing time scale" << endl;
-	dt = 0.1*sqrt(0.25*PI);
+	dt = 0.01;
 	dt0 = dt;
 
 	// use FIRE in hopper geometry to relax overlaps
 	cout << "		-- Using FIRE to relax overlaps..." << endl;
 	fireMinimizeHopperSP(radii,w0,w,th);
+
+	// update vertex positions based on cell positions
+	for (ci=0; ci<NCELLS; ci++){		
+
+		// initialize vertices as a regular polygon
+		cell(ci).regularPolygon();
+
+		// update real-space positions
+		for (vi=0; vi<cell(ci).getNV(); vi++){
+			for (d=0; d<NDIM; d++)
+				cell(ci).setVPos(vi,d,cell(ci).cpos(d) + cell(ci).vrel(vi,d));
+		}
+	}
 }
 
 
@@ -201,8 +211,8 @@ void cellPacking2D::fireMinimizeHopperSP(vector<double>& radii, double w0, doubl
 			cout << " 	FIRE MINIMIZATION, itr = " << itr << endl << endl;
 			cout << "===================================================" << endl;
 			cout << "	* Run data:" << endl;
-			cout << "	* K 		= " << Knew/Ktol << endl;
-			cout << "	* Pvirial 	= " << Pvirial/Ptol << endl;
+			cout << "	* K 		= " << Knew << endl;
+			cout << "	* Pvirial 	= " << Pvirial << endl;
 			cout << "	* phi 		= " << phi << endl;
 			cout << "	* dt 		= " << dt << endl;
 			cout << "	* alpha 	= " << alpha << endl;
@@ -333,7 +343,7 @@ void cellPacking2D::fireMinimizeHopperSP(vector<double>& radii, double w0, doubl
 
 		// check for convergence
 		converged = (abs(Pvirial) < Ptol && npPMIN > NMIN);
-		converged = (converged || (abs(Pvirial) > 2*Ptol && Knew < Ktol));
+		converged = (converged || (abs(Pvirial) > Ptol && Knew < Ktol));
 
 		if (converged){
 			cout << "	** FIRE has converged!" << endl;
@@ -1141,9 +1151,10 @@ void cellPacking2D::hopperWallForcesDP(double w0, double w, double th, int close
 void cellPacking2D::hopperDPNVE(double w0, double w, double th, double g, double T0){
 	// local variables
 	int closed = 1;
-	int t, ci, vi, d;
+	int t, ci, vi, vip1, nvtmp, d;
 	double Pvirial, K;
 	double aH, aR, aT;
+	double cxtmp, xi, xip1, yi, yip1, utmp;
 
 	// reservoir area
 	aR = w0*L.at(0);
@@ -1177,6 +1188,32 @@ void cellPacking2D::hopperDPNVE(double w0, double w, double th, double g, double
 			cout << " 		Deformable Particle NVE in hopper geometry, t = " << t << endl << endl;
 			cout << "===================================================" << endl;
 
+			// add gravitiational potential energy to uint
+			for (ci=0; ci<NCELLS; ci++){
+				// get com position
+				cxtmp = 0.0;
+				nvtmp = cell(ci).getNV();
+				for (vi=0; vi<nvtmp; vi++){
+					// next index
+					vip1 = (vi+1) % nvtmp;
+
+					// get vertex coordinates
+					xi = cell(ci).vpos(vi,0);
+					xip1 = cell(ci).vpos(vip1,0);
+
+					yi = cell(ci).vpos(vi,1);
+					yip1 = cell(ci).vpos(vip1,1);
+
+					// add to com
+					cxtmp += (1.0/6.0)*((xi + xip1)*(xi*yip1 - xip1*yi));
+				}
+
+				// add to potential energy
+				utmp = -g*cxtmp;
+				for (vi=0; vi<nvtmp; vi++)
+					cell(ci).setUInt(vi,cell(ci).uInt(vi) + (utmp/nvtmp));
+			}
+
 			// print if object has been opened already
 			if (packingPrintObject.is_open()){
 				cout << "	* Printing DP center positions to file" << endl;
@@ -1189,7 +1226,9 @@ void cellPacking2D::hopperDPNVE(double w0, double w, double th, double g, double
 			}
 			
 			cout << "	* Run data:" << endl;
-			cout << "	* K 		= " << K << endl;
+			cout << "	* U 		= " << totalPotentialEnergy() << endl;
+			cout << "	* K 		= " << totalKineticEnergy() << endl;
+			cout << "	* E 		= " << totalPotentialEnergy() + totalKineticEnergy() << endl;
 			cout << "	* virial P 	= " << Pvirial << endl;
 			cout << "	* dt 		= " << dt << endl;
 			cout << endl << endl;
@@ -1524,8 +1563,102 @@ void cellPacking2D::flowHopperSP(vector<double>& radii, double w0, double w, dou
 
 
 // function to flow cells through hopper as deformable particles (DP) using body force of scale g
-void cellPacking2D::flowHopperDP(double w0, double w, double th, double g){
+void cellPacking2D::flowHopperDP(double w0, double w, double th, double g, double b){
+	// local variables
+	int closed = 0;
+	int t, ci, vi, vip1, nvtmp, d;
+	double Pvirial, K;
+	double aH, aR, aT;
+	double cxtmp, xi, xip1, yi, yip1, utmp;
 
+	// reservoir area
+	aR = w0*L.at(0);
+
+	// hopper area
+	aH = w*w0 + pow(w0-w,2)/(4.0*tan(th));
+
+	// total area
+	aT = aR + aH;
+
+	// check that NT has been set 
+	if (NT <= 0){
+		cout << "	** ERROR: in hopper DP NVE, sim length NT = " << NT << ", which is <= 0. ending." << endl;
+		exit(1);
+	}
+
+	// loop over time, run NVE dynamics
+	for (t=0; t<NT; t++){
+		// update virial pressure
+		Pvirial = 0.5*(sigmaXX + sigmaYY)/(NCELLS*aT);
+
+		// update kinetic energy based on com velocity
+		K = totalKineticEnergy();
+
+		// output some information to console
+		if (t % NPRINT == 0){
+			cout << "===================================================" << endl << endl;
+			cout << " 		Deformable Particle NVE in hopper geometry, t = " << t << endl << endl;
+			cout << "===================================================" << endl;
+
+			// add gravitiational potential energy to uint
+			for (ci=0; ci<NCELLS; ci++){
+				// get com position
+				cxtmp = 0.0;
+				nvtmp = cell(ci).getNV();
+				for (vi=0; vi<nvtmp; vi++){
+					// next index
+					vip1 = (vi+1) % nvtmp;
+
+					// get vertex coordinates
+					xi = cell(ci).vpos(vi,0);
+					xip1 = cell(ci).vpos(vip1,0);
+
+					yi = cell(ci).vpos(vi,1);
+					yip1 = cell(ci).vpos(vip1,1);
+
+					// add to com
+					cxtmp += (1.0/6.0)*((xi + xip1)*(xi*yip1 - xip1*yi));
+				}
+
+				// add to potential energy
+				utmp = -g*cxtmp;
+				for (vi=0; vi<nvtmp; vi++)
+					cell(ci).setUInt(vi,cell(ci).uInt(vi) + (utmp/nvtmp));
+			}
+
+			// print if object has been opened already
+			if (packingPrintObject.is_open()){
+				cout << "	* Printing DP center positions to file" << endl;
+				printHopperDP(w0, w, th);
+			}
+			
+			if (energyPrintObject.is_open()){
+				cout << "	* Printing DP energy to file" << endl;
+				printSystemEnergy();
+			}
+			
+			cout << "	* Run data:" << endl;
+			cout << "	* U 		= " << totalPotentialEnergy() << endl;
+			cout << "	* K 		= " << totalKineticEnergy() << endl;
+			cout << "	* E 		= " << totalPotentialEnergy() + totalKineticEnergy() << endl;
+			cout << "	* virial P 	= " << Pvirial << endl;
+			cout << "	* dt 		= " << dt << endl;
+			cout << endl << endl;
+		}
+
+		// VV update in FIRE 2.0: position update
+		for (ci=0; ci<NCELLS; ci++){
+			cell(ci).verletPositionUpdate(dt);
+			cell(ci).updateCPos();
+		}
+
+		// calculate forces
+		hopperForcesDP(w0, w, th, g, closed);
+
+		// VV update in FIRE 2.0: Velocity update 2 with damping
+		for (ci=0; ci<NCELLS; ci++)
+			cell(ci).verletVelocityUpdate(dt,b);
+	}
 }
 
 

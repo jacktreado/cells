@@ -164,9 +164,10 @@ int main(int argc, char const *argv[])
 	}
 
 	// print final configuration
-	cout << "	** at it = " << it << ", outputting FINAL vdos and config to files..." << endl;
+	cout << "	** at it = " << it << ", outputting FINAL vdos, config and energy to files..." << endl;
 	packingObject.vdos();
 	packingObject.printJammedConfig();
+	packingObject.printSystemEnergy(1);
 
 	cout << "	** FINISHED COMPRESSING ABOVE JAMMING, ENDING MAIN FILE" << endl;
 	return 0;
