@@ -18,8 +18,8 @@ NDOFList        = zeros(NSIM,1);        % total # of degrees of freedom in each 
 NFRAMEList      = zeros(NSIM,1);        % total # of frames for each sim
 NvList          = cell(NSIM,1);         % # of vertices on each particle
 LList           = zeros(NSIM,2);        % box lengths
-a0List          = zeros(NSIM,1);        % particle preferred area list
-l0List          = zeros(NSIM,1);        % vertex size list
+a0List          = cell(NSIM,1);        % particle preferred area list
+l0List          = cell(NSIM,1);        % vertex size list
 
 % containers for extracted VDOS data
 pList           = cell(NSIM,1);         % list of positive pressures
