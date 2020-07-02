@@ -21,24 +21,24 @@ const double PI = 4.0*atan(1);
 
 // simulation constants
 const int NV 					= 12;			// number of vertices
-const int seed 					= 20;			// initial seed
-const int NT 					= 1e5;			// number of time steps for flow simulation
-const int NPRINT 				= 2e2;			// number of steps between printing
+const int seed 					= 1;			// initial seed
+const int NT 					= 2e5;			// number of time steps for flow simulation
+const int NPRINT 				= 5e2;			// number of steps between printing
 const double smallRadius 		= 0.5;			// radius fo smaller particles (diameter is length unit)
 const double sizeRatio 			= 1.4;			// ratio of small diameter to large diameter
 const double w0 				= 10.0;			// width of hopper reservoir (in units of small diameter)
 const double w 					= 1.5;			// orifice width (in units of small diameter)
 const double th 				= PI/6.0;		// hopper angle (pi - th = deflection angle from horizontal)
 const double phi0 				= 0.4;			// initial packing fraction
-const double T 					= 1e-2;			// constant temperature
-const double timeStepMag 		= 0.05;			// time step
+const double T 					= 1e-4;			// constant temperature
+const double timeStepMag 		= 0.01;			// time step
 
 // force parameters
 const double ka 			= 1.0;				// area force constant (should be = 1)
 const double kl 			= 1.0;				// perimeter force constant
 const double kb 			= 0.0;				// bending force constant
 const double gam 			= 0.0;				// surface tension force constant
-const double kint 			= 0.5;				// interaction energy constant
+const double kint 			= 1.0;				// interaction energy constant
 const double a 				= 0.0;				// attraction parameter 
 const double del 			= 1.0;				// radius of vertices in units of l0
 
@@ -100,10 +100,10 @@ int main()
 	packingObject.initializeHopperSP(radii,w0,w,th,Lmin,NV);
 
 	// check hopper NVE
-	double g = 0.1;
+	double g = 0.005;
 	cout << "	** Running hopper NVE with g = " << g << endl;
-	// packingObject.hopperDPNVE(w0,w,th,g,T);
-	packingObject.flowHopperDP(w0,w,th,g,b);
+	packingObject.hopperDPNVE(w0,w,th,g,T);
+	// packingObject.flowHopperDP(w0,w,th,g,b);
 
 	return 0;
 }

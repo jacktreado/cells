@@ -1,8 +1,7 @@
 /*
 
-	Main file to start with a random distribution of 
-	particles in a hopper reservoir, and then flow
-	toward orifice with body force of strength g/f_0 (f_0 = 1)
+	Main file to start flow of bidisperse 
+	repulsive DPM particles in hopper
 
 	Input parameters:
 		-- NCELLS: 				number of cells
@@ -31,91 +30,110 @@ using namespace std;
 const double PI = 4.0*atan(1);
 
 // simulation constants
-const int NPRINT 				= 2e2;			// number of steps between printing
-const int NV 					= 12;			// number of vertices (not important for SP model)
-const double meanRadius 		= 0.5;			// mean radius (diameter is length unit)
-const double th 				= PI/3.0;		// hopper angle (pi - th = deflection angle from horizontal)
+const int NPRINT 				= 5e2;			// number of steps between printing
+const double smallRadius 		= 0.5;			// radius fo smaller particles (diameter is length unit)
+const double sizeRatio 			= 1.4;			// ratio of small diameter to large diameter
+const double th 				= PI/6.0;		// hopper angle (pi - th = deflection angle from horizontal)
+const double b 					= 0.1;			// damping coefficient
+const double timeStepMag 		= 0.01;			// time step
+
+// force parameters
+const double ka 			= 1.0;				// area force constant (should be = 1)
+const double kint 			= 1.0;				// interaction energy constant
+const double a 				= 0.0;				// attraction parameter 
+const double del 			= 1.0;				// radius of vertices in units of l0
+const double calA0 			= 1.0;				// target shape parameter, set to 1 for hopper simulations
 
 // int main
 int main(int argc, char const *argv[])
 {
 	// local variables
 	int ci;
-	double r1, r2, grv, Lmin;
+	double Lmin;
 
 	// inputs from command line
 	string NCELLS_str 			= argv[1];
-	string NT_str 				= argv[2];
-	string sizeDisp_str 		= argv[3];
+	string NV_str 				= argv[2];
+	string NT_str 				= argv[3];
 	string g_str 				= argv[4];
 	string w0_str				= argv[5];
 	string w_str 				= argv[6];
-	string seed_str 			= argv[7];
-	string positionFile			= argv[8];
+	string kl_str 				= argv[7];
+	string gam_str 				= argv[8];
+	string kb_str 				= argv[9];
+	string seed_str 			= argv[10];
+	string positionFile			= argv[11];
 
 	// load strings into sstream
 	stringstream NCELLSss(NCELLS_str);
+	stringstream NVss(NV_str);
 	stringstream NTss(NT_str);
-	stringstream sizeDispss(sizeDisp_str);
 	stringstream gss(g_str);
 	stringstream w0ss(w0_str);
 	stringstream wss(w_str);
+	stringstream klss(kl_str);
+	stringstream gamss(gam_str);
+	stringstream kbss(kb_str);
 	stringstream seedss(seed_str);
 
 	// read-in variables
-	int NCELLS, NT, seed;
-	double NT_dbl, L, sizeDispersion, g, w0, w;
+	int NCELLS, NV, NT, seed;
+	double NT_dbl, L, g, w0, w, kl, gam, kb;
 
 	// parse values from strings
 	NCELLSss 		>> NCELLS;
+	NVss 			>> NV;
 	NTss 			>> NT_dbl;
-	sizeDispss 		>> sizeDispersion;
 	gss				>> g;
 	w0ss 			>> w0;
 	wss 			>> w;
+	klss 			>> kl;
+	gamss 			>> gam;
+	kbss 			>> kb;
 	seedss 			>> seed;
 
 	// get integer NT from input double value
 	NT = (int)round(NT_dbl);
 
-	// seed random number generator
-	srand48(341234018*seed);
-
-	// determine L from hopper geometry parameters
+	// determine L from w0, w, th
 	L = 0.5*(w0 - w)/tan(th);
-
-	// initialize radii as gaussian random variables
-	vector<double> radii(NCELLS,0.0);
-	for (ci=0; ci<NCELLS; ci++){
-		// generate random numbers
-		r1 = drand48();
-		r2 = drand48();
-
-		// calculate gaussian random variable using Box-Muller transform
-		grv = sqrt(-2.0*log(r1))*cos(2*PI*r2);
-
-		// get radius
-		radii.at(ci) = grv*sizeDispersion + meanRadius;
-	}
 
 	// determine scale of reservoir size to make sure that phi \approx 2 given width
 	Lmin = (NCELLS*PI)/(L*w0*3.0);
 
+	// initialize radii
+	vector<double> radii(NCELLS,0.0);
+	for (ci=0; ci<NCELLS; ci++){
+		if (ci < round(0.5*NCELLS))
+			radii.at(ci) = smallRadius;
+		else
+			radii.at(ci) = smallRadius*sizeRatio;
+	}
+
 	// instantiate object
 	cout << "	** Instantiating object with NCELLS = " << NCELLS << endl;
 	cellPacking2D packingObject(NCELLS,NT,NPRINT,L,seed);
+
+	// set deformability, force values
+	packingObject.forceVals(calA0,ka,kl,gam,kb,kint,del,a);
+
+	// update time scale
+	packingObject.vertexDPMTimeScale(timeStepMag);
 
 	// open print objects
 	cout << "	** Opening printing objects for positions and energy " << endl;
 	packingObject.openPackingObject(positionFile);
 
 	// initialize positions in hopper reservoir
-	cout << "	** Relaxing particle positions using SP model" << endl;
+	cout << "	** Initially placing particles in hopper using SP model" << endl;
 	packingObject.initializeHopperSP(radii,w0,w,th,Lmin,NV);
 
-	// flow particles through hopper with force strength g
-	cout << "	** Running hopper FLOW with g = " << g << endl;
-	packingObject.flowHopperSP(radii,w0,w,th,g);
+	// run flow simulation for NT time steps
+	cout << "	** Running hopper DPM flow with g = " << g << endl;
+	packingObject.flowHopperDP(w0,w,th,g,b);
 
+
+	// print ending statement
+	cout <<" 	** FINISHED RUNNING DP HOPPER FLOW FOR NT = " << NT << " TIME STEPS, ENDING. " << endl;
 	return 0;
 }
