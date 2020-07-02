@@ -18,8 +18,8 @@ NDOFList        = zeros(NSIM,1);        % total # of degrees of freedom in each 
 NFRAMEList      = zeros(NSIM,1);        % total # of frames for each sim
 NvList          = cell(NSIM,1);         % # of vertices on each particle
 LList           = zeros(NSIM,2);        % box lengths
-a0List          = cell(NSIM,1);        % particle preferred area list
-l0List          = cell(NSIM,1);        % vertex size list
+a0List          = cell(NSIM,1);         % particle preferred area list
+l0List          = cell(NSIM,1);         % vertex size list
 
 % containers for extracted VDOS data
 pList           = cell(NSIM,1);         % list of positive pressures
@@ -30,7 +30,7 @@ lambdaMatList   = cell(NSIM,1);         % matrix of lambda values as a function 
 stiffEVMatList  = cell(NSIM,1);         % matrix of eigenvalues from stiffness matrix
 vertexPrList    = cell(NSIM,1);         % vertex participation ratio as a function of pressure
 cellPrList      = cell(NSIM,1);         % cell participation ratio as a function of pressure     
-projList        = cell(NSIM,3);         % mode projection as a function of pressure
+projList        = cell(NSIM,1);         % mode projection as a function of pressure (Dong's 3 directions, Frenet-Serret)
 
 % containers for extracted energetic data
 jFrameList      = cell(NSIM,1);         % map from energetic frame list to vdos frame list
@@ -106,10 +106,6 @@ for ss = 1:NSIM
     NCELLS                  = cellJamData.NCELLS;
     L                       = cellJamData.L;
     nv                      = cellJamData.nv(1,:);
-    
-    % particle size information
-    a0List{ss}              = cellJamData.a0;
-    l0List{ss}              = cellJamData.l0;
         
     % total number of degrees of freedom
     NVTOT                   = sum(nv);
@@ -175,6 +171,10 @@ for ss = 1:NSIM
     % parse and sort vdos data
     NvvInput                = cellJamData.Nvv;
     NccInput                = cellJamData.Ncc;
+    xposInput               = cellJamData.xpos;
+    yposInput               = cellJamData.ypos;
+    l0Input                 = cellJamData.l0;
+    a0Input                 = cellJamData.a0;
     lambdaInput             = cellVDOSData.totalEvals;
     evecsInput              = cellVDOSData.totalEvecs;
     totalStEvalsInput       = cellVDOSData.totalStEvals;
@@ -186,6 +186,10 @@ for ss = 1:NSIM
     evecsPos                = evecsInput(ssPos);
     Ppos                    = P(P > PCUT);
     NPOSFRAMES              = sum(P > PCUT);
+    xpos                    = xposInput(ssPos,:);
+    ypos                    = yposInput(ssPos,:);
+    l0Pos                   = l0Input(ssPos,:);
+    a0Pos                   = a0Input(ssPos,:);
     
     NFRAMEList(ss)          = NPOSFRAMES;
     
@@ -195,6 +199,8 @@ for ss = 1:NSIM
     pList{ss}               = Ppos;
     NvvList{ss}             = NvvPos;
     NccList{ss}             = NccPos;
+    l0List{ss}              = l0Pos;
+    a0List{ss}              = a0Pos;
     
     fprintf('\t ** -- Eigenvalue matrix...\n');
     
@@ -269,7 +275,7 @@ for ss = 1:NSIM
     fprintf('\t ** -- Mode projections...\n');
     
     % compute projections for each pressure
-    projections = cell(NPOSFRAMES,3);
+    projections = cell(NPOSFRAMES,5);
     for pp = 1:NPOSFRAMES
         % swap eigenvector order for use in Dong's code
         evectmp = evecsPos{pp};
@@ -291,9 +297,9 @@ for ss = 1:NSIM
         yall = zeros(NVTOT,1);
         Dc = zeros(NCELLS,1);
 
-        xtmp = cellJamData.xpos(pp,:);
-        ytmp = cellJamData.ypos(pp,:);
-        l0tmp = cellJamData.l0(pp,:);
+        xtmp = xpos(pp,:);
+        ytmp = ypos(pp,:);
+        l0tmp = l0Pos(pp,:);
         last = 1;
 
         for nn = 1:NCELLS
@@ -313,7 +319,63 @@ for ss = 1:NSIM
         projections{pp,1} = V2_norm(1,:)';
         projections{pp,2} = V2_norm(2,:)';
         projections{pp,3} = V2_norm(3,:)';
+        
+        % Project eigenvectors onto frenet serret
+        
+        % compute FS directions
+        tv = zeros(NDOF,1);
+        sv = zeros(NDOF,1);
+        last = 1;
+        for nn = 1:NCELLS
+            % vertex indices
+            ip1 = [(2:nv(nn))'; 1];
+            im1 = [nv(nn); (1:nv(nn)-1)'];
+            
+            % vertex coordinates for cell nn
+            vx = xtmp{nn};
+            vy = ytmp{nn};
+
+            % directions for each vertex, normalized for each cell
+            vl = [vx(ip1) - vx, vy(ip1) - vy];
+            l = sqrt(sum(vl.^2,2));
+            ul = vl./l;
+            ti = ul(im1,:) + ul;
+            ti = ti./sqrt(sum(ti.^2,2));
+            si = ul(im1,:) - ul;
+            si = si./sqrt(sum(si.^2,2));
+            
+            % store in array
+            next = last + 2*nv(nn) - 1;
+            xindnn = last:2:(next-1);
+            yindnn = (last+1):2:next;
+            tv(xindnn) = ti(:,1);
+            tv(yindnn) = ti(:,2);
+            sv(xindnn) = si(:,1);
+            sv(yindnn) = si(:,2);
+            last = next + 1;
+        end
+        
+        % normalize tv and sv across all vertices
+        tvnorm = sqrt(sum(tv.^2));
+        svnorm = sqrt(sum(sv.^2));
+        
+        tv = tv./tvnorm;
+        sv = sv./svnorm;
+        
+        % compute dot product of each constructed direction with
+        % eigenvector
+        t_proj = zeros(NDOF,1);
+        s_proj = zeros(NDOF,1);
+        for dd = 1:NDOF
+            t_proj(dd) = sum(tv.*evectmp(:,dd));
+            s_proj(dd) = sum(sv.*evectmp(:,dd));
+        end
+        
+        % save projection
+        projections{pp,4} = t_proj;
+        projections{pp,5} = s_proj;
     end
+
 
     fprintf('\t ** Finishing storing simulation data...\n');
 
@@ -332,7 +394,7 @@ for ss = 1:NSIM
     
     enStress                = cellEnergyData.stress;
     enPhi                   = cellEnergyData.phi;
-    enP                     = 0.5*(enStress(:,1) + enStress(:,2))/(NCELLS*Lx*Ly);
+    enP                     = 0.5*(enStress(:,1) + enStress(:,3))/(NCELLS*Lx*Ly);
     enCalA                  = cellEnergyData.calA;
     enCalA0                 = cellEnergyData.calA0;
     enPList{ss}             = enP;
@@ -345,7 +407,7 @@ end
 NCELLSList(simSkip)         = [];
 NDOFList(simSkip)           = [];
 NvList(simSkip)             = [];
-LList(simSkip)              = [];
+LList(simSkip,:)            = [];
 a0List(simSkip)             = [];
 l0List(simSkip)             = [];
 pList(simSkip)              = [];
@@ -361,6 +423,7 @@ jFrameList(simSkip)         = [];
 enPList(simSkip)            = [];
 enPhiList(simSkip)          = [];
 enCalAList(simSkip,:)         = [];
+
 
 % total number of sims after removing empties
 NSIMS = sum(~simSkip);
