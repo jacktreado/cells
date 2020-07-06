@@ -20,11 +20,14 @@ NvList          = cell(NSIM,1);         % # of vertices on each particle
 LList           = zeros(NSIM,2);        % box lengths
 a0List          = cell(NSIM,1);         % particle preferred area list
 l0List          = cell(NSIM,1);         % vertex size list
+riList          = cell(NSIM,1);         % number of rattlers list
 
 % containers for extracted VDOS data
 pList           = cell(NSIM,1);         % list of positive pressures
 NvvList         = cell(NSIM,1);         % # of vertex-vertex contacts
 NccList         = cell(NSIM,1);         % # of cell-cell contacts
+NvvrList        = cell(NSIM,1);         % # of vertex-vertex contacts after rattler removal
+NccrList        = cell(NSIM,1);         % # of cell-cell contacts after rattler removal
 NqList          = cell(NSIM,1);         % # of quartic modes, counted by stiffness matrix
 lambdaMatList   = cell(NSIM,1);         % matrix of lambda values as a function of pressure
 stiffEVMatList  = cell(NSIM,1);         % matrix of eigenvalues from stiffness matrix
@@ -376,9 +379,6 @@ for ss = 1:NSIM
         projections{pp,5} = s_proj;
     end
 
-
-    fprintf('\t ** Finishing storing simulation data...\n');
-
     % number of quartic modes
     lambdaMatList{ss}       = lambdaMatrix;
     stiffEVMatList{ss}      = stiffEVMatrix;
@@ -401,6 +401,153 @@ for ss = 1:NSIM
     enPhiList{ss}           = enPhi;
     enCalAList{ss,1}        = enCalA;
     enCalAList{ss,2}        = enCalA0;
+    
+    
+    
+    % -- compute number of rattlers
+    fprintf('\t ** -- Computing rattler data...\n');
+    
+    ritmp = zeros(NPOSFRAMES,NCELLS);
+    Nvvr = zeros(NPOSFRAMES,1);
+    Nccr = zeros(NPOSFRAMES,1);
+    for pp = 1:NPOSFRAMES
+        nvvMeas = 0;
+        nccMeas = 0;
+        
+        % contact matrices
+        cij = zeros(NCELLS);
+        bcij = zeros(NCELLS);
+        
+        % vertex positions and sizes
+        xtmp = xpos(pp,:);
+        ytmp = ypos(pp,:);
+        l0tmp = l0Pos(pp,:);
+            
+        
+        % loop over vertex pairs, try to get correctly Nvv and Ncc
+        for ii = 1:NCELLS
+            xii = xtmp{ii};
+            yii = ytmp{ii};
+            dii = l0tmp(ii);
+            
+            for jj = ii+1:NCELLS
+                xjj = xtmp{jj};
+                yjj = ytmp{jj};
+                djj = l0tmp(jj);
+                
+                ccFound = 0;
+                
+                for aa = 1:nv(ii)
+                    for bb = 1:nv(jj)
+                        sab = 0.5*(dii + djj);
+                        
+                        % scale contact distance by a little bit to make
+                        % contacts easier to count
+                        sab = sab*(1.0 + 1e-8);
+                        
+                        dx = xjj(bb) - xii(aa);
+                        dx = dx - Lx*round(dx/Lx);
+                        
+                        dy = yjj(bb) - yii(aa);
+                        dy = dy - Ly*round(dy/Ly);
+                        
+                        dr = sqrt(dx*dx + dy*dy);
+                        
+                        % if vertices overlap, increase contact count
+                        if dr < sab
+                            if ccFound == 0
+                                nccMeas = nccMeas + 1;
+                                bcij(ii,jj) = 1;
+                                bcij(jj,ii) = 1;
+                                ccFound = 1;
+                            end
+                            nvvMeas = nvvMeas + 1;
+                            cij(ii,jj) = cij(ii,jj) + 1;
+                            cij(jj,ii) = cij(jj,ii) + 1;
+                        end
+                    end
+                end
+            end
+        end
+        
+        dnvv = NvvPos(pp) - nvvMeas;
+        dncc = NccPos(pp) - nccMeas;
+        fprintf('\t\t ** pp = %d, dnvv = %d, dncc = %d\n',pp,dnvv,dncc);
+        
+        % get initial cell contacts
+        zcc = sum(bcij,1);
+        zccInit = zcc;
+        cijInit = cij;
+        bcijInit = bcij;
+        
+        % number of rattlers, marginal rattlers
+        nm = 1;
+        it = 0;
+        itmax = 1e3;
+        while (nm > 0 && it < itmax)
+            
+            % reset marginal count to 0
+            nm = 0;
+            
+            % remove all cells with only 1 cell-cell contact
+            ct1_inds = (zcc == 1);
+            nct = sum(ct1_inds);
+            
+            nm = nm + nct;
+            
+            cij(ct1_inds,:) = zeros(nct,NCELLS);
+            cij(:,ct1_inds) = zeros(NCELLS,nct);
+            
+            bcij(ct1_inds,:) = zeros(nct,NCELLS);
+            bcij(:,ct1_inds) = zeros(NCELLS,nct);
+            
+            % update zcc
+            zcc = sum(bcij,1);
+            
+            % remove all cells with 2 cell-cell contacts, at least 1 is
+            % marginal
+            mvvcts = sum(cij == 1,2);
+            ct2_inds = ((mvvcts == 1 | mvvcts == 2) & (zcc == 2)');
+            nct = sum(ct2_inds);
+            
+            nm = nm + nct;
+            
+            cij(ct2_inds,:) = zeros(nct,NCELLS);
+            cij(:,ct2_inds) = zeros(NCELLS,nct);
+            
+            bcij(ct2_inds,:) = zeros(nct,NCELLS);
+            bcij(:,ct2_inds) = zeros(NCELLS,nct);
+            
+            % update zcc
+            zcc = sum(bcij,1);
+            
+            % increase iterate check
+            it = it + 1;
+        end
+        if it == itmax
+            error('Error in processBidConf, iteration max found while removing rattlers.');
+        end
+        
+        % tally up rattlers
+        ri = (zcc == 0);
+        
+        
+        % compute nvv and ncc after rattler removal
+        zvv = sum(cij,1);
+        
+        Nvvr(pp) = NCELLS*mean(zvv)/2;
+        Nccr(pp) = NCELLS*mean(zcc)/2;
+        
+        % save for this pressure
+        ritmp(pp,:) = ri';
+    end
+    
+    % save rattker matrix to list
+    riList{ss} = ritmp;
+    NvvrList{ss} = Nvvr;
+    NccrList{ss} = Nccr;
+    
+    fprintf('\t ** Finishing storing simulation data for ss = %d...\n',ss);
 end
 
 % delete any entries that were skipped
@@ -413,6 +560,8 @@ l0List(simSkip)             = [];
 pList(simSkip)              = [];
 NvvList(simSkip)            = [];
 NccList(simSkip)            = [];
+NvvrList(simSkip)           = [];
+NccrList(simSkip)           = [];
 NqList(simSkip)             = [];
 lambdaMatList(simSkip)      = [];
 stiffEVMatList(simSkip)     = [];
@@ -422,8 +571,8 @@ projList(simSkip)           = [];
 jFrameList(simSkip)         = [];
 enPList(simSkip)            = [];
 enPhiList(simSkip)          = [];
-enCalAList(simSkip,:)         = [];
-
+enCalAList(simSkip,:)       = [];
+riList(simSkip)             = [];
 
 % total number of sims after removing empties
 NSIMS = sum(~simSkip);
@@ -435,8 +584,9 @@ fprintf('\t ** saving to %s\n',saveStr);
 
 save(saveStr,...
     'NSIMS','simStr','NCELLSList','NDOFList','NvList','LList','a0List','l0List',...
-    'NFRAMEList','pList','NvvList','NccList','NqList',...
+    'NFRAMEList','pList','NvvList','NccList','NvvrList','NccrList','NqList',...
     'lambdaMatList','stiffEVMatList','vertexPrList','cellPrList','projList',...
-    'jFrameList','enPList','enPhiList','enCalAList');
+    'jFrameList','enPList','enPhiList','enCalAList','riList');
 
 end
+
