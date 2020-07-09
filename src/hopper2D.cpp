@@ -28,26 +28,24 @@ const double PI = 4*atan(1);
 // 	** SET PBCS TO 0
 // 
 // 
-// 	******************************************************************************************
-// 	NOTE ABOUT LEN: right now, assume using the constructor that assigns Lx = Ly = input, so 
-//  use of L in the below code will always be L.at(0). A BETTER WAY TO DO IT would be to 
-//  use Lx = L.at(0) = the L parameter (length of tapered region) and Ly = L.at(1) = w0, 
-//  i.e. width of hopper in y-direction. Then you can eliminate the th variable and calculate
-// 	it in situ, and decrease the number of required input parameters
-// 	******************************************************************************************
 // 
 // 
-// 	NOTE: radii should be input in units of sigma, the mean particle diameter
-// 		** also will give the ratio of nv_i to NV, the number of vertices on the mean
+// 	07/09/2020: NOTE THAT THIS INITIALIZES FOR DPM; for SP, may have issues because L is necessarily different
+// 				NEED TO write different initialization for DPM
+
 void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double w, double th, double Lmin, int NV){
 	// local variables
 	int ci, vi, d, nvtmp;
 	double a0tmp, l0tmp, calA0tmp;
 	double xpos, ypos;
 	double xmin, xmax, ymin, ymax;
+	double vrmin, Ltmp;
 
 	// minimum number of vertices
 	const int nvmin = 12;
+
+	// random number generator
+	srand48(10*seed);
 
 	// check inputs to hopper initialization
 	if (w0 < 0.0){
@@ -73,11 +71,9 @@ void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double 
 	// initialize cell information
 	cout << "		-- Ininitializing cell objects" << endl;
 	for (ci=0; ci<NCELLS; ci++){
-		// boundary information ( SET PBCS TO 1 )
-		for (d=0; d<NDIM; d++){
-			cell(ci).setL(d,L.at(0));
+		// boundary information ( SET PBCS TO 0 )
+		for (d=0; d<NDIM; d++)
 			cell(ci).setpbc(d,0);
-		}
 
 		// number of vertices ( SIGMA SETS # OF VERTS )
 		nvtmp = round(2.0*radii.at(ci)*NV);
@@ -105,6 +101,15 @@ void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double 
 		cell(ci).setdel(1.0);
 	}
 
+	// initialize L based on smallest vertex radius
+	vrmin = 0.5*cell(0).getl0();
+	Ltmp = 0.5*(w0 - w)*tan(th) + vrmin*((1.0/cos(th)) + 1.0 - tan(th));
+	L.at(0) = Ltmp;
+	for (ci=0; ci<NCELLS; ci++){
+		for (d=0; d<NDIM; d++)
+			cell(ci).setL(d,Ltmp);
+	}
+
 	// initialize particle positions
 	cout << "		-- Ininitializing cell positions" << endl;
 	for (ci=0; ci<NCELLS; ci++){
@@ -114,7 +119,7 @@ void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double 
 		ymin = radii.at(ci);
 		ymax = w0 - radii.at(ci);
 
-		// get random location in hopper RESERVOIR
+		// get random location in hopper reservoir
 		xpos = (xmin-xmax)*drand48() + xmax;
 		ypos = (ymax-ymin)*drand48() + ymin;
 
@@ -134,8 +139,9 @@ void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double 
 	dt0 = dt;
 
 	// slightly increase radii to give more space for dp
+	double rscaleForDP = 1.1;
 	for (ci=0; ci<NCELLS; ci++)
-		radii.at(ci) *= 1.5;
+		radii.at(ci) *= rscaleForDP;
 
 	// use FIRE in hopper geometry to relax overlaps
 	cout << "		-- Using FIRE to relax initial overlaps..." << endl;
@@ -143,7 +149,7 @@ void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double 
 
 	// shrink radii back down for SP runs
 	for (ci=0; ci<NCELLS; ci++)
-		radii.at(ci) /= 1.5;
+		radii.at(ci) /= rscaleForDP;
 
 	// update vertex positions based on cell positions
 	for (ci=0; ci<NCELLS; ci++){		
@@ -891,7 +897,7 @@ void cellPacking2D::hopperWallForcesDP(double w0, double w, double th, int close
 			sib = 0.5*(sigma + sb);
 
 			// x cutoff for bead interaction
-			xedge = xtb - sib*s;
+			xedge = xtb - sib*c;
 
 			// get particle positions
 			x = cell(ci).vpos(vi,0);
@@ -902,17 +908,13 @@ void cellPacking2D::hopperWallForcesDP(double w0, double w, double th, int close
 				// if vertex in hopper bulk
 				if (x < xedge){
 					// check ymin for walls
-					yPlusMin 	= w0 - x*t - 0.5*sigma/c;
-					yMinusMax 	= x*t + 0.5*sigma/c;
+					yPlusMin 	= w0 - (x/t) - (0.5*sigma/s);
+					yMinusMax 	= (x/t) + (0.5*sigma/s);
 
 					// if true, interacting with bottom wall
 					if (y < yMinusMax){
-						// vector to wall
-						lwx = s*(x*s - y*c);
-						lwy = c*(y*c - x*s);
-
 						// distance to wall
-						lw = sqrt(lwx*lwx + lwy*lwy);
+						lw = (y - x/t)*s;
 
 						if (lw < 0.5*sigma){
 							// overlap with wall
@@ -920,28 +922,24 @@ void cellPacking2D::hopperWallForcesDP(double w0, double w, double th, int close
 
 							// force
 							ftmp = (2.0/sigma)*(1 - overlap);
-							cell(ci).setVForce(vi,0,cell(ci).vforce(vi,0) + ftmp*(lwx/lw));
-							cell(ci).setVForce(vi,1,cell(ci).vforce(vi,1) + ftmp*(lwy/lw));
+							cell(ci).setVForce(vi,0,cell(ci).vforce(vi,0) - ftmp*c);
+							cell(ci).setVForce(vi,1,cell(ci).vforce(vi,1) + ftmp*s);
 
 							// add to energies
 							utmp = 0.5*pow(1 - overlap,2);
 							cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp);
 
 							// add to net force on bottom wall
-							sigmaYX -= ftmp*(lwx/lw);
-							sigmaYY -= ftmp*(lwy/lw);
+							sigmaYX += ftmp*c;
+							sigmaYY -= ftmp*s;
 						}
 					}
 
 
 					// if true, interacting with top wall
 					if (y > yPlusMin){
-						// vector to wall
-						lwx = s*(x*s + (y - w0)*c);
-						lwy = c*((y - w0)*c + x*s);
-
-						// distance
-						lw = sqrt(lwx*lwx + lwy*lwy);
+						// distance to wall
+						lw = (w0 - x/t - y)*s;
 
 						if (lw < 0.5*sigma){
 							// overlap with wall
@@ -949,16 +947,16 @@ void cellPacking2D::hopperWallForcesDP(double w0, double w, double th, int close
 
 							// force
 							ftmp = (2.0/sigma)*(1 - overlap);
-							cell(ci).setVForce(vi,0,cell(ci).vforce(vi,0) + ftmp*(lwx/lw));
-							cell(ci).setVForce(vi,1,cell(ci).vforce(vi,1) + ftmp*(lwy/lw));
+							cell(ci).setVForce(vi,0,cell(ci).vforce(vi,0) - ftmp*c);
+							cell(ci).setVForce(vi,1,cell(ci).vforce(vi,1) - ftmp*s);
 
 							// add to energies
 							utmp = 0.5*pow(1 - overlap,2);
 							cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp);
 
 							// add to net force on top wall
-							sigmaXX -= ftmp*(lwx/lw);
-							sigmaXY -= ftmp*(lwy/lw);
+							sigmaXX += ftmp*c;
+							sigmaXY += ftmp*s;
 						}
 					}
 				}
@@ -970,14 +968,10 @@ void cellPacking2D::hopperWallForcesDP(double w0, double w, double th, int close
 						// define line separating wall force and edge force regime
 						yline = (x - xtb)/t + ytb;
 
-						// if above yline, use wall force
+						// if above yline, use wall force from top wall
 						if (y > yline){
-							// vector to wall
-							lwx = s*(x*s + (y - w0)*c);
-							lwy = c*((y - w0)*c + x*s);
-
 							// distance
-							lw = sqrt(lwx*lwx + lwy*lwy);
+							lw = (w0 - (x/t) - y)*s;
 
 							if (lw < 0.5*sigma){
 								// overlap with wall
@@ -985,16 +979,16 @@ void cellPacking2D::hopperWallForcesDP(double w0, double w, double th, int close
 
 								// force
 								ftmp = (2.0/sigma)*(1 - overlap);
-								cell(ci).setVForce(vi,0,cell(ci).vforce(vi,0) + ftmp*(lwx/lw));
-								cell(ci).setVForce(vi,1,cell(ci).vforce(vi,1) + ftmp*(lwy/lw));
+								cell(ci).setVForce(vi,0,cell(ci).vforce(vi,0) - ftmp*c);
+								cell(ci).setVForce(vi,1,cell(ci).vforce(vi,1) - ftmp*s);
 
 								// add to energies
 								utmp = 0.5*pow(1 - overlap,2);
 								cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp);
 
 								// add to net force on top wall
-								sigmaXX -= ftmp*(lwx/lw);
-								sigmaXY -= ftmp*(lwy/lw);
+								sigmaXX += ftmp*c;
+								sigmaXY += ftmp*s;
 							}
 						}
 						// else, check overlap with bead
@@ -1003,15 +997,15 @@ void cellPacking2D::hopperWallForcesDP(double w0, double w, double th, int close
 							lwx = x - xtb;
 							lwy = y - ytb;
 
-							// distance to bead center
-							lw = sqrt(lwx*lwx + lwy*lwy);
+							// distance to bead center edge
+							lw = sqrt(lwx*lwx + lwy*lwy) - 0.5*sb;
 
-							if (lw < sib){
+							if (lw < 0.5*sigma){
 								// overlap with wall (use bead edge, not center)
-								overlap = lw/sib;
+								overlap = 2.0*lw/sigma;
 
 								// force
-								ftmp = (1 - overlap)/sib;
+								ftmp = (2.0/sigma)*(1 - overlap);
 								cell(ci).setVForce(vi,0,cell(ci).vforce(vi,0) + ftmp*(lwx/lw));
 								cell(ci).setVForce(vi,1,cell(ci).vforce(vi,1) + ftmp*(lwy/lw));
 
@@ -1032,12 +1026,8 @@ void cellPacking2D::hopperWallForcesDP(double w0, double w, double th, int close
 
 						// if below yline, use wall force
 						if (y < yline){
-							// vector to wall
-							lwx = s*(x*s - y*c);
-							lwy = c*(y*c - x*s);
-
-							// distance to bead center
-							lw = sqrt(lwx*lwx + lwy*lwy);
+							// distance to wall
+							lw = (y - (x/t))*s;
 
 							if (lw < 0.5*sigma){
 								// overlap with wall
@@ -1045,16 +1035,16 @@ void cellPacking2D::hopperWallForcesDP(double w0, double w, double th, int close
 
 								// force
 								ftmp = (2.0/sigma)*(1 - overlap);
-								cell(ci).setVForce(vi,0,cell(ci).vforce(vi,0) + ftmp*(lwx/lw));
-								cell(ci).setVForce(vi,1,cell(ci).vforce(vi,1) + ftmp*(lwy/lw));
+								cell(ci).setVForce(vi,0,cell(ci).vforce(vi,0) - ftmp*c);
+								cell(ci).setVForce(vi,1,cell(ci).vforce(vi,1) + ftmp*s);
 
 								// add to energies
 								utmp = 0.5*pow(1 - overlap,2);
 								cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp);
 
 								// add to net force on bottom wall
-								sigmaYX -= ftmp*(lwx/lw);
-								sigmaYY -= ftmp*(lwy/lw);
+								sigmaYX += ftmp*c;
+								sigmaYY -= ftmp*s;
 							}
 						}
 						// else, check overlap with bottom bead						
@@ -1064,14 +1054,14 @@ void cellPacking2D::hopperWallForcesDP(double w0, double w, double th, int close
 							lwy = y - ybb;
 
 							// distance
-							lw = sqrt(lwx*lwx + lwy*lwy);
+							lw = sqrt(lwx*lwx + lwy*lwy) - 0.5*sb;
 
-							if (lw < sib){
+							if (lw < 0.5*sigma){
 								// overlap with wall (use bead edge, not center)
-								overlap = lw/sib;
+								overlap = 2.0*lw/sigma;
 
 								// force
-								ftmp = (1 - overlap)/sib;
+								ftmp = (2.0/sigma)*(1 - overlap);
 								cell(ci).setVForce(vi,0,cell(ci).vforce(vi,0) + ftmp*(lwx/lw));
 								cell(ci).setVForce(vi,1,cell(ci).vforce(vi,1) + ftmp*(lwy/lw));
 
@@ -1168,14 +1158,14 @@ void cellPacking2D::hopperWallForcesDP(double w0, double w, double th, int close
 						lwy = y - ytb;
 
 						// distance
-						lw = sqrt(lwx*lwx + lwy*lwy);
+						lw = sqrt(lwx*lwx + lwy*lwy) - 0.5*sb;
 
-						if (lw < sib){
+						if (lw < 0.5*sigma){
 							// overlap with wall
-							overlap = lw/sib;
+							overlap = 2.0*lw/sigma;
 
 							// force
-							ftmp = (1 - overlap)/sib;
+							ftmp = (2.0/sigma)*(1 - overlap);
 							cell(ci).setVForce(vi,0,cell(ci).vforce(vi,0) + ftmp*(lwx/lw));
 							cell(ci).setVForce(vi,1,cell(ci).vforce(vi,1) + ftmp*(lwy/lw));
 
@@ -1217,14 +1207,14 @@ void cellPacking2D::hopperWallForcesDP(double w0, double w, double th, int close
 						lwy = y - ybb;
 
 						// distance
-						lw = sqrt(lwx*lwx + lwy*lwy);
+						lw = sqrt(lwx*lwx + lwy*lwy) - 0.5*sb;
 
-						if (lw < sib){
+						if (lw < 0.5*sigma){
 							// overlap with wall
-							overlap = lw/sib;
+							overlap = 2.0*lw/sigma;
 
 							// force
-							ftmp = (1 - overlap)/sib;
+							ftmp = (2.0/sigma)*(1 - overlap);
 							cell(ci).setVForce(vi,0,cell(ci).vforce(vi,0) + ftmp*(lwx/lw));
 							cell(ci).setVForce(vi,1,cell(ci).vforce(vi,1) + ftmp*(lwy/lw));
 

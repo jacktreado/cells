@@ -74,7 +74,7 @@ cellPacking2D::cellPacking2D(int ncells, int nt, int nprint, double l, double s)
 	seed = s;
 
 	// set random number generator
-	srand(seed);
+	srand48(seed);
 
 	// first use starting variabls
 	defaultvars();
