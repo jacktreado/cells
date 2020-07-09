@@ -30,12 +30,12 @@ using namespace std;
 const double PI = 4.0*atan(1);
 
 // simulation constants
-const int NPRINT 				= 5e2;			// number of steps between printing
+const int NPRINT 				= 1e3;			// number of steps between printing
 const double smallRadius 		= 0.5;			// radius fo smaller particles (diameter is length unit)
 const double sizeRatio 			= 1.4;			// ratio of small diameter to large diameter
-const double th 				= PI/6.0;		// hopper angle (pi - th = deflection angle from horizontal)
+const double th 				= PI/4.0;		// hopper angle (pi - th = deflection angle from horizontal)
 const double b 					= 0.1;			// damping coefficient
-const double timeStepMag 		= 0.01;			// time step
+const double timeStepMag 		= 0.05;			// time step
 
 // force parameters
 const double ka 			= 1.0;				// area force constant (should be = 1)
@@ -95,12 +95,6 @@ int main(int argc, char const *argv[])
 	// get integer NT from input double value
 	NT = (int)round(NT_dbl);
 
-	// determine L from w0, w, th
-	L = 0.5*(w0 - w)/tan(th);
-
-	// determine scale of reservoir size to make sure that phi \approx 2 given width
-	Lmin = (NCELLS*PI)/(L*w0*3.0);
-
 	// initialize radii
 	vector<double> radii(NCELLS,0.0);
 	for (ci=0; ci<NCELLS; ci++){
@@ -110,15 +104,15 @@ int main(int argc, char const *argv[])
 			radii.at(ci) = smallRadius*sizeRatio;
 	}
 
+	// determine scale of reservoir size to make sure that phi \approx 2 given width
+	Lmin = 0.2*w0;
+
 	// instantiate object
 	cout << "	** Instantiating object with NCELLS = " << NCELLS << endl;
 	cellPacking2D packingObject(NCELLS,NT,NPRINT,L,seed);
 
 	// set deformability, force values
 	packingObject.forceVals(calA0,ka,kl,gam,kb,kint,del,a);
-
-	// update time scale
-	packingObject.vertexDPMTimeScale(timeStepMag);
 
 	// open print objects
 	cout << "	** Opening printing objects for positions and energy " << endl;
@@ -127,6 +121,9 @@ int main(int argc, char const *argv[])
 	// initialize positions in hopper reservoir
 	cout << "	** Initially placing particles in hopper using SP model" << endl;
 	packingObject.initializeHopperSP(radii,w0,w,th,Lmin,NV);
+
+	// update time scale
+	packingObject.vertexDPMTimeScale(timeStepMag);
 
 	// run flow simulation for NT time steps
 	cout << "	** Running hopper DPM flow with g = " << g << endl;
