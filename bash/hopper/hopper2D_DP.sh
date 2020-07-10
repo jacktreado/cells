@@ -39,7 +39,7 @@ let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=hopper2D_DP_N"$NCELLS"_NT"$NT"_g"$g"_w0"$w0"_w"$w"_kl"$kl"_gam"$gam"_kb"$kb"
+basestr=hopper2D_DP_N"$NCELLS"_NV"$NV"_g"$g"_w0"$w0"_w"$w"_kl"$kl"_gam"$gam"_kb"$kb"
 runstr="$basestr"_si"$startSeed"_sf"$endSeed"
 
 # make directory specific for this simulation
