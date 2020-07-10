@@ -109,7 +109,7 @@ int main(int argc, char const *argv[])
 
 	// instantiate object
 	cout << "	** Instantiating object with NCELLS = " << NCELLS << endl;
-	cellPacking2D packingObject(NCELLS,NT,NPRINT,L,seed);
+	cellPacking2D packingObject(NCELLS,NT,NPRINT,Lmin,seed);
 
 	// set deformability, force values
 	packingObject.forceVals(calA0,ka,kl,gam,kb,kint,del,a);
