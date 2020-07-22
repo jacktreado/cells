@@ -20,7 +20,7 @@ using namespace std;
 const double PI = 4.0*atan(1);
 
 // simulation constants
-const int NV 					= 24;			// number of vertices
+const int NV 					= 12;			// number of vertices
 const int seed 					= 1;			// initial seed
 const int NT 					= 2e5;			// number of time steps for flow simulation
 const int NPRINT 				= 1e3;			// number of steps between printing
@@ -35,9 +35,9 @@ const double timeStepMag 		= 0.01;			// time step
 
 // force parameters
 const double ka 			= 1.0;				// area force constant (should be = 1)
-const double kl 			= 1.0;			// perimeter force constant
+const double kl 			= 0.0;			// perimeter force constant
 const double kb 			= 0.0;				// bending force constant
-const double gam 			= 0.0;				// surface tension force constant
+const double gam 			= 0.01;				// surface tension force constant
 const double kint 			= 1.0;				// interaction energy constant
 const double a 				= 0.0;				// attraction parameter 
 const double del 			= 1.0;				// radius of vertices in units of l0

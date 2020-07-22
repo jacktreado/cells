@@ -370,8 +370,13 @@ for ss = 1:NSIM
         t_proj = zeros(NDOF,1);
         s_proj = zeros(NDOF,1);
         for dd = 1:NDOF
-            t_proj(dd) = sum(abs(tv.*evectmp(:,dd)));
-            s_proj(dd) = sum(abs(sv.*evectmp(:,dd)));
+            evtmp = evectmp(:,dd);
+            for vv = 1:NV
+                xi = 2*vv - 1;
+                yi = 2*vv;
+                t_proj(dd) = tprod(dd) + abs(tv(xi)*evtmp(xi) + tv(yi)*evtmp(yi));
+                s_proj(dd) = sprod(dd) + abs(sv(xi)*evtmp(xi) + sv(yi)*evtmp(yi));
+            end
         end
         
         % save projection
