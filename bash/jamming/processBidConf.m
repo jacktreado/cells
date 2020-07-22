@@ -371,11 +371,15 @@ for ss = 1:NSIM
         s_proj = zeros(NDOF,1);
         for dd = 1:NDOF
             evtmp = evectmp(:,dd);
-            for vv = 1:NV
-                xi = 2*vv - 1;
-                yi = 2*vv;
-                t_proj(dd) = tprod(dd) + abs(tv(xi)*evtmp(xi) + tv(yi)*evtmp(yi));
-                s_proj(dd) = sprod(dd) + abs(sv(xi)*evtmp(xi) + sv(yi)*evtmp(yi));
+            last = 0;
+            for nn = 1:NCELLS
+                for vv = 1:nv(nn)
+                    xi = 2*vv - 1 + last;
+                    yi = 2*vv + last;
+                    t_proj(dd) = tprod(dd) + abs(tv(xi)*evtmp(xi) + tv(yi)*evtmp(yi));
+                    s_proj(dd) = sprod(dd) + abs(sv(xi)*evtmp(xi) + sv(yi)*evtmp(yi));
+                end
+                last = last + 2*nv(nn);
             end
         end
         
