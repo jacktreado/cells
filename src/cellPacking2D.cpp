@@ -2569,7 +2569,7 @@ void cellPacking2D::vdos(){
 		}
 	}
 
-	// compute initial forces to have upodate contact network
+	// compute initial forces to have update contact network
 	calculateForces();
 
 	// Loop over cells, compute shape forces for each individual cell and contributions from

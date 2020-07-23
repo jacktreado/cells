@@ -376,8 +376,8 @@ for ss = 1:NSIM
                 for vv = 1:nv(nn)
                     xi = 2*vv - 1 + last;
                     yi = 2*vv + last;
-                    t_proj(dd) = tprod(dd) + abs(tv(xi)*evtmp(xi) + tv(yi)*evtmp(yi));
-                    s_proj(dd) = sprod(dd) + abs(sv(xi)*evtmp(xi) + sv(yi)*evtmp(yi));
+                    t_proj(dd) = t_proj(dd) + abs(tv(xi)*evtmp(xi) + tv(yi)*evtmp(yi));
+                    s_proj(dd) = s_proj(dd) + abs(sv(xi)*evtmp(xi) + sv(yi)*evtmp(yi));
                 end
                 last = last + 2*nv(nn);
             end
@@ -485,9 +485,6 @@ for ss = 1:NSIM
         
         % get initial cell contacts
         zcc = sum(bcij,1);
-        zccInit = zcc;
-        cijInit = cij;
-        bcijInit = bcij;
         
         % number of rattlers, marginal rattlers
         nm = 1;
