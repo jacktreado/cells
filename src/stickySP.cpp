@@ -615,7 +615,6 @@ void cellPacking2D::stickySPGelationQS(vector<double>& radii, double phiGel, dou
 		cout << "	* old phi 	= " << phi + dphiGel << endl;
 		cout << "	* new phi 	= " << phi << endl;
 		cout << "	* dt 		= " << dt << endl;
-		cout << "	* nc 		= " << totalNumberOfContacts() << endl;
 		cout << endl << endl;
 
 		// relax overlaps
@@ -672,7 +671,6 @@ void cellPacking2D::stickySPGelationRate(vector<double>& radii, double phiGel, d
 			cout << "	* old phi 	= " << phi << endl;
 			cout << "	* new phi 	= " << phitmp << endl;
 			cout << "	* dt 		= " << dt << endl;
-			cout << "	* nc 		= " << totalNumberOfContacts() << endl;
 			cout << endl << endl;
 
 			// print config and energy

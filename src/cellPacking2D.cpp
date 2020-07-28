@@ -448,10 +448,8 @@ void cellPacking2D::operator=(cellPacking2D& onTheRight){
 		cell(ci) = onTheRight.cell(ci);
 
 		// copy elements from contact matrix
-		for (cj=ci+1; cj<NCELLS; cj++){
-			if (onTheRight.contacts(ci,cj))
-				addContact(ci,cj);
-		}
+		for (cj=ci+1; cj<NCELLS; cj++)
+			setContact(ci,cj,onTheRight.contacts(ci,cj));
 	}
 }
 
@@ -483,10 +481,8 @@ void cellPacking2D::saveState(cellPacking2D& saveObject){
 			saveObject.cell(ci) = cell(ci);
 
 			// copy elements from contact matrix
-			for (cj=ci+1; cj<NCELLS; cj++){
-				if (contacts(ci,cj))
-					saveObject.addContact(ci,cj);
-			}
+			for (cj=ci+1; cj<NCELLS; cj++)
+				saveObject.setContact(ci,cj,contacts(ci,cj));
 		}
 	}
 }
@@ -520,10 +516,8 @@ void cellPacking2D::loadState(cellPacking2D& loadObject){
 		cell(ci) = loadObject.cell(ci);
 
 		// copy elements from contact matrix
-		for (cj=ci+1; cj<NCELLS; cj++){
-			if (loadObject.contacts(ci,cj))
-				addContact(ci,cj);
-		}
+		for (cj=ci+1; cj<NCELLS; cj++)
+			setContact(ci,cj,loadObject.contacts(ci,cj));
 	}
 }
 
@@ -774,22 +768,6 @@ int cellPacking2D::contacts(int ci, int cj){
 *************************/
 
 
-// total number of particle-particle contacts
-int cellPacking2D::totalNumberOfContacts(){
-	// local variables
-	int ci,cj;
-	int val = 0;
-
-	// loop over particle contacts
-	for (ci=0; ci<NCELLS; ci++){
-		for (cj=ci+1; cj<NCELLS; cj++)
-			val += contacts(ci,cj);
-	}
-
-	// return number of contacts
-	return val;
-}
-
 
 // Calculate the packing fraction
 double cellPacking2D::packingFraction(){
@@ -998,15 +976,21 @@ void cellPacking2D::vertexDPMTimeScale(double timeStepMag){
 }
 
 
+// set value in contact matrix to value
+void cellPacking2D::setContact(int ci, int cj, int val){
+	contactMatrix[cmindex(ci,cj)] = val;
+}
+
+
 // set value in contact matrix to 1
 void cellPacking2D::addContact(int ci, int cj){
-	contactMatrix[cmindex(ci,cj)] = 1;
+	contactMatrix[cmindex(ci,cj)]++;
 }
 
 
 // set value in contact matrix to 0
 void cellPacking2D::deleteContact(int ci, int cj){
-	contactMatrix[cmindex(ci,cj)] = 0;
+	contactMatrix[cmindex(ci,cj)]--;
 }
 
 
@@ -1014,22 +998,75 @@ void cellPacking2D::deleteContact(int ci, int cj){
 void cellPacking2D::resetContacts(){
 	for (int ci=0; ci<NCELLS; ci++){
 		for (int cj=ci+1; cj<NCELLS; cj++)
-			deleteContact(ci,cj);
+			setContact(ci,cj,0);
 	}
 }
 
-int cellPacking2D::particleContacts(int ci){
+
+// return TOTAL number of vv contacts across system
+int cellPacking2D::vvContacts(){
+	// local variables
+	int ci, cj, nc = 0;
+
+	// loop over all contacts, add total number of contacts
+	for (ci=0; ci<NCELLS; ci++){
+		for (cj=ci+1; cj<NCELLS; cj++)
+			nc += contacts(ci,cj);
+	}
+
+	return nc;
+}
+
+
+// return number of vv contacts for INDIVIDUAL cell ci
+int cellPacking2D::vvContacts(int ci){
 	// local variables
 	int cj, nc = 0;
 
 	// loop over other cells, count contacts
-	for (cj=0; cj<NCELLS; cj++)
+	for (cj=0; cj<NCELLS; cj++){
 		if (cj != ci)
 			nc += contacts(ci,cj);
+	}
 
 	// return
 	return nc;
 }
+
+
+// return TOTAL number of cc contacts across system
+int cellPacking2D::ccContacts(){
+	// local variables
+	int ci, cj, nc = 0;
+
+	// loop over all contacts, add total number of contacts
+	for (ci=0; ci<NCELLS; ci++){
+		for (cj=ci+1; cj<NCELLS; cj++){
+			if (contacts(ci,cj) > 0)
+				nc++;
+		}
+	}
+
+	return nc;
+}
+
+// return number of cc contacts for INDIVIDUAL cell ci
+int cellPacking2D::ccContacts(int ci){
+	// local variables
+	int cj, nc = 0;
+
+	// loop over other cells, count contacts
+	for (cj=0; cj<NCELLS; cj++){
+		if (cj != ci){
+			if (contacts(ci,cj) > 0)
+				nc++;
+		}
+	}
+
+	// return
+	return nc;
+}
+
 
 
 // set packing fraction to desired value
@@ -1104,7 +1141,7 @@ void cellPacking2D::rescaleVelocities(double temperature){
 
 // remove rattlers
 int cellPacking2D::removeRattlers(int krcrs){
-	int ci, cj, r, nr, nm;
+	int ci, cj, rvv, rcc, nr, nm;
 
 	// monitor recursion depth
 	krcrs++;
@@ -1117,22 +1154,25 @@ int cellPacking2D::removeRattlers(int krcrs){
 
 	// loop over rows, eliminate contacts to rattlers
 	for (ci=0; ci<NCELLS; ci++) {
-		// get number of contacts
-		r = particleContacts(ci);
+		// get number of vv contacts
+		rvv = vvContacts(ci);
 
-		// remove from network if r <= DOF, delete contacts
-		if (r <= NDIM) {
+		// get number of cc contacts
+		rcc = ccContacts(ci);
+
+		// check to see if particle should be removed from network
+		if (rcc <= NDIM && rvv <= 3) {
 			// increment # of rattlers
 			nr++;
 
 			// if in contact, remove contacts
-			if (r > 0) {
+			if (rvv > 0) {
 				nm++;
 
 				for (cj=0; cj<NCELLS; cj++) {
 					// delete contact between ci and cj
 					if (ci != cj)
-						deleteContact(ci,cj);
+						setContact(ci,cj,0);
 				}
 			}
 		}
@@ -1202,7 +1242,7 @@ void cellPacking2D::calculateForces(){
 			inContact = cell(ci).vertexForce(cell(cj),sigmaXX,sigmaXY,sigmaYX,sigmaYY);
 			if (inContact > 0){
 				// add to cell-cell contacts
-				addContact(ci,cj);
+				setContact(ci,cj,inContact);
 				Ncc++;
 
 				// increment vertex-vertex contacts
@@ -1283,7 +1323,7 @@ void cellPacking2D::gelationForces(){
 			
 			if (inContact > 0){
 				// add to cell-cell contacts
-				addContact(ci,cj);
+				setContact(ci,cj,inContact);
 				Ncc++;
 
 				// increment vertex-vertex contacts
@@ -1855,7 +1895,8 @@ void cellPacking2D::cellNVE(){
 			cout << "	* K 		= " << K << endl;
 			cout << "	* E 		= " << U + K << endl;
 			cout << "	* dt 		= " << dt << endl;
-			cout << "	* nc 		= " << totalNumberOfContacts() << endl;
+			cout << "	* Nvv 		= " << Nvv << endl;
+			cout << "	* Ncc 		= " << Ncc << endl;
 			cout << endl << endl;
 		}
 
@@ -1928,8 +1969,8 @@ void cellPacking2D::cellOverDamped(){
 			cout << "	* U 		= " << U << endl;
 			cout << "	* K 		= " << K << endl;
 			cout << "	* E 		= " << U + K << endl;
-			cout << "	* dt 		= " << dt << endl;
-			cout << "	* nc 		= " << totalNumberOfContacts() << endl;
+			cout << "	* Nvv 		= " << Nvv << endl;
+			cout << "	* Ncc 		= " << Ncc << endl;
 			cout << endl << endl;
 		}
 
@@ -2021,8 +2062,9 @@ void cellPacking2D::findJamming(double dphi0, double Ftol, double Ptol){
 		kr = 0;
 		nr = removeRattlers(kr);
 
-		// update number of contacts
-		nc = totalNumberOfContacts();
+		// update contacts
+		Nvv = vvContacts();
+		Ncc = ccContacts();
 
 		// boolean checks
 		undercompressed = ((Ptest < 2.0*Ptol && rH < 0) || (Ptest < Ptol && rH > 0));
@@ -2042,7 +2084,8 @@ void cellPacking2D::findJamming(double dphi0, double Ftol, double Ptol){
 		cout << "	* Ftest 		= " << Ftest << endl;
 		cout << "	* Ktest 		= " << Ktest << endl;
 		cout << "	* Ptest 		= " << Ptest << endl;
-		cout << "	* # of contacts = " << nc << endl;
+		cout << "	* Nvv 			= " << Nvv << endl;
+		cout << "	* Ncc 			= " << Ncc << endl;
 		cout << "	* # of rattlers = " << nr << endl;
 		cout << "	* undercompressed = " << undercompressed << endl;
 		cout << "	* overcompressed = " << overcompressed << endl;
@@ -2207,7 +2250,8 @@ void cellPacking2D::enthalpyMin(double dphi0, double Ftol, double Ptol){
 		nr = removeRattlers(kr);
 
 		// update number of contacts
-		nc = totalNumberOfContacts();
+		Nvv = vvContacts();
+		Ncc = ccContacts();
 
 		// boolean checks
 		undercompressed = ((Pcheck < 1.1*Ptol && rH < 0) || (Pcheck < Ptol && rH > 0));
@@ -2227,7 +2271,8 @@ void cellPacking2D::enthalpyMin(double dphi0, double Ftol, double Ptol){
 		cout << "	* Fcheck 		= " << Fcheck << endl;
 		cout << "	* Kcheck 		= " << Kcheck << endl;
 		cout << "	* Pcheck 		= " << Pcheck << endl;
-		cout << "	* # of contacts = " << nc << endl;
+		cout << "	* Nvv 			= " << Nvv << endl;
+		cout << "	* Ncc 			= " << Ncc << endl;
 		cout << "	* # of rattlers = " << nr << endl;
 		cout << "	* undercompressed = " << undercompressed << endl;
 		cout << "	* overcompressed = " << overcompressed << endl;
@@ -2569,15 +2614,26 @@ void cellPacking2D::vdos(){
 		}
 	}
 
-	// compute initial forces to have update contact network
+	// compute initial forces to have updated contact network
 	calculateForces();
+
+	// remove rattlers
+	int kr = 0;
+	int nr = removeRattlers(kr);
+
+	// update number of contacts
+	Nvv = vvContacts();
+	Ncc = ccContacts();
+
+	// print contact info to console
+	cout << "	** Computing VDOS, N = " << NCELLS << ";  # of rattlers = " << nr << ";  total # of vv contacts = " << Nvv << ";  total # of cc contacts = " << Ncc << endl;
 
 	// Loop over cells, compute shape forces for each individual cell and contributions from
 	// vertex-vertex interactions
 	for (ci=0; ci<NCELLS; ci++){
 
 		// print statement
-		cout << "	-- Computing dynamical matrix elements for cell ci = " << ci << endl;
+		cout << "		-- Computing dynamical matrix elements for cell ci = " << ci << endl;
 		
 
 		// ------------------------------------------
@@ -2865,99 +2921,105 @@ void cellPacking2D::vdos(){
 		// off-diagonal components
 		for (cj=ci+1; cj<NCELLS; cj++){
 
-			// interaction energy scale
-			eij = 0.5*(cell(ci).getkint() + cell(cj).getkint());
+			// only check overlaps if contact is force-bearing, 
+			// 	i.e. if both ci and cj are non-rattlers
+			if (contacts(ci,cj) > 0){
 
-			// loop over pairs of vertices on both cells, check for overlap, compute matrix elements
-			for (vi=0; vi<nv; vi++){
+				// interaction energy scale
+				eij = 0.5*(cell(ci).getkint() + cell(cj).getkint());
 
-				// matrix element indices (cell ci, vertex vi)
-				mxi = NDIM*(Mu.at(ci) + vi);
-				myi = NDIM*(Mu.at(ci) + vi) + 1;
+				// loop over pairs of vertices on both cells, check for overlap, compute matrix elements
+				for (vi=0; vi<nv; vi++){
 
-				// contact distance
-				sij = 0.5*(cell(ci).getdel()*l0 + cell(cj).getdel()*cell(cj).getl0());
+					// matrix element indices (cell ci, vertex vi)
+					mxi = NDIM*(Mu.at(ci) + vi);
+					myi = NDIM*(Mu.at(ci) + vi) + 1;
 
-				for (vj=0; vj<cell(cj).getNV(); vj++){
+					// contact distance
+					sij = 0.5*(cell(ci).getdel()*l0 + cell(cj).getdel()*cell(cj).getl0());
 
-					// get distance between vertices
-					dx = cell(ci).distance(cell(cj),vj,vi,0);
-					dy = cell(ci).distance(cell(cj),vj,vi,1);
-					dr = sqrt(dx*dx + dy*dy);
+					for (vj=0; vj<cell(cj).getNV(); vj++){
 
-					// check for overlap
-					if (dr < sij){
+						// get distance between vertices
+						dx = cell(ci).distance(cell(cj),vj,vi,0);
+						dy = cell(ci).distance(cell(cj),vj,vi,1);
+						dr = sqrt(dx*dx + dy*dy);
 
-						// spring constant
-						kij = eij/(sij*dr);
+						// check for overlap
+						if (dr < sij){
 
-						// dimensionless overlap
-						h = dr/sij;
+							// spring constant
+							kij = eij/(sij*dr);
 
-						// matrix element indices (cell cj, vertex vj)
-						mxj = NDIM*(Mu.at(cj) + vj);
-						myj = NDIM*(Mu.at(cj) + vj) + 1;
+							// dimensionless overlap
+							h = dr/sij;
 
-						// derivatives of distance w.r.t. coordinates
-						dr_dxi = -dx/dr;
-						dr_dyi = -dy/dr;
+							// matrix element indices (cell cj, vertex vj)
+							mxj = NDIM*(Mu.at(cj) + vj);
+							myj = NDIM*(Mu.at(cj) + vj) + 1;
 
-						// compute stiffness and stress matrices (off diagonal, enforce symmetry in lower triangles)
+							// derivatives of distance w.r.t. coordinates
+							dr_dxi = -dx/dr;
+							dr_dyi = -dy/dr;
 
-						// -- stiffness matrix
-						Hvv(mxi,mxj) = -eij*(dr_dxi*dr_dxi);
-						Hvv(myi,myj) = -eij*(dr_dyi*dr_dyi);
-						Hvv(mxi,myj) = -eij*(dr_dxi*dr_dyi);
-						Hvv(myi,mxj) = -eij*(dr_dyi*dr_dxi);
+							// compute stiffness and stress matrices (off diagonal, enforce symmetry in lower triangles)
 
-						Hvv(mxj,mxi) = Hvv(mxi,mxj);
-						Hvv(myj,myi) = Hvv(myi,myj);
-						Hvv(mxj,myi) = Hvv(myi,mxj);
-						Hvv(myj,mxi) = Hvv(mxi,myj);
+							// -- stiffness matrix
+							Hvv(mxi,mxj) = -eij*(dr_dxi*dr_dxi);
+							Hvv(myi,myj) = -eij*(dr_dyi*dr_dyi);
+							Hvv(mxi,myj) = -eij*(dr_dxi*dr_dyi);
+							Hvv(myi,mxj) = -eij*(dr_dyi*dr_dxi);
 
-
-
-						// -- stress matrix
-						Svv(mxi,mxj) = kij*(1.0 - h)*(dr_dyi*dr_dyi);
-						Svv(myi,myj) = kij*(1.0 - h)*(dr_dxi*dr_dxi);
-						Svv(mxi,myj) = -kij*(1.0 - h)*(dr_dxi*dr_dyi);
-						Svv(myi,mxj) = -kij*(1.0 - h)*(dr_dxi*dr_dyi);
-
-						Svv(mxj,mxi) = Svv(mxi,mxj);
-		                Svv(myj,myi) = Svv(myi,myj);
-		                Svv(mxj,myi) = Svv(myi,mxj);
-		                Svv(myj,mxi) = Svv(mxi,myj);
+							Hvv(mxj,mxi) = Hvv(mxi,mxj);
+							Hvv(myj,myi) = Hvv(myi,myj);
+							Hvv(mxj,myi) = Hvv(myi,mxj);
+							Hvv(myj,mxi) = Hvv(mxi,myj);
 
 
-		                
-		                // add to diagonal, using off diagonals and reciprocity
 
-		                // -- stiffness matrix
-		                Hvv(mxi,mxi) -= Hvv(mxi,mxj);
-		                Hvv(myi,myi) -= Hvv(myi,myj);
-		                Hvv(mxi,myi) -= Hvv(mxi,myj);
-		                Hvv(myi,mxi) -= Hvv(myi,mxj);
-		                
-		                Hvv(mxj,mxj) -= Hvv(mxi,mxj);
-		                Hvv(myj,myj) -= Hvv(myi,myj);
-		                Hvv(mxj,myj) -= Hvv(mxi,myj);
-		                Hvv(myj,mxj) -= Hvv(myi,mxj);
+							// -- stress matrix
+							Svv(mxi,mxj) = kij*(1.0 - h)*(dr_dyi*dr_dyi);
+							Svv(myi,myj) = kij*(1.0 - h)*(dr_dxi*dr_dxi);
+							Svv(mxi,myj) = -kij*(1.0 - h)*(dr_dxi*dr_dyi);
+							Svv(myi,mxj) = -kij*(1.0 - h)*(dr_dxi*dr_dyi);
+
+							Svv(mxj,mxi) = Svv(mxi,mxj);
+			                Svv(myj,myi) = Svv(myi,myj);
+			                Svv(mxj,myi) = Svv(myi,mxj);
+			                Svv(myj,mxi) = Svv(mxi,myj);
 
 
-		                // -- stress matrix
-		                Svv(mxi,mxi) -= Svv(mxi,mxj);
-		                Svv(myi,myi) -= Svv(myi,myj);
-		                Svv(mxi,myi) -= Svv(mxi,myj);
-		                Svv(myi,mxi) -= Svv(myi,mxj);
-		                
-		                Svv(mxj,mxj) -= Svv(mxi,mxj);
-		                Svv(myj,myj) -= Svv(myi,myj);
-		                Svv(mxj,myj) -= Svv(mxi,myj);
-		                Svv(myj,mxj) -= Svv(myi,mxj);
+			                
+			                // add to diagonal, using off diagonals and reciprocity
+
+			                // -- stiffness matrix
+			                Hvv(mxi,mxi) -= Hvv(mxi,mxj);
+			                Hvv(myi,myi) -= Hvv(myi,myj);
+			                Hvv(mxi,myi) -= Hvv(mxi,myj);
+			                Hvv(myi,mxi) -= Hvv(myi,mxj);
+			                
+			                Hvv(mxj,mxj) -= Hvv(mxi,mxj);
+			                Hvv(myj,myj) -= Hvv(myi,myj);
+			                Hvv(mxj,myj) -= Hvv(mxi,myj);
+			                Hvv(myj,mxj) -= Hvv(myi,mxj);
+
+
+			                // -- stress matrix
+			                Svv(mxi,mxi) -= Svv(mxi,mxj);
+			                Svv(myi,myi) -= Svv(myi,myj);
+			                Svv(mxi,myi) -= Svv(mxi,myj);
+			                Svv(myi,mxi) -= Svv(myi,mxj);
+			                
+			                Svv(mxj,mxj) -= Svv(mxi,mxj);
+			                Svv(myj,myj) -= Svv(myi,myj);
+			                Svv(mxj,myj) -= Svv(mxi,myj);
+			                Svv(myj,mxj) -= Svv(myi,mxj);
+						}
 					}
 				}
 			}
-		}
+
+		}	
 	}
 
 	// compute D from sum of other dynamical matrices

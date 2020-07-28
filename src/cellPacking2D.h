@@ -60,7 +60,7 @@ private:
 	deformableParticles2D* cellArray;
 
 	// contact matrix
-	int* contactMatrix;				// array of contacts between particles
+	int* contactMatrix;				// array of contacts between particles (= number of vv contacts between two cells)
 
 	// ofstream objects
 	std::ofstream packingPrintObject;
@@ -141,11 +141,21 @@ public:
 	// box len
 	double getL(int d) { return L.at(d); };
 
-	deformableParticles2D& cell(int ci);	// return cell object ci
-	int nframes();							// number of frames in the simulation
-	int cmindex(int ci, int cj);			// contact matrix index
-	int contacts(int ci, int cj);			// contact matrix element
-	int totalContacts();
+	// array of cell objects
+	deformableParticles2D& cell(int ci);		// return cell object ci
+	int nframes();								// number of frames in the simulation
+
+	// contact information
+	int cmindex(int ci, int cj);				// contact matrix index
+	int contacts(int ci, int cj);				// contact matrix element
+	int vvContacts();							// total number of vertex-vertex contacts
+	int vvContacts(int ci);						// total number of vertex-vertex contacts on cell ci
+	int ccContacts();							// total number of cell-cell contacts
+	int ccContacts(int ci);						// total number of cell-cell contacts on cell ci
+	void setContact(int ci, int cj, int val);	// set contact to a certain value
+	void addContact(int ci, int cj);			// add a single contact
+	void deleteContact(int ci, int cj);			// delete a single contact
+	void resetContacts();						// reset all contacts to 0
 
 	// system-wide calculations
 	int totalNumberOfContacts();			// calculate total number of contacts
@@ -172,10 +182,6 @@ public:
 	void forceVals(double calA0, double ka, double kl, double gam, double kb, double kint, double del, double a);
 
 	void vertexDPMTimeScale(double timeStepMag);
-	void addContact(int ci, int cj);
-	void deleteContact(int ci, int cj);
-	void resetContacts();
-	int particleContacts(int ci);
 	void setPackingFraction(double val);
 	void setAsphericity(double val);
 	void setAsphericity(int ci, double val);
