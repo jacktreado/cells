@@ -557,6 +557,7 @@ for ss = 1:NSIM
 end
 
 % delete any entries that were skipped
+simList(simSkip)            = [];
 NCELLSList(simSkip)         = [];
 NDOFList(simSkip)           = [];
 NvList(simSkip)             = [];
@@ -589,7 +590,7 @@ NSIMS = sum(~simSkip);
 fprintf('\t ** saving to %s\n',saveStr);
 
 save(saveStr,...
-    'NSIMS','simStr','NCELLSList','NDOFList','NvList','LList','a0List','l0List',...
+    'NSIMS','simList','NCELLSList','NDOFList','NvList','LList','a0List','l0List',...
     'NFRAMEList','pList','NvvList','NccList','NvvrList','NccrList','NqList',...
     'lambdaMatList','stiffEVMatList','vertexPrList','cellPrList','projList',...
     'jFrameList','enPList','enPhiList','enCalAList','riList');
