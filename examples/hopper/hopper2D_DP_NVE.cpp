@@ -91,7 +91,7 @@ int main()
 
 	// initialize positions in hopper reservoir
 	cout << "	** Initially placing particles in hopper using SP model" << endl;
-	packingObject.initializeHopperSP(radii,w0,w,th,Lmin,NV);
+	packingObject.initializeHopperDP(radii,w0,w,th,Lmin,NV);
 
 	// update time scale
 	packingObject.vertexDPMTimeScale(timeStepMag);
