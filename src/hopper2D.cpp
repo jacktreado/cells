@@ -274,6 +274,9 @@ void cellPacking2D::initializeHopperDP(vector<double>& radii, double w0, double 
 }
 
 
+
+
+
 void cellPacking2D::fireMinimizeHopperSP(vector<double>& radii, double w0, double w, double th){
 	// HARD CODE IN FIRE PARAMETERS
 	const double alpha0 	= 0.25;
@@ -665,6 +668,14 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 	c = cos(th);
 	s = sin(th);
 
+	// reset wall forces 
+	// 	** forces on top wall in x/y direction stored in sigmaXX/sigmaXY
+	// 	** forces on bottom wall in x/y direction stored in sigmaYX/sigmaYY
+	sigmaXX = 0.0;
+	sigmaXY = 0.0;
+	sigmaYX = 0.0;
+	sigmaYY = 0.0;
+
 	// loop over cells
 	for (ci=0; ci<NCELLS; ci++){
 		// get sigma (2*radius)
@@ -705,11 +716,9 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 						for (vi=0; vi<cell(ci).getNV(); vi++)
 							cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
 
-						// virial stresses
-						sigmaXX += ftmp*(lwx/lw)*lwx;
-						sigmaXY += ftmp*(lwx/lw)*lwy;
-						sigmaYX += ftmp*(lwy/lw)*lwx;
-						sigmaYY += ftmp*(lwy/lw)*lwy;
+						// add to net force on wall
+						sigmaYX -= ftmp*(lwx/lw);
+						sigmaYY -= ftmp*(lwy/lw);
 					}
 				}
 
@@ -737,11 +746,9 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 						for (vi=0; vi<cell(ci).getNV(); vi++)
 							cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
 
-						// virial stresses
-						sigmaXX += ftmp*(lwx/lw)*lwx;
-						sigmaXY += ftmp*(lwx/lw)*lwy;
-						sigmaYX += ftmp*(lwy/lw)*lwx;
-						sigmaYY += ftmp*(lwy/lw)*lwy;
+						// add to net force on wall
+						sigmaXX -= ftmp*(lwx/lw);
+						sigmaXY -= ftmp*(lwy/lw);
 					}
 				}
 			}
@@ -776,11 +783,9 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 							for (vi=0; vi<cell(ci).getNV(); vi++)
 								cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
 
-							// virial stresses
-							sigmaXX += ftmp*(lwx/lw)*lwx;
-							sigmaXY += ftmp*(lwx/lw)*lwy;
-							sigmaYX += ftmp*(lwy/lw)*lwx;
-							sigmaYY += ftmp*(lwy/lw)*lwy;
+							// add to net force on wall
+							sigmaXX -= ftmp*(lwx/lw)*lwx;
+							sigmaXY -= ftmp*(lwy/lw)*lwy;
 						}
 					}
 					// else if below yline but above radius cutoff, use edge force
@@ -806,11 +811,9 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 							for (vi=0; vi<cell(ci).getNV(); vi++)
 								cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
 
-							// virial stresses
-							sigmaXX += ftmp*(lwx/lw)*lwx;
-							sigmaXY += ftmp*(lwx/lw)*lwy;
-							sigmaYX += ftmp*(lwy/lw)*lwx;
-							sigmaYY += ftmp*(lwy/lw)*lwy;
+							// add to net force on wall
+							sigmaXX -= ftmp*(lwx/lw)*lwx;
+							sigmaXY -= ftmp*(lwy/lw)*lwy;
 						}
 					}
 				}
@@ -842,11 +845,9 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 							for (vi=0; vi<cell(ci).getNV(); vi++)
 								cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
 
-							// virial stresses
-							sigmaXX += ftmp*(lwx/lw)*lwx;
-							sigmaXY += ftmp*(lwx/lw)*lwy;
-							sigmaYX += ftmp*(lwy/lw)*lwx;
-							sigmaYY += ftmp*(lwy/lw)*lwy;
+							// add to net force on wall
+							sigmaYX -= ftmp*(lwx/lw);
+							sigmaYY -= ftmp*(lwy/lw);
 						}
 					}
 					// else if above yline but below radius cutoff, use edge force
@@ -872,11 +873,9 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 							for (vi=0; vi<cell(ci).getNV(); vi++)
 								cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
 
-							// virial stresses
-							sigmaXX += ftmp*(lwx/lw)*lwx;
-							sigmaXY += ftmp*(lwx/lw)*lwy;
-							sigmaYX += ftmp*(lwy/lw)*lwx;
-							sigmaYY += ftmp*(lwy/lw)*lwy;
+							// add to net force on wall
+							sigmaYX -= ftmp*(lwx/lw);
+							sigmaYY -= ftmp*(lwy/lw);
 						}
 					}
 				}
@@ -906,8 +905,8 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 				for (vi=0; vi<cell(ci).getNV(); vi++)
 					cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
 
-				// virial stress in YY direction
-				sigmaYY += ftmp*lwy;
+				// add to net force on wall in y direction
+				sigmaYY -= ftmp;
 			}
 
 			// if true, interacting with top wall
@@ -927,8 +926,8 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 				for (vi=0; vi<cell(ci).getNV(); vi++)
 					cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
 
-				// virial stress in YY direction 
-				sigmaYY -= ftmp*lwy;
+				// add to net force on wall in y direction
+				sigmaXY += ftmp;
 			}
 		}
 
@@ -950,9 +949,6 @@ void cellPacking2D::hopperWallForcesSP(vector<double>& radii, double w0, double 
 				utmp = 0.25*sigma*pow(1 - overlap,2);
 				for (vi=0; vi<cell(ci).getNV(); vi++)
 					cell(ci).setUInt(vi,cell(ci).uInt(vi) + utmp/cell(ci).getNV());
-
-				// virial stress in XX direction 
-				sigmaXX -= ftmp*lwx;
 			}
 		}
 		
