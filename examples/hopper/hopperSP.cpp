@@ -23,12 +23,12 @@ const double PI = 4.0*atan(1);
 const int NV 					= 12;			// number of vertices (not relevant for SP model)
 const int seed 					= 20;			// initial seed
 const int NT 					= 1e5;			// number of time steps for flow simulation
-const int NPRINT 				= 2e2;			// number of steps between printing
-const double sizeDispersion 	= 0.05;			// std deviation of polydispersity
+const int NPRINT 				= 2e3;			// number of steps between printing
+const double sizeDispersion 	= 0.1;			// std deviation of polydispersity
 const double meanRadius 		= 0.5;			// mean radius (diameter is length unit)
-const double w0 				= 5.0;			// width of hopper reservoir (in units of mean diameter sigma)
+const double w0 				= 10.0;			// width of hopper reservoir (in units of mean diameter sigma)
 const double w 					= 2.01;			// orifice width (in units of mean diameter sigma)
-const double th 				= PI/6.0;		// hopper angle (pi - th = deflection angle from horizontal)
+const double th 				= PI/3.0;		// hopper angle (pi - th = deflection angle from horizontal)
 const double phi0 				= 0.4;			// initial packing fraction
 
 // main function
@@ -43,7 +43,6 @@ int main()
 
 	// output files
 	string posFile = "pos.test";
-	string enFile = "en.test";
 
 	// determine L from w0, w, th
 	double L = 0.5*(w0 - w)/tan(th);
@@ -74,13 +73,12 @@ int main()
 	cellPacking2D packingObject(NCELLS,NT,NPRINT,L,seed);
 
 	// open print objects
-	cout << "	** Opening printing objects for positions and energy " << endl;
+	cout << "	** Opening printing object for positions " << endl;
 	packingObject.openPackingObject(posFile);
-	packingObject.openEnergyObject(enFile);
 
 	// initialize positions in hopper reservoir
 	cout << "	** Relaxing particle positions using SP model" << endl;
-	packingObject.initializeHopperSP(radii,w0,w,th,Lmin,NV);
+	packingObject.initializeHopperSP(radii,w0,w,th,Lmin);
 
 
 	// flow particles through hopper with force strength g

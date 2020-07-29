@@ -111,7 +111,7 @@ int main(int argc, char const *argv[])
 
 	// initialize positions in hopper reservoir
 	cout << "	** Relaxing particle positions using SP model" << endl;
-	packingObject.initializeHopperSP(radii,w0,w,th,Lmin,NV);
+	packingObject.initializeHopperSP(radii,w0,w,th,Lmin);
 
 	// flow particles through hopper with force strength g
 	cout << "	** Running hopper FLOW with g = " << g << endl;

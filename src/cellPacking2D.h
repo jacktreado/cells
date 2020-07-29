@@ -303,7 +303,8 @@ public:
 	void spActivePipeFlow(std::vector<double>& radii, double a, double v0, double Dr);
 
 	// Hopper functions
-	void initializeHopperSP(std::vector<double>& radii, double w0, double w, double th, double Lmin, int NV);
+	void initializeHopperSP(std::vector<double>& radii, double w0, double w, double th, double Lmin);
+	void initializeHopperDP(std::vector<double>& radii, double w0, double w, double th, double Lmin, int NV);
 	void fireMinimizeHopperSP(std::vector<double>& radii, double w0, double w, double th);
 	void fireMinimizeHopperDP(double w0, double w, double th);
 	void hopperForcesSP(std::vector<double>& radii, double w0, double w, double th, double g, int closed);

@@ -19,21 +19,129 @@ const double PI = 4*atan(1);
 
 
 
-
 // FUNCTION TO INITALIZE PARTICLE POSITIONS AS IF THEY WERE SOFT PARTICLES
 // WITH DIAMETER SIGMA
 // 
 // assume following will already be initialized:
 // 	** NCELLS, NPRINT, L.at(0) (using w,w0,th)
 // 	** SET PBCS TO 0
-// 
-// 
-// 
-// 
-// 	07/09/2020: NOTE THAT THIS INITIALIZES FOR DPM; for SP, may have issues because L is necessarily different
-// 				NEED TO write different initialization for DPM
 
-void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double w, double th, double Lmin, int NV){
+
+void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double w, double th, double Lmin){
+	// local variables
+	int ci, vi, d, nvtmp;
+	double a0tmp, l0tmp, calA0tmp;
+	double xpos, ypos;
+	double xmin, xmax, ymin, ymax;
+
+	// minimum number of vertices
+	const int nvmin = 12;
+
+	// check inputs to hopper initialization
+	if (w0 < 0.0){
+		cout << "	** ERROR: in initializing hopper, input w0 = " << w0 << ", which is < 0. ending." << endl;
+		exit(1);
+	}
+	else if (w < 0.0){
+		cout << "	** ERROR: in initializing hopper, input w = " << w << ", which is < 0. ending." << endl;
+		exit(1);
+	}
+	else if (w > w0){
+		cout << "	** ERROR: in initializing hopper, input w = " << w << ", which is > w0. ending." << endl;
+		exit(1);
+	}
+	else if (th < 0){
+		cout << "	** ERROR: in initializing hopper, input th = " << th << ", which is < 0. ending." << endl;
+		exit(1);
+	}
+
+	// output to console
+	cout << "		-- In hopper initialization, initializing cells and relaxing initial overlaps as SP particles" << endl;
+
+	// initialize cell information
+	cout << "		-- Ininitializing cell objects" << endl;
+	for (ci=0; ci<NCELLS; ci++){
+		// boundary information ( SET PBCS TO 1 )
+		for (d=0; d<NDIM; d++){
+			cell(ci).setL(d,L.at(0));
+			cell(ci).setpbc(d,0);
+		}
+
+		// number of vertices ( SIGMA SETS # OF VERTS )
+		nvtmp = round(2.0*radii.at(ci)*nvmin);
+		if (nvtmp > nvmin)
+ 			cell(ci).setNV(nvtmp);
+		else
+			cell(ci).setNV(nvmin);
+
+		// array information
+		cell(ci).initializeVertices();
+		cell(ci).initializeCell();
+
+		// initialize cells as regular polygons
+		calA0tmp = nvtmp*tan(PI/nvtmp)/PI;
+
+		// preferred area is regular polygon with slightly smaller radius
+		a0tmp = 0.5*nvtmp*pow(radii.at(ci),2.0)*sin(2.0*PI/nvtmp);
+
+		// initial length of polygon side
+		l0tmp = sqrt(4.0*PI*a0tmp*calA0tmp)/nvtmp;
+
+		// set preferred area and length 
+		cell(ci).seta0(a0tmp);
+		cell(ci).setl0(l0tmp);
+		cell(ci).setdel(1.0);
+	}
+
+	// initialize particle positions
+	cout << "		-- Ininitializing cell positions" << endl;
+	for (ci=0; ci<NCELLS; ci++){
+		// set min and max values of positions
+		xmin = -Lmin*L.at(0);
+		xmax = -radii.at(ci);
+		ymin = radii.at(ci);
+		ymax = w0 - radii.at(ci);
+
+		// get random location in hopper RESERVOIR
+		xpos = (xmin-xmax)*drand48() + xmax;
+		ypos = (ymax-ymin)*drand48() + ymin;
+
+		// set as initial position of com
+		cell(ci).setCPos(0,xpos);
+		cell(ci).setCPos(1,ypos);
+
+		// initialize vertices as a regular polygon
+		cell(ci).regularPolygon();
+	}
+
+	// initialize phi
+	cout << "		-- Ininitializing packing fraction...";
+	phi = hopperPackingFraction(radii,w0,w,th);
+	cout << "which is phi = " << phi << endl;
+
+	// initial time scales (t_0^2 = mass*sigma/f_0, mass = 0.25*PI*sigma^2)
+	cout << "		-- Ininitializing time scale" << endl;
+	dt = 0.1*sqrt(0.25*PI);
+	dt0 = dt;
+
+	// use FIRE in hopper geometry to relax overlaps
+	cout << "		-- Using FIRE to relax overlaps..." << endl;
+	fireMinimizeHopperSP(radii,w0,w,th);
+}
+
+
+
+// FUNCTION TO INITALIZE PARTICLE POSITIONS AS IF THEY WERE SOFT PARTICLES
+// WITH DIAMETER SIGMA
+// 
+// THEN turn particles to deformable particles
+// 
+// assume following will already be initialized:
+// 	** NCELLS, NPRINT, L.at(0) (using w,w0,th)
+// 	** SET PBCS TO 0
+
+
+void cellPacking2D::initializeHopperDP(vector<double>& radii, double w0, double w, double th, double Lmin, int NV){
 	// local variables
 	int ci, vi, d, nvtmp;
 	double a0tmp, l0tmp, calA0tmp;
@@ -135,7 +243,7 @@ void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double 
 
 	// initial time scales
 	cout << "		-- Ininitializing time scale" << endl;
-	dt = 0.01;
+	dt = 0.05;
 	dt0 = dt;
 
 	// slightly increase radii to give more space for dp
@@ -164,7 +272,6 @@ void cellPacking2D::initializeHopperSP(vector<double>& radii, double w0, double 
 		}
 	}
 }
-
 
 
 void cellPacking2D::fireMinimizeHopperSP(vector<double>& radii, double w0, double w, double th){
@@ -1515,7 +1622,7 @@ void cellPacking2D::flowHopperSP(vector<double>& radii, double w0, double w, dou
 			// print if object has been opened already
 			if (packingPrintObject.is_open()){
 				cout << "	* Printing SP center positions to file" << endl;
-				printHopperSP(radii,w0,w,th,0.0);
+				printHopperSP(radii,w0,w,th,g);
 			}
 			
 			if (energyPrintObject.is_open()){
