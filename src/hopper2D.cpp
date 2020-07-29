@@ -1598,9 +1598,6 @@ void cellPacking2D::flowHopperSP(vector<double>& radii, double w0, double w, dou
 	itr = 0;
 	itrMax = 1e6;
 	while (xmax < L.at(0) - 2.5*radii.at(0) && itr < itrMax){
-		// update virial pressure
-		Pvirial = 0.5*(sigmaXX + sigmaYY);
-
 		// update kinetic energy based on com velocity
 		K = 0.0;
 		for (ci=0; ci<NCELLS; ci++)
@@ -1628,7 +1625,8 @@ void cellPacking2D::flowHopperSP(vector<double>& radii, double w0, double w, dou
 			
 			cout << "	* Run data:" << endl;
 			cout << "	* K 		= " << K << endl;
-			cout << "	* virial P 	= " << Pvirial << endl;
+			cout << "	* Ftop  	= " << sqrt(sigmaXX*sigmaXX + sigmaXY*sigmaXY) << endl;
+			cout << "	* Fbottom  	= " << sqrt(sigmaYX*sigmaYX + sigmaYY*sigmaYY) << endl;
 			cout << "	* phi 		= " << phi << endl;
 			cout << "	* dt 		= " << dt << endl;
 			cout << "	* g 		= " << g << endl;
