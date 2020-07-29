@@ -989,6 +989,13 @@ void cellPacking2D::hopperWallForcesDP(double w0, double w, double th, int close
 	xbb 	= xtb;
 	ybb 	= 0.5*(w0 - w - sb);
 
+	// reset wall forces 
+	// 	** forces on top wall in x/y direction stored in sigmaXX/sigmaXY
+	// 	** forces on bottom wall in x/y direction stored in sigmaYX/sigmaYY
+	sigmaXX = 0.0;
+	sigmaXY = 0.0;
+	sigmaYX = 0.0;
+	sigmaYY = 0.0;
 
 	// loop over cells and vertices
 	for (ci=0; ci<NCELLS; ci++){
@@ -1709,7 +1716,8 @@ void cellPacking2D::flowHopperSP(vector<double>& radii, double w0, double w, dou
 			
 			cout << "	* Run data:" << endl;
 			cout << "	* K 		= " << K << endl;
-			cout << "	* virial P 	= " << Pvirial << endl;
+			cout << "	* Ftop  	= " << sqrt(sigmaXX*sigmaXX + sigmaXY*sigmaXY) << endl;
+			cout << "	* Fbottom  	= " << sqrt(sigmaYX*sigmaYX + sigmaYY*sigmaYY) << endl;
 			cout << "	* phi 		= " << phi << endl;
 			cout << "	* dt 		= " << dt << endl;
 			cout << "	* g 		= " << g << endl;
@@ -1859,7 +1867,8 @@ void cellPacking2D::flowHopperDP(double w0, double w, double th, double g, doubl
 			cout << "	* U 		= " << totalPotentialEnergy() << endl;
 			cout << "	* K 		= " << totalKineticEnergy() << endl;
 			cout << "	* E 		= " << totalPotentialEnergy() + totalKineticEnergy() << endl;
-			cout << "	* virial P 	= " << Pvirial << endl;
+			cout << "	* Ftop  	= " << sqrt(sigmaXX*sigmaXX + sigmaXY*sigmaXY) << endl;
+			cout << "	* Fbottom  	= " << sqrt(sigmaYX*sigmaYX + sigmaYY*sigmaYY) << endl;
 			cout << "	* dt 		= " << dt << endl;
 			cout << endl << endl;
 		}
