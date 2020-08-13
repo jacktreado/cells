@@ -2387,7 +2387,8 @@ void cellPacking2D::enthalpyMin(double dphi0, double Ftol, double Ptol){
 					cout << "	** F = " << Fcheck << endl;
 					cout << "	** P = " << Pcheck << endl;
 					cout << "	** K = " << Kcheck << endl;
-					cout << "	** nc = " << nc << endl;
+					cout << "	** Nvv = " << vvContacts() << endl;
+					cout << "	** Ncc = " << ccContacts() << endl;
 					cout << " WRITING ENTHALPY-MINIMIZED CONFIG TO .jam FILE" << endl;
 					cout << " ENDING COMPRESSION SIMULATION" << endl;
 					printJammedConfig();
@@ -3034,18 +3035,38 @@ void cellPacking2D::vdos(){
 	}
 
 	// compute eigenvalues
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> shapeStiffness(Hshape);
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> contactsStiffness(Hvv);
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> totalStiffness(H);
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> totalStress(S);
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> allModes(D);
+
+	// define eigenvector matrix
+	Eigen::MatrixXd evecs = allModes.eigenvectors();
 
 	// print eigenvalues to print object
 	statPrintObject << NDOF << endl;
-	statPrintObject << shapeStiffness.eigenvalues() << endl;
-	statPrintObject << contactsStiffness.eigenvalues() << endl;
+	// statPrintObject << shapeStiffness.eigenvalues() << endl;
+	// statPrintObject << contactsStiffness.eigenvalues() << endl;
 	statPrintObject << totalStiffness.eigenvalues() << endl;
 	statPrintObject << allModes.eigenvalues() << endl;
-	statPrintObject << allModes.eigenvectors() << endl;
+	statPrintObject << evecs << endl;
+
+	// print projections onto stiffness and stress directions
+	double stiffProj, stressProj, v1, v2;
+	int l1, l2;
+	for (k=0; k<NDOF; k++){
+		stiffProj = 0.0;
+		stressProj = 0.0;
+		for (l1=0; l1<NDOF; l1++){
+			v1 = evecs(l1,k);
+			for (l2=0; l2<NDOF; l2++){
+				v2 			= evecs(l2,k);
+				stiffProj 	+= H(l1,l2)*v1*v2;
+				stressProj 	+= S(l1,l2)*v1*v2;
+			}
+		}
+		statPrintObject << setprecision(14) << stiffProj << endl;
+		statPrintObject << setprecision(14) << stressProj << endl;
+	}
 
 	/* 
 
