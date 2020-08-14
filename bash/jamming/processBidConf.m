@@ -202,12 +202,16 @@ for ss = 1:NSIM
     lambdaInput             = cellVDOSData.totalEvals;
     evecsInput              = cellVDOSData.totalEvecs;
     totalStEvalsInput       = cellVDOSData.totalStEvals;
+    stiffProjInput          = cellVDOSData.stiffProj;
+    stressProjInput         = cellVDOSData.stressProj;
 
     NvvPos                  = NvvInput(ssPos);
     NccPos                  = NccInput(ssPos);
     lambdaPos               = lambdaInput(ssPos);
     stiffEPos               = totalStEvalsInput(ssPos);
     evecsPos                = evecsInput(ssPos);
+    stiffProjPos            = stiffProjInput(ssPos);
+    stressProjPos           = stressProjInput(ssPos);
     Ppos                    = P(P > PCUT);
     NPOSFRAMES              = sum(P > PCUT);
     xpos                    = xposInput(ssPos,:);
@@ -441,7 +445,6 @@ for ss = 1:NSIM
     cypos = cellJamData.cypos;
     
     ritmp   = zeros(NPOSFRAMES,NCELLS);
-    spdof   = zeros(NPOSFRAMES,NCELLS);
     Nvvr    = zeros(NPOSFRAMES,1);
     Nccr    = zeros(NPOSFRAMES,1);
     for pp = 1:NPOSFRAMES
@@ -649,74 +652,12 @@ for ss = 1:NSIM
             H = Ha + Hl + Hb + Hvv;
             S = Sa + Sl + Sb + Svv;
             D = H + S;
-                
-                
-            [singleEV, devals] = eig(D);
-            lambda = diag(devals);
+
+            lambda = eig(D);
             spzeros(ii) = sum(lambda < 1e-8);
-
-            if spzeros(ii) > 0
-                figure(1), clf, hold on, box on;
-                aa = 1;
-                for jj = 1:NCELLS
-                    xv = xtmp{jj};
-                    yv = ytmp{jj};
-                    ww = l0tmp(jj);  
-                    for vv = 1:nv(jj)
-                        for xim = -1:1
-                            for yim = -1:1
-                                xx = xv(vv) + Lx*xim;
-                                yy = yv(vv) + Ly*yim;
-                                if ri(jj) == 0
-                                    rectangle('Position',[xx-0.5*ww,yy-0.5*ww,ww,ww],'Curvature',[1 1],'EdgeColor','k');
-                                else
-                                    rectangle('Position',[xx-0.5*ww,yy-0.5*ww,ww,ww],'Curvature',[1 1],'EdgeColor','r');
-                                end
-
-                                % plot contacts
-                                for bb = (aa+1):NVTOT
-                                    if cab(aa,bb)
-                                        x0 = xall(aa) + Lx*xim;
-                                        y0 = yall(aa) + Ly*yim;
-
-                                        x1 = xall(bb) + Lx*xim;
-                                        y1 = yall(bb) + Ly*yim;
-
-                                        dx = x1 - x0;
-                                        dx = dx - Lx*round(dx/Lx);
-
-                                        dy = y1 - y0;
-                                        dy = dy - Ly*round(dy/Ly);
-
-                                        x1 = x0 + dx;
-                                        y1 = y0 + dy;
-
-                                        plot([x0 x1],[y0 y1],'b-','linewidth',1.5);
-                                    end
-                                end
-                            end
-                        end
-                        aa = aa + 1;
-                    end
-                end
-                quiver(vx,vy,singleEV(1:2:(2*nv(ii)-1),1),singleEV(2:2:(2*nv(ii)),1),'-r','linewidth',2);
-                plot(px,py,'bs','markersize',4,'MarkerFaceColor','b');
-%                 tstr = ['$\lambda_{' num2str(lplot) '} = ' sprintf('%0.4g',lambda(lplot)) '$'];
-%                 title(tstr,'Interpreter','latex','FontSize',18);
-                plot([0 Lx Lx 0 0],[0 0 Ly Ly 0],'k-','linewidth',1.5);
-                axis equal;
-                ax = gca;
-                ax.XTick = [];
-                ax.YTick = [];
-                ax.XLim = [-0.25 1.25].*Lx;
-                ax.YLim = [-0.25 1.25].*Ly;
-
-                test = 1;
-            end
         end
-        
     end
-    
+
     % save rattker matrix to list
     riList{ss} = ritmp;
     NvvrList{ss} = Nvvr;

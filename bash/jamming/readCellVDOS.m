@@ -12,42 +12,47 @@ fprintf('File size = %f MB\n',finfo.bytes/1e6)
 
 % initialize output data
 NDOF            = zeros(NFRAMES,1);
-shapeStEvals    = cell(NFRAMES,1);
-contactStEvals  = cell(NFRAMES,1);
 totalStEvals    = cell(NFRAMES,1);
 totalEvals      = cell(NFRAMES,1);
 totalEvecs      = cell(NFRAMES,1);
+stiffProj       = cell(NFRAMES,1);
+stressProj      = cell(NFRAMES,1);
 
 % loop over frames, grab vdos info
 for ff = 1:NFRAMES
     % scan in data
     data = textscan(fid,'%d',1);
-    NDOF(ff) = data{1};
-
-    % read in eigenvalues of stiffness matrix
-    data = textscan(fid,'%f',NDOF(ff));
-    shapeStEvals{ff} = data{1};
-    
-    % read in eigenvalues of stress matrix
-    data = textscan(fid,'%f',NDOF(ff));
-    contactStEvals{ff} = data{1};
+    NDOFTMP = data{1};
+    NDOF(ff) = NDOFTMP;
     
     % read in eigenvalues of total matrix
-    data = textscan(fid,'%f',NDOF(ff));
+    data = textscan(fid,'%f',NDOFTMP);
     totalStEvals{ff} = data{1};
     
     % read in eigenvalues of total matrix
-    data = textscan(fid,'%f',NDOF(ff));
+    data = textscan(fid,'%f',NDOFTMP);
     totalEvals{ff} = data{1};
 
     % read in eigenvectors
-    frmt = repmat('%f ',1,NDOF(ff));
-    data = textscan(fid,frmt,NDOF(ff));
-    evecstmp = zeros(NDOF(ff));
-    for vv = 1:NDOF(ff)
+    frmt = repmat('%f ',1,NDOFTMP);
+    data = textscan(fid,frmt,NDOFTMP);
+    evecstmp = zeros(NDOFTMP);
+    for vv = 1:NDOFTMP
         evecstmp(:,vv) = data{vv};
     end
     totalEvecs{ff} = evecstmp;
+    
+    % read in projections
+    stiffProjTmp = zeros(NDOFTMP,1);
+    stressProjTmp = zeros(NDOFTMP,1);
+    for vv = 1:NDOFTMP
+        data = textscan(fid,'%f',1);
+        stiffProjTmp(vv) = data{1};
+        data = textscan(fid,'%f',1);
+        stressProjTmp(vv) = data{1};
+    end
+    stiffProj{ff} = stiffProjTmp;
+    stressProj{ff} = stressProjTmp;
     
 %     % read in energy due to perturbations
 %     data = textscan(fid,'%d',1);
@@ -77,10 +82,10 @@ fclose(fid);
 
 % save data
 cellVDOSData = struct('NDOF',NDOF);
-cellVDOSData.shapeStEvals = shapeStEvals;
-cellVDOSData.contactStEvals = contactStEvals;
 cellVDOSData.totalStEvals = totalStEvals;
 cellVDOSData.totalEvals = totalEvals;
 cellVDOSData.totalEvecs = totalEvecs;
+cellVDOSData.stiffProj = stiffProj;
+cellVDOSData.stressProj = stressProj;
 
 end
