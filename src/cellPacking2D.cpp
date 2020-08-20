@@ -1600,7 +1600,7 @@ void cellPacking2D::fireMinimizeF(double Ftol, double& Fcheck, double& Kcheck){
 	const double falpha 	= 0.99;
 	const double dtmax 		= 10*dt0;
 	const double dtmin 		= 1e-8*dt0;
-	const double Trescale 	= 1e-5*NCELLS;
+	const double Trescale 	= 1e-12*NCELLS;
 	const int NMIN 			= 20;
 	const int NNEGMAX 		= 2000;
 	const int NDELAY 		= 500;
