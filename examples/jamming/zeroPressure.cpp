@@ -53,7 +53,7 @@ int main()
 	calA0 = 1.02;
 	kl = 1.0;
 	kb = 0.01;
-	pTarget = 1e-11;
+	pTarget = 1e-13;
 	seed = 1;
 
 	// initial pressure tolerance
