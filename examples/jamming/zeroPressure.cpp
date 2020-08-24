@@ -44,7 +44,7 @@ int main()
 	double calA0, kl, kb, pTarget, Ptol, dphi;
 
 	// inputs from command line
-	string inputFile 			= "examples/jamming/dpmb.pos";
+	string inputFile 			= "examples/jamming/dpmb_dong.pos";
 	string energyFile 			= "zeropEn.test";
 	string jammingFile 			= "zeropPos.test";
 	string vdosFile 			= "zeropVDOS.test";
