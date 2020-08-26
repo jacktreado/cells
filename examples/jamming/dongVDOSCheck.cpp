@@ -96,6 +96,7 @@ int main()
 	// print initial configuration and compute VDOS
 	cout << "	** computing VDOS after state 1, printing to " << vdosFile << endl << endl;
 	packingObject.vdos();
+	packingObject.printJammedConfig();
 
 	// compute degree to which size should be increased
 	double phi = packingObject.packingFraction();
@@ -115,6 +116,7 @@ int main()
 		cout << "	** After state " << cc + 1 << "/" << NCOMP+1 << ", Pcheck = " << Pcheck << endl << endl;
 		cout << "	** computing VDOS after state " << cc + 1 << "/" << NCOMP+1 << ", printing to " << vdosFile << endl << endl;
 		packingObject.vdos();
+		packingObject.printJammedConfig();
 	}
 
 
