@@ -41,7 +41,7 @@ int main()
 {
 	// input variables
 	int seed;
-	double calA0, kl, kb, pTarget, Ptol, dphi;
+	double calA0, kl, kb, pTarget, Fcheck, dphi;
 
 	// inputs from command line
 	string inputFile 			= "examples/jamming/dpmb_dong.pos";
@@ -86,7 +86,6 @@ int main()
 	packingObject.enthalpyMin(dphi, Ftol, Ptol);
 
 	// compute pressure in initial jammed state
-	double Pcheck = 0.5*(packingObject.getSigmaXX() + packingObject.getSigmaYY())/(packingObject.getNCELLS()*packingObject.getL(0)*packingObject.getL(0));
 	cout << "	** Pcheck = " << Pcheck << endl << endl;
 
 	// print initial configuration and compute VDOS

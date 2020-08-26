@@ -315,7 +315,7 @@ cellPacking2D::cellPacking2D(string& inputFile, double T0, double s){
 
 		// print to console
 		cout << "	** on cell " << ci << ", NV = " << nv << ";\t com at x = " << x << ", y = " << y;
-		cout << ";\t l0 = " << l0tmp << ", a0 = " << a0tmp << ", so calA0 = " << (nv*nv*l0tmp*l0tmp)/(4.0*PI*a0tmp) << endl;
+		cout << ";\t l0 = " << l0tmp << ", a0 = " << a0tmp << ", so calA0 = " << setprecision(8) << (nv*nv*l0tmp*l0tmp)/(4.0*PI*a0tmp) << endl;
 
 		// read in descriptive string
 		getline(inputFileObject, inputStr);

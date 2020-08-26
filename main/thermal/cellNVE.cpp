@@ -258,7 +258,7 @@ int main(int argc, char const *argv[]){
 		a0.at(ci) 		= a0tmp;
 
 		// set disk radius
-		drad.at(ci) 	= 1.025*sqrt((2.0*a0tmp)/(nvtmp*sin(2.0*PI/nvtmp)));
+		drad.at(ci) 	= 1.05*sqrt((2.0*a0tmp)/(nvtmp*sin(2.0*PI/nvtmp)));
 
 		// set l0, vector radius
 		l0.at(ci) 	= 2.0*lenscale*sqrt(PI*calA0tmp)/nvtmp;
@@ -588,7 +588,7 @@ int main(int argc, char const *argv[]){
 			gi = gindex(ci,vi,szList);
 
 			// get distance from cell center to vertex if reg poly
-			lenscale = sqrt((2.0*a0.at(ci))/(nv.at(ci)*sin(2.0*PI/nv.at(ci))));
+			lenscale = sqrt((2.0*a0.at(ci))/(nv.at(ci)*sin((2.0*PI)/nv.at(ci))));
 
 			// set vertex positions
 			vpos.at(NDIM*gi) 		= lenscale*cos((2.0*PI*vi)/nv.at(ci)) + dpos.at(NDIM*ci);
@@ -598,17 +598,6 @@ int main(int argc, char const *argv[]){
 
 	// print vertex positions to check placement
 	printPos(posout, vpos, a0, l0, L, nv, szList, phi0, NCELLS);
-
-
-
-
-
-
-
-
-
-
-
 
 
 
