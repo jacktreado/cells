@@ -46,7 +46,7 @@ int main()
 	kl = 1.0;
 	kb = 0.01;
 	seed = 1;
-	dphi = 5e-5;
+	dphi = 2e-4;
 
 	// number of compression states after state 1 (total is NCOMP + 1)
 	NCOMP = 3;
