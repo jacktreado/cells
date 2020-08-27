@@ -46,31 +46,33 @@ int main()
 	kl = 1.0;
 	kb = 0.01;
 	seed = 1;
-	dphi = 2e-4;
+	dphi = 5e-4;
 
 	// number of compression states after state 1 (total is NCOMP + 1)
-	NCOMP = 3;
+	NCOMP = 5;
 
 	// instantiate main packing object
 	cout << "	** Reading in from file " << inputFile << endl;
 	cellPacking2D packingObject(inputFile,T0,seed);
 
 	// set deformability, force values USING DONG'S FORCE COEFFICIENTS
-	double kltmp, kbtmp, l0;
+	double katmp, kltmp, kbtmp, a0, l0;
 	int NCELLS = packingObject.getNCELLS();
 	for (int ci=0; ci<NCELLS; ci++){
-		kltmp = kl/packingObject.cell(ci).getNV();
-
+		a0 = packingObject.cell(ci).geta0();
 		l0 = packingObject.cell(ci).getl0();
 		calA0 = packingObject.cell(ci).calA0();
+
+		katmp = (1.0/a0);
+		kltmp = kl/(packingObject.cell(ci).getNV()*l0);
 		kbtmp = ((l0*l0)/(calA0*calA0))*PI*kb;
 
-		packingObject.cell(ci).setka(1.0);
+		packingObject.cell(ci).setka(katmp);
 		packingObject.cell(ci).setkl(kltmp);
 		packingObject.cell(ci).setkb(kbtmp);
 		packingObject.cell(ci).setkint(kint);
 
-		cout << "	** ci = " << ci << ": ka = 1, kl = " << kltmp << ", kb = " << kbtmp << endl;
+		cout << "	** ci = " << ci << ": ka = " << katmp << ", kl = " << kltmp << ", kb = " << kbtmp << endl;
 	}
 
 	// update time scale
@@ -107,6 +109,23 @@ int main()
 		// decrease by packing fraction
 		cout << "	** Compression protocol state " << cc + 1 << "/" << NCOMP+1 << " from phi = " << phi << " to phi + dphi = " << phi + dphi << " by dphi = " << dphi << endl;
 		packingObject.scaleLengths(rscale);
+
+		for (int ci=0; ci<NCELLS; ci++){
+			a0 = packingObject.cell(ci).geta0();
+			l0 = packingObject.cell(ci).getl0();
+			calA0 = packingObject.cell(ci).calA0();
+
+			katmp = (1.0/a0);
+			kltmp = kl/(packingObject.cell(ci).getNV()*l0);
+			kbtmp = ((l0*l0)/(calA0*calA0))*PI*kb;
+
+			packingObject.cell(ci).setka(katmp);
+			packingObject.cell(ci).setkl(kltmp);
+			packingObject.cell(ci).setkb(kbtmp);
+			packingObject.cell(ci).setkint(kint);
+
+			cout << "	** ci = " << ci << ": ka = " << katmp << ", kl = " << kltmp << ", kb = " << kbtmp << endl;
+		}
 
 		// minimize forces of new state
 		cout << "	** STATE " << cc + 1 << "/" << NCOMP+1 << ": relaxing system force to Ftol = " << Ftol << endl;

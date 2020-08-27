@@ -1161,8 +1161,8 @@ void deformableParticles2D::shapeForces(){
 			// NOTE: assuming that ka = 1
 
 			// calculate force term in each direction (based on calc from notes)
-			fxTmp = astrain*0.5*(vrel(im1,1) - vrel(ip1,1));
-			fyTmp = astrain*0.5*(vrel(ip1,0) - vrel(im1,0));
+			fxTmp = ka*astrain*0.5*(vrel(im1,1) - vrel(ip1,1));
+			fyTmp = ka*astrain*0.5*(vrel(ip1,0) - vrel(im1,0));
 
 			// add to force on vertices
 			setVForce(i,0,vforce(i,0)+fxTmp);
