@@ -53,7 +53,6 @@ const int itmax       		= 1e7;
 // DP force constants
 const double ka 			= 1.0;			// area spring (should be = 1)
 const double eint 			= 1.0;			// interaction energy 
-const double a 				= 0.0;			// attraction parameter 
 const double del 			= 1.0;			// radius of vertices in units of l0
 
 
@@ -246,6 +245,7 @@ int main(int argc, char const *argv[]){
 	vector<double> l0(NCELLS,1.0);
 
 	// initialize effective disk radius (for minimization), and l0 parameter
+	areaSum = 0.0;
 	for (ci=0; ci<NCELLS; ci++){
 		// set initial area
 		if (ci < smallN){
@@ -273,9 +273,9 @@ int main(int argc, char const *argv[]){
 		for (vi=0; vi<nvtmp; vi++)
 			vrad.at(gi+vi)	= 0.5*l0.at(ci)*del;
 
-		// add to sum of particle areas
-		areaSum 		+= PI*pow(drad.at(ci),2.0);
-		cout << "drad = " << drad.at(ci) << ", disk area = " << PI*pow(drad.at(ci),2.0) << ", l0 = " << l0.at(ci) << ", a0 = " << a0tmp << ", vrad = " << vrad.at(ci) << endl;
+		// add to sum of particle areas (including contribution from vertices)
+		areaSum 		+= a0tmp + 0.25*PI*pow(l0.at(ci)*del,2.0)*(0.5*nvtmp - 1);
+		cout << "drad = " << drad.at(ci) << ", disk area = " << PI*pow(drad.at(ci),2.0) << ", l0 = " << l0.at(ci) << ", a0 = " << a0tmp << endl;
 	}
 
 	// determine box lengths from particle sizes and input packing fraction
@@ -614,12 +614,6 @@ int main(int argc, char const *argv[]){
 	// D P  M I N I M I Z A T I O N
 	// 
 	// ----------------------------
-
-
-	// TO DO LIST
-	// 	-- 1. DEBUG interaction code using linked list implementation in sphereGel.cpp
-	// 	-- 2. Run initial DP FIRE minimization, output final state and check results
-	//  -- 3. Add NVE code, output K and U energies, check energy conservation
 
 
 
@@ -1004,9 +998,9 @@ int main(int argc, char const *argv[]){
 			cout << "	** alpha = " << alpha << endl;
 			cout << "	** Uint = " << U << endl;
 
-				// print vertex positions to check placement
-			// cout << "\t** PRINTING POSITIONS TO FILE... " << endl;
-			// printPos(posout, vpos, a0, l0, L, nv, szList, phi0, NCELLS);
+			// print vertex positions to check placement
+			cout << "\t** PRINTING POSITIONS TO FILE... " << endl;
+			printPos(posout, vpos, a0, l0, L, nv, szList, phi0, NCELLS);
 		}
 
 		// Step 1. adjust simulation based on net motion of degrees of freedom
@@ -1099,10 +1093,25 @@ int main(int argc, char const *argv[]){
 
 
 	// print vertex positions to check placement
-	// cout << "\t** PRINTING POSITIONS TO FILE... " << endl;
-	// printPos(posout, vpos, a0, l0, L, nv, szList, phi0, NCELLS);
+	cout << "\t** PRINTING POSITIONS TO FILE... " << endl;
+	printPos(posout, vpos, a0, l0, L, nv, szList, phi0, NCELLS);
 
+	// check phi
+	double phiCheck, phi0Check;
+	phiCheck = 0.0;
+	phi0Check = 0.0;
+	for (ci=0; ci<NCELLS; ci++){
+		cout << "area of particle " << ci << " = " << area(vpos,ci,L,nv,szList) + 0.25*PI*pow(l0.at(ci)*del,2.0)*(0.5*nv[ci] - 1) << endl;
+		phiCheck += area(vpos,ci,L,nv,szList) + 0.25*PI*pow(l0.at(ci)*del,2.0)*(0.5*nv[ci] - 1);
+	}
+	phiCheck /= (L[0]*L[1]);
 
+	// print packing fraction just to check
+	cout << "input phi0 = " << phi0 << endl;
+	cout << "computed phi = " << phiCheck << endl;
+	cout << "Lx = " << L.at(0) << ", Ly = " << L.at(1) << endl;
+
+	return 0;
 
 
 
