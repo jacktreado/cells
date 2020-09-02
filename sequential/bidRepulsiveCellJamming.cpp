@@ -661,6 +661,7 @@ int main(int argc, char const *argv[]){
 	double pcheck;
 
 	// max number of jamming iteractions
+	k = 0;
 	kmax = 1e4;
 
 	// initial boolean variables
