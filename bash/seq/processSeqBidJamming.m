@@ -132,7 +132,7 @@ for ss = 1:NSIM
     phiJList{ss,2}      = phi0J;
     
     
-    % parse and save VDOS information
+    % read in vdos data
     fid = fopen(vdosfstr);
 
     % dof
@@ -141,29 +141,72 @@ for ss = 1:NSIM
 
     % eigenvalue data
     evals = textscan(fid,'%f',dof);
-    evals = evals{1};
+    if isempty(evals)
+        fprintf('Evals not read, skipping\n');
+        simSkip(ss) = true;
+        fclose(fid);
+        continue;
+    else
+        evals = evals{1};
+    end
 
     % eigenvector data
     frmt = repmat('%f ',1,dof);
     evecs = textscan(fid,frmt,dof);
+    if isempty(evecs)
+        fprintf('Evecs not read, skipping\n');
+        simSkip(ss) = true;
+        fclose(fid);
+        continue;
+    else
+        evecs = cell2mat(evecs);
+    end
 
     hproj = zeros(dof,1);
     sproj = zeros(dof,1);
     for dd = 1:dof
-        data = textscan(fid,'%f',1);
-        hproj(dd) = data{1};
+        if feof(fid) == 1
+            fprintf('EOF found before end of projections, skipping...\n');
+            simSkip(ss) = true;
+            break;
+        else
+            data = textscan(fid,'%f',1);
+            if isempty(data{1})
+                fprintf('Projections not read, skipping...\n');
+                simSkip(ss) = true;
+                break;
+            else
+                hproj(dd) = data{1};
+            end
+        end
 
-        data = textscan(fid,'%f',1);
-        sproj(dd) = data{1};
+        if feof(fid) == 1
+            fprintf('EOF found before end of projections, skipping...\n');
+            simSkip(ss) = true;
+            break;
+        else
+            data = textscan(fid,'%f',1);
+            if isempty(data{1})
+                fprintf('Projections not read, skipping...\n');
+                simSkip(ss) = true;
+                break;
+            else
+                sproj(dd) = data{1};
+            end
+        end
     end
+    if simSkip(ss) == true
+        fclose(fid);
+        continue;
+    end
+
+    % close the file
+    fclose(fid);
     
     % save data
     evalsList{ss} = evals;
     hProjList{ss} = hproj;
     sProjList{ss} = sproj;
-
-    % ciose the file
-    fclose(fid);
     
     
     % NOTE IF YOU WANT TO SAVE PARTICIPATION RATIOS, PROJECTION ONTO T, R, etc
