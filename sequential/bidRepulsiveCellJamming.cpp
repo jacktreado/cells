@@ -1239,22 +1239,22 @@ int main(int argc, char const *argv[]){
 		cout << "	* jammed = " << jammed << endl << endl;
 
 		// print contact matrix
-		cout << "Contact matrix:" << endl;
-		for (ci=0; ci<NCELLS; ci++){
-			for (cj=0; cj<NCELLS; cj++){
-				if (ci != cj){
-					if (ci > cj)
-						cout << cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2] << "  ";
-					else
-						cout << cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2] << "  ";
-				}
-				else
-					cout << 0 << "  ";
+		// cout << "Contact matrix:" << endl;
+		// for (ci=0; ci<NCELLS; ci++){
+		// 	for (cj=0; cj<NCELLS; cj++){
+		// 		if (ci != cj){
+		// 			if (ci > cj)
+		// 				cout << cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2] << "  ";
+		// 			else
+		// 				cout << cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2] << "  ";
+		// 		}
+		// 		else
+		// 			cout << 0 << "  ";
 				
-			}
-			cout << endl;
-		}
-		cout << endl << endl;
+		// 	}
+		// 	cout << endl;
+		// }
+		// cout << endl << endl;
 
 		// print vertex positions
 		// cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl;
