@@ -64,7 +64,8 @@ const int itmax       		= 1e7;
 
 // DP force constants
 const double ka 			= 1.0;			// area spring (should be = 1)
-const double eint 			= 1.0;			// interaction energy 
+// const double eint 			= 1.0;			// interaction energy NOTE: OTHER FORM IS DONG'S ENERGY
+const double eint 			= 0.01;			// interaction energy 
 const double del 			= 1.0;			// radius of vertices in units of l0
 
 
@@ -947,7 +948,8 @@ int main(int argc, char const *argv[]){
 
 						// shape force parameters
 						Kl = nvtmp*l0tmp*kl;
-						Kb = kb/(nvtmp*pow(l0tmp,4.0));
+						// Kb = kb/(nvtmp*pow(l0tmp,4.0)); NOTE: OTHER FORM IS FROM DONG'S ENERGY
+						Kb = kb/(nvtmp*pow(l0tmp,2.0));
 
 						// compute cell center of mass
 						xi = vpos[NDIM*gi];
@@ -1238,28 +1240,6 @@ int main(int argc, char const *argv[]){
 		cout << "	* overcompressed = " << overcompressed << endl;
 		cout << "	* jammed = " << jammed << endl << endl;
 
-		// print contact matrix
-		// cout << "Contact matrix:" << endl;
-		// for (ci=0; ci<NCELLS; ci++){
-		// 	for (cj=0; cj<NCELLS; cj++){
-		// 		if (ci != cj){
-		// 			if (ci > cj)
-		// 				cout << cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2] << "  ";
-		// 			else
-		// 				cout << cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2] << "  ";
-		// 		}
-		// 		else
-		// 			cout << 0 << "  ";
-				
-		// 	}
-		// 	cout << endl;
-		// }
-		// cout << endl << endl;
-
-		// print vertex positions
-		// cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl;
-		// printPos(posout, vpos, a0, l0, L, cij, nv, szList, phi0, NCELLS);
-
 		// update particle sizes based on target check
 		if (rH < 0){
 			// if still undercompressed, then grow until overcompressed found
@@ -1531,7 +1511,8 @@ int main(int argc, char const *argv[]){
 		delA = area(vpos,ci,L,nv,szList) - a0tmp;
 
 		// bending energy constants (use form where curvatures are dimensionless)
-		eb = kb/(nvtmp*pow(l0tmp,2.0));
+		// eb = kb/(nvtmp*pow(l0tmp,2.0)); NOTE: OTHER FORM IS DONG'S ENERGY
+		eb = kb/nvtmp;
 		fb = eb/pow(l0tmp,2.0);
 
 		// loop over vertices, compute each DM element
