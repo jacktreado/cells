@@ -1963,8 +1963,9 @@ int main(int argc, char const *argv[]){
 
 
 	// compute eigenvalues
-	cout << "	** Computing eigenvalues and eigenvectors of full DM" << endl;
+	cout << "	** Computing eigenvalues and eigenvectors of full DM AND stiffness matrix" << endl;
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> allModes(M);
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> hModes(H);
 
 	// define eigenvector matrix
 	Eigen::MatrixXd evecs = allModes.eigenvectors();
@@ -1973,26 +1974,27 @@ int main(int argc, char const *argv[]){
 	cout << "	** Printing evals and evecs to file" << endl;
 	vdosout << vertDOF << endl;
 	vdosout << allModes.eigenvalues() << endl;
+	vdosout << hModes.eigenvalues() << endl;
 	vdosout << evecs << endl;
 
 	// print projections onto stiffness and stress directions
-	cout << "	** Printing projections onto stiffness and stress directions" << endl;
-	double stiffProj, stressProj, v1, v2;
-	int l1, l2;
-	for (k=0; k<vertDOF; k++){
-		stiffProj = 0.0;
-		stressProj = 0.0;
-		for (l1=0; l1<vertDOF; l1++){
-			v1 = evecs(l1,k);
-			for (l2=0; l2<vertDOF; l2++){
-				v2 			= evecs(l2,k);
-				stiffProj 	+= H(l1,l2)*v1*v2;
-				stressProj 	+= S(l1,l2)*v1*v2;
-			}
-		}
-		vdosout << setprecision(14) << stiffProj << endl;
-		vdosout << setprecision(14) << stressProj << endl;
-	}
+	// cout << "	** Printing projections onto stiffness and stress directions" << endl;
+	// double stiffProj, stressProj, v1, v2;
+	// int l1, l2;
+	// for (k=0; k<vertDOF; k++){
+	// 	stiffProj = 0.0;
+	// 	stressProj = 0.0;
+	// 	for (l1=0; l1<vertDOF; l1++){
+	// 		v1 = evecs(l1,k);
+	// 		for (l2=0; l2<vertDOF; l2++){
+	// 			v2 			= evecs(l2,k);
+	// 			stiffProj 	+= H(l1,l2)*v1*v2;
+	// 			stressProj 	+= S(l1,l2)*v1*v2;
+	// 		}
+	// 	}
+	// 	vdosout << setprecision(14) << stiffProj << endl;
+	// 	vdosout << setprecision(14) << stressProj << endl;
+	// }
 
 
 	// close open objects
