@@ -64,8 +64,7 @@ const int itmax       		= 1e7;
 
 // DP force constants
 const double ka 			= 1.0;			// area spring (should be = 1)
-// const double eint 			= 1.0;			// interaction energy NOTE: OTHER FORM IS DONG'S ENERGY
-const double eint 			= 0.01;			// interaction energy 
+const double eint 			= 1.0;			// interaction energy
 const double del 			= 1.0;			// radius of vertices in units of l0
 
 
@@ -948,8 +947,8 @@ int main(int argc, char const *argv[]){
 
 						// shape force parameters
 						Kl = nvtmp*l0tmp*kl;
-						// Kb = kb/(nvtmp*pow(l0tmp,4.0)); NOTE: OTHER FORM IS FROM DONG'S ENERGY
-						Kb = kb/(nvtmp*pow(l0tmp,2.0));
+						Kb = kb/(nvtmp*pow(l0tmp,4.0));
+						// Kb = kb/(nvtmp*pow(l0tmp,2.0)); // NOTE: THIS FORM IS DONG'S ENERGY
 
 						// compute cell center of mass
 						xi = vpos[NDIM*gi];
@@ -1511,8 +1510,8 @@ int main(int argc, char const *argv[]){
 		delA = area(vpos,ci,L,nv,szList) - a0tmp;
 
 		// bending energy constants (use form where curvatures are dimensionless)
-		// eb = kb/(nvtmp*pow(l0tmp,2.0)); NOTE: OTHER FORM IS DONG'S ENERGY
-		eb = kb/nvtmp;
+		eb = kb/(nvtmp*pow(l0tmp,2.0)); 
+		// eb = kb/nvtmp; // NOTE: THIS FORM IS DONG'S ENERGY
 		fb = eb/pow(l0tmp,2.0);
 
 		// loop over vertices, compute each DM element
