@@ -67,7 +67,7 @@ let arrsz=0
 for f in $flist
     let arrsz=$arrsz+1
 done
-if [[ arrsz -lt 2 ]]
+if [[ $arrsz -lt 2 ]]
 then
     echo arrsz = $arrsz, which is too small, ending.
     exit 1
