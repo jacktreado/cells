@@ -86,10 +86,17 @@ for f in $flist; do
     then
         echo seed = $seed too small, skipping...
         continue
-    else    
-        # increment file count
-        let fcount=$fcount+1
-        echo seed = $seed is ready for primetime, adding to task file.
+    else
+        # check if file is empty
+        if [[ ! -s $file ]]
+        then
+            echo file $file is empty, skipping...
+            continue
+        else
+            # increment file count
+            let fcount=$fcount+1
+            echo seed = $seed is ready for primetime, adding to task file.
+        fi
     fi
 
     # echo string of numSeedPerRun commands to task file
