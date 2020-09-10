@@ -41,7 +41,7 @@ const double alpha0      	= 0.2;
 const double finc        	= 1.1;
 const double fdec        	= 0.5;
 const double falpha      	= 0.99;
-const double Ftol 			= 1e-14;
+const double Ftol 			= 1e-10;
 
 const int NSKIP 			= 1e3;
 const int NMIN        		= 100;
@@ -838,7 +838,7 @@ int main(int argc, char const *argv[]){
 
 					// shape force parameters
 					Kl = nvtmp*l0tmp*kl;
-					Kb = kb/(nvtmp*pow(l0tmp,4.0));
+					Kb = kb/(nvtmp*pow(l0tmp,2.0));
 
 					// compute cell center of mass
 					xi = vpos[NDIM*gi];
@@ -996,10 +996,6 @@ int main(int argc, char const *argv[]){
 			cout << "	** Pdir = " << P/(fnorm*vnorm) << endl;
 			cout << "	** alpha = " << alpha << endl;
 			cout << "	** Uint = " << U << endl;
-
-			// print vertex positions to check placement
-			cout << "\t** PRINTING POSITIONS TO FILE... " << endl;
-			printPos(posout, vpos, a0, l0, L, nv, szList, phi0, NCELLS);
 		}
 
 		// Step 1. adjust simulation based on net motion of degrees of freedom
@@ -1094,31 +1090,6 @@ int main(int argc, char const *argv[]){
 	// print vertex positions to check placement
 	cout << "\t** PRINTING POSITIONS TO FILE... " << endl;
 	printPos(posout, vpos, a0, l0, L, nv, szList, phi0, NCELLS);
-
-	// check phi
-	double phiCheck, phi0Check;
-	phiCheck = 0.0;
-	phi0Check = 0.0;
-	for (ci=0; ci<NCELLS; ci++){
-		cout << "area of particle " << ci << " = " << area(vpos,ci,L,nv,szList) + 0.25*PI*pow(l0.at(ci)*del,2.0)*(0.5*nv[ci] - 1) << endl;
-		phiCheck += area(vpos,ci,L,nv,szList) + 0.25*PI*pow(l0.at(ci)*del,2.0)*(0.5*nv[ci] - 1);
-	}
-	phiCheck /= (L[0]*L[1]);
-
-	// print packing fraction just to check
-	cout << "input phi0 = " << phi0 << endl;
-	cout << "computed phi = " << phiCheck << endl;
-	cout << "Lx = " << L.at(0) << ", Ly = " << L.at(1) << endl;
-
-	return 0;
-
-
-
-
-
-
-
-
 
 
 
@@ -1342,7 +1313,7 @@ int main(int argc, char const *argv[]){
 
 					// shape force parameters
 					Kl = nvtmp*l0tmp*kl;
-					Kb = kb/(nvtmp*pow(l0tmp,4.0));
+					Kb = kb/(nvtmp*pow(l0tmp,2.0));
 
 					// compute cell center of mass
 					xi = vpos[NDIM*gi];
