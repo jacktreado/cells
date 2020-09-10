@@ -89,7 +89,7 @@ for f in $flist; do
         continue
     else
         # check if file is empty
-        if [[ ! -s $file ]]
+        if [[ ! -s $f ]]
         then
             echo file $file is empty, skipping...
             continue
