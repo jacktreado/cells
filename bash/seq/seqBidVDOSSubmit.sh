@@ -29,9 +29,6 @@ partition=$6
 time=$7
 startSeed=$8
 
-let numSeeds=$numSeedsPerRun*$numRuns
-let endSeed=$startSeed+$numSeeds-1
-
 # name strings
 basestr=seqbidcells_N"$NCELLS"_NV"$NV"_calA"$calA0"_kl"$kl"_kb"$kb"
 runstr="$basestr"_startseed"$startSeed"
@@ -43,7 +40,6 @@ mkdir -p $simdatadir
 # compile into binary using packing.h
 binf=bin/"$runstr".o
 mainf=$maindir/bidRepulsiveCellVDOS.cpp
-echo  $numSeeds jamming sims of $NCELLS cells with $NV verts, bidisperse , calA0 = $calA0 , and bending energy kb = $kb
 
 # run compiler
 rm -f $binf
