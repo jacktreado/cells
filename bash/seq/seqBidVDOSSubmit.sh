@@ -65,6 +65,7 @@ for f in $flist; do
 done
 if [[ $arrsz -lt 2 ]]
 then
+    echo flist = $flist
     echo arrsz = $arrsz, which is too small, ending.
     exit 1
 else
