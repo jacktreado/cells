@@ -31,7 +31,7 @@ startSeed=$8
 
 # name strings
 basestr=seqbidcells_N"$NCELLS"_NV"$NV"_calA"$calA0"_kl"$kl"_kb"$kb"
-runstr="$basestr"_startseed"$startSeed"
+runstr="$basestr"_startseed"$startSeed"_VDOS
 
 # make directory specific for this simulation
 simdatadir=$simtypedir/$basestr
@@ -149,7 +149,7 @@ cat $slurmf
 
 # run sbatch file
 echo -- running on slurm in partition $partition
-echo sbatch -t $time $slurmf
+sbatch -t $time $slurmf
 
 
 # ====================
