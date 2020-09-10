@@ -60,7 +60,7 @@ rm -f $taskf
 # loop over files, check that array has entries
 flist="$simdatadir"/"$basestr"_seed*.jam
 let arrsz=0
-for f in $flist
+for f in $flist; do
     let arrsz=$arrsz+1
 done
 if [[ $arrsz -lt 2 ]]
