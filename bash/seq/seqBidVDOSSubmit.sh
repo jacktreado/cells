@@ -61,8 +61,20 @@ fi
 taskf=tasks/"$runstr".task
 rm -f $taskf
 
-# loop over files
+# loop over files, check that array has entries
 flist="$simdatadir"/"$basestr"_seed*.jam
+let arrsz=0
+for f in $flist
+    let arrsz=$arrsz+1
+done
+if [[ arrsz -lt 2 ]]
+then
+    echo arrsz = $arrsz, which is too small, ending.
+    exit 1
+else
+    echo flist has $arrsz files, adding to task list...
+fi
+
 let fcount=0
 
 # LOOP OVER FILES. 
