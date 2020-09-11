@@ -243,6 +243,7 @@ for ss = 1:NSIM
     xall = zeros(NVTOT,1);
     yall = zeros(NVTOT,1);
     Dc = zeros(NCELLS,1);
+    last = 1;
     for nn = 1:NCELLS
         next = last + nv(nn) - 1;
         xall(last:next) = xpos{nn};
@@ -253,8 +254,21 @@ for ss = 1:NSIM
         Dc(nn) = l0(nn)/sin(pi/nv(nn));
     end
     
+    evecsSwap = evecs;
+        
+    % my indexing
+    x0inds = 1:2:(NDOF-1);
+    y0inds = 2:2:NDOF;
+
+    % Dong's indexing
+    xinds = 1:NVTOT;
+    yinds = (NVTOT + 1):NDOF;
+
+    evecsSwap(xinds,:) = evecs(x0inds,:);
+    evecsSwap(yinds,:) = evecs(y0inds,:);
+    
     % use Dong's code
-    V2_norm = ModeProj_DPM(NCELLS, nv, Dc, xall, yall, evecs);
+    V2_norm = ModeProj_DPM(NCELLS, nv, Dc, xall, yall, evecsSwap);
 
     % save projections for this pressure
     projList{ss,1} = V2_norm(1,:)';
