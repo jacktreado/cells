@@ -227,7 +227,7 @@ for ss = 1:NSIM
 
             pvdenom = pvdenom + (Ex*Ex + Ey*Ey)^2;
         end
-        pvdenom = N * pvdenom;
+        pvdenom = NCELLS * pvdenom;
 
 
         pc(kk) = pvnum/pvdenom;
