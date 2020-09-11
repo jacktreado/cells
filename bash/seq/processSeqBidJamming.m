@@ -201,7 +201,7 @@ for ss = 1:NSIM
     for kk = 1:dof
         pvnum = 0.0;
         gi = 1;
-        for ii = 1:N
+        for ii = 1:NCELLS
             xinds = xi(gi:sz(ii));
             yinds = xinds + 1;
             ex = evecs(xinds,kk);
@@ -216,7 +216,7 @@ for ss = 1:NSIM
 
         pvdenom = 0.0;
         gi = 1;
-        for ii = 1:N
+        for ii = 1:NCELLS
             xinds = xi(gi:sz(ii));
             yinds = xinds + 1;
             ex = evecs(xinds,kk);
