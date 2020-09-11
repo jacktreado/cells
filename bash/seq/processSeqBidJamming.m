@@ -257,8 +257,8 @@ for ss = 1:NSIM
     evecsSwap = evecs;
         
     % my indexing
-    x0inds = 1:2:(NDOF-1);
-    y0inds = 2:2:NDOF;
+    x0inds = 1:2:(dof-1);
+    y0inds = 2:2:dof;
 
     % Dong's indexing
     xinds = 1:NVTOT;
