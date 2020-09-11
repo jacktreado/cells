@@ -28,11 +28,11 @@ phiJList            = cell(NSIM,2);         % packing fractions (both from a and
 
 % VDOS list
 evalsList           = cell(NSIM,1);         % list of eigenvalues at jamming
-hProjList           = cell(NSIM,1);         % list of projections of eigenvectors onto H
-sProjList           = cell(NSIM,1);         % list of projections of eignevectors onto S
-% dirProjList         = cell(NSIM,3);         % list of projections onto T, R, S directions
-% vertPrList          = cell(NSIM,1);         % vertex-based participation ratio at jamming
-% cellPrList          = cell(NSIM,1);         % cell-based participation ratio at jamming
+hvalsList           = cell(NSIM,1);         % list of projections of eigenvectors onto H
+svalsList           = cell(NSIM,1);         % list of projections of eignevectors onto S
+pvList              = cell(NSIM,1);         % vertex-based participation ratio at jamming
+pcList              = cell(NSIM,1);         % cell-based participation ratio at jamming
+projList            = cell(NSIM,3);         % list of projections onto T, R, S directions
 
 
 %% Loop over simulations
@@ -141,111 +141,228 @@ for ss = 1:NSIM
 
     % eigenvalue data
     evals = textscan(fid,'%f',dof);
-    if isempty(evals)
-        fprintf('Evals not read, skipping\n');
-        simSkip(ss) = true;
-        fclose(fid);
-        continue;
-    else
-        evals = evals{1};
-    end
-    
-    % TMP: stiffness eigenvalues
-    hvals = textscan(fid,'%f',dof);
-    if isempty(hvals)
-        fprintf('hvals not read, skipping\n');
-        simSkip(ss) = true;
-        fclose(fid);
-        continue;
-    else
-        hvals = hvals{1};
-    end
-    
+    evals = evals{1};
 
+
+    % stiffness eval data
+    hvals = textscan(fid,'%f',dof);
+    hvals = hvals{1};
+
+
+    % stiffness eval data
+    svals = textscan(fid,'%f',dof);
+    svals = svals{1};
+    
     % eigenvector data
     frmt = repmat('%f ',1,dof);
     evecs = textscan(fid,frmt,dof);
     if isempty(evecs)
-        fprintf('Evecs not read, skipping\n');
-        simSkip(ss) = true;
+        fprintf('Evecs from %s not read, skipping\n',vdosfname);
         fclose(fid);
+        simSkip(ss) = true;
         continue;
     else
         evecs = cell2mat(evecs);
     end
-
-%     TMP
-%     hproj = zeros(dof,1);
-%     sproj = zeros(dof,1);
-%     for dd = 1:dof
-%         if feof(fid) == 1
-%             fprintf('EOF found before end of projections, skipping...\n');
-%             simSkip(ss) = true;
-%             break;
-%         else
-%             data = textscan(fid,'%f',1);
-%             if isempty(data{1})
-%                 fprintf('Projections not read, skipping...\n');
-%                 simSkip(ss) = true;
-%                 break;
-%             else
-%                 hproj(dd) = data{1};
-%             end
-%         end
-% 
-%         if feof(fid) == 1
-%             fprintf('EOF found before end of projections, skipping...\n');
-%             simSkip(ss) = true;
-%             break;
-%         else
-%             data = textscan(fid,'%f',1);
-%             if isempty(data{1})
-%                 fprintf('Projections not read, skipping...\n');
-%                 simSkip(ss) = true;
-%                 break;
-%             else
-%                 sproj(dd) = data{1};
-%             end
-%         end
-%     end
-%     if simSkip(ss) == true
-%         fclose(fid);
-%         continue;
-%     end
-%     TMP
 
     % close the file
     fclose(fid);
     
     % save data
     evalsList{ss} = evals;
-    hProjList{ss} = hvals;
-%     hProjList{ss} = hproj;
-%     sProjList{ss} = sproj;
+    hvalsList{ss} = hvals;
+    svalsList{ss} = svals;
+    
+    % vertex-based participation ratio
+    pv = zeros(dof,1);
+    for kk = 1:dof
+        pvnum = 0.0;
+        for ll = 1:2:dof-1
+            pvnum = pvnum + evecs(ll,kk)*evecs(ll,kk) + evecs(ll+1,kk)*evecs(ll+1,kk);
+        end
+        pvnum = pvnum * pvnum;
+
+        pvdenom = 0.0;
+        for ll = 1:2:dof-1
+            pvdenom = pvdenom + (evecs(ll,kk)*evecs(ll,kk) + evecs(ll+1,kk)*evecs(ll+1,kk))^2;
+        end
+        pvdenom = 0.5 * dof * pvdenom;
+
+
+        pv(kk) = pvnum/pvdenom;
+    end
+
+    
+    % cell-based participation ratio
+    xi = 1:2:dof-1;
+    sz = cumsum(nv);
+
+    pc = zeros(dof,1);
+    for kk = 1:dof
+        pvnum = 0.0;
+        gi = 1;
+        for ii = 1:N
+            xinds = xi(gi:sz(ii));
+            yinds = xinds + 1;
+            ex = evecs(xinds,kk);
+            ey = evecs(yinds,kk);
+            Ex = sum(ex);
+            Ey = sum(ey);
+            gi = sz(ii) + 1;
+
+            pvnum = pvnum + Ex*Ex + Ey*Ey;
+        end
+        pvnum = pvnum * pvnum;
+
+        pvdenom = 0.0;
+        gi = 1;
+        for ii = 1:N
+            xinds = xi(gi:sz(ii));
+            yinds = xinds + 1;
+            ex = evecs(xinds,kk);
+            ey = evecs(yinds,kk);
+            Ex = sum(ex);
+            Ey = sum(ey);
+            gi = sz(ii) + 1;
+
+            pvdenom = pvdenom + (Ex*Ex + Ey*Ey)^2;
+        end
+        pvdenom = N * pvdenom;
+
+
+        pc(kk) = pvnum/pvdenom;
+    end
+    
+    % save participation ratios
+    pvList{ss} = pv;
+    pcList{ss} = pc;
     
     
-    % NOTE IF YOU WANT TO SAVE PARTICIPATION RATIOS, PROJECTION ONTO T, R, etc
-    % DO so here using VDOS data
+    % construct data for projection computation
+    NVTOT = sum(nv);
+    xall = zeros(NVTOT,1);
+    yall = zeros(NVTOT,1);
+    Dc = zeros(NCELLS,1);
+    for nn = 1:NCELLS
+        next = last + nv(nn) - 1;
+        xall(last:next) = xpos{nn};
+        yall(last:next) = ypos{nn};
+        last = next + 1;
+
+        % compute effective cell diameter
+        Dc(nn) = l0(nn)/sin(pi/nv(nn));
+    end
+    
+    % use Dong's code
+    V2_norm = ModeProj_DPM(NCELLS, nv, Dc, xall, yall, evecs);
+
+    % save projections for this pressure
+    projList{ss,1} = V2_norm(1,:)';
+    projList{ss,2} = V2_norm(2,:)';
+    projList{ss,3} = V2_norm(3,:)';
 end
 
 % remove problematic sims
-simList(simSkip) = [];
-NCELLSList(simSkip) = [];
-NvList(simSkip) = [];
-LList(simSkip,:) = [];
-zcList(simSkip) = [];
-zvList(simSkip) = [];
-a0List(simSkip) = [];
-l0List(simSkip) = [];
-calAList(simSkip,:) = [];
-phiJList(simSkip,:) = [];
-evalsList(simSkip) = [];
-hProjList(simSkip) = [];
-sProjList(simSkip) = [];
+simList(simSkip)        = [];
+NCELLSList(simSkip)     = [];
+NvList(simSkip)         = [];
+LList(simSkip,:)        = [];
+zcList(simSkip)         = [];
+zvList(simSkip)         = [];
+a0List(simSkip)         = [];
+l0List(simSkip)         = [];
+calAList(simSkip,:)     = [];
+phiJList(simSkip,:)     = [];
+evalsList(simSkip)      = [];
+hvalsList(simSkip)      = [];
+svalsList(simSkip)      = [];
+pvList(simSkip)         = [];
+pcList(simSkip)         = [];
+projList(simSkip)       = [];
 
 % save to matfile
 save(saveStr,'simList','NCELLSList','NvList','LList','zcList','zvList','a0List',...
-    'l0List','calAList','phiJList','evalsList','hProjList','sProjList');
+    'l0List','calAList','phiJList','evalsList','hvalsList','svalsList','pvList','pcList','projList');
+
+
+end
+
+
+
+
+
+
+
+
+
+
+function V2_norm = ModeProj_DPM(Nc, Ns, Dc, x, y, eigV)
+%% FUNCTION to compute projection of modes onto different directions
+% -- Nc: number of cells
+% -- Ns: number of vertices / cell
+% -- Dc: effective cell diamters, based on l0
+% -- x: all x vertex positions
+% -- y: all y vertex positions
+% -- eigV: eigenVector matrix, sorted by all x, then all y
+
+% jack's edits to Dongs code
+N = sum(Ns);
+
+ift = zeros(N, 1);
+jft = zeros(N, 1);
+idx_start = zeros(Nc, 1);
+idx_end = zeros(Nc, 1);
+Ns_all = zeros(N, 1);
+
+for nc = 1:Nc
+    idx1 = sum(Ns(1:nc-1)) + 1;
+    idx2 = sum(Ns(1:nc));
+    idx_start(nc) = idx1;
+    idx_end(nc) = idx2;
+    ift(idx1:idx2) = [2:Ns(nc) 1]' + idx1 - 1;
+    jft(idx1:idx2) = [Ns(nc) 1:Ns(nc)-1]' + idx1 - 1;
+    Ns_all(idx1:idx2) = Ns(nc);
+end
+
+U = zeros(2 * N, 3 * Nc);
+for it = 1:Nc
+    idx1 = idx_start(it);
+    idx2 = idx_end(it);
+    U(idx1:idx2, it) = 1;
+    U(idx1+N:idx2+N, it + Nc) = 1;
+    
+    dtheta = 2 / Dc(nc);
+    xs = x(idx1:idx2);
+    ys = y(idx1:idx2);
+    x_cen = mean(xs);
+    y_cen = mean(ys);
+    rx = xs - x_cen;
+    ry = ys - y_cen;
+    r = sqrt(rx.^2 + ry.^2);
+    theta_s = atan2(ry, rx);
+    U(idx1:idx2, it + 2 * Nc) = -dtheta * r .* sin(theta_s);
+    U(idx1+N:idx2+N, it + 2 * Nc) = dtheta * r .* cos(theta_s);
+end
+
+for it = 1:3*Nc
+    U(:, it) = U(:, it) / norm(U(:, it));
+end
+
+V2 = zeros(3 * Nc, 2 * N);
+
+for i = 1:2*N
+    for j = 1:3*Nc
+        V2(j, i) = dot(eigV(:, i), U(:, j));
+    end
+end
+
+V2_norm = zeros(3, 2*N);
+for it = 1:2*N
+    V2_norm(1, it) = sum(V2(1:2*Nc, it).^2); % translation
+    V2_norm(2, it) = sum(V2(2*Nc+1:3*Nc, it).^2); % rotation 
+    V2_norm(3, it) = 1 - V2_norm(1, it) - V2_norm(2, it); % deformation
+end
+
 
 
 end
