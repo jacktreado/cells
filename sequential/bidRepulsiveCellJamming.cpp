@@ -1107,9 +1107,6 @@ int main(int argc, char const *argv[]){
 				cout << "	** P 		= " << P << endl;
 				cout << "	** Pdir 	= " << P/(fnorm*vnorm) << endl;
 				cout << "	** alpha 	= " << alpha << endl;
-
-				cout << "	* Writing config to file : " << positionFile << endl << endl;
-				printPos(posout, vpos, a0, l0, L, cij, nv, szList, phi0, NCELLS);
 			}
 
 			// Step 1. adjust simulation based on net motion of degrees of freedom
@@ -1241,8 +1238,6 @@ int main(int argc, char const *argv[]){
 		cout << "	* undercompressed = " << undercompressed << endl;
 		cout << "	* overcompressed = " << overcompressed << endl;
 		cout << "	* jammed = " << jammed << endl << endl;
-		cout << "	* Writing config to file : " << positionFile << endl << endl;
-		printPos(posout, vpos, a0, l0, L, cij, nv, szList, phi0, NCELLS);
 
 		// update particle sizes based on target check
 		if (rH < 0){
