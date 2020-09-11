@@ -275,7 +275,7 @@ int main(int argc, char const *argv[]){
 		a0.at(ci) 		= a0tmp;
 
 		// set disk radius
-		drad.at(ci) 	= 1.5*sqrt((2.0*a0tmp)/(nvtmp*sin(2.0*PI/nvtmp)));
+		drad.at(ci) 	= 1.05*sqrt((2.0*a0tmp)/(nvtmp*sin(2.0*PI/nvtmp)));
 
 		// set l0, vector radius
 		l0.at(ci) 	= 2.0*lenscale*sqrt(PI*calA0tmp)/nvtmp;
