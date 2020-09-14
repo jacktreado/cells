@@ -33,13 +33,14 @@ startSeed="${10}"
 
 # other variables
 kl=1.0
-Ptol=1e-8
+Ptol=1e-10
+Ftol=1e-15
 
 let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=seqbidcells_N"$NCELLS"_NV"$NV"_calA"$calA0"_kl"$kl"_kb"$kb"_dphi"$dphi"
+basestr=seqbidcells_N"$NCELLS"_NV"$NV"_calA"$calA0"_kl"$kl"_kb"$kb"_dphi"$dphi"_Ptol"$Ptol"_Ftol"$Ftol"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation
@@ -96,7 +97,7 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         vdosf=$simdatadir/$filestr.vdos
 
         # append to runString
-        runString="$runString ; ./$binf $NCELLS $NV $calA0 $dphi $kl $kb $Ptol $runseed $jamf $vdosf"
+        runString="$runString ; ./$binf $NCELLS $NV $calA0 $dphi $kl $kb $Ptol $Ftol $runseed $jamf $vdosf"
     done
 
     # finish off run string

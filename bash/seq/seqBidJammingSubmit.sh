@@ -34,6 +34,7 @@ startSeed="${10}"
 # other variables
 dphi=1e-4
 Ptol=1e-8
+Ftol=1e-14
 
 let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
@@ -96,7 +97,7 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         vdosf=$simdatadir/$filestr.vdos
 
         # append to runString
-        runString="$runString ; ./$binf $NCELLS $NV $calA0 $dphi $kl $kb $Ptol $runseed $jamf $vdosf"
+        runString="$runString ; ./$binf $NCELLS $NV $calA0 $dphi $kl $kb $Ptol $Ftol $runseed $jamf $vdosf"
     done
 
     # finish off run string

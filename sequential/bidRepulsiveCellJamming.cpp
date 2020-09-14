@@ -53,7 +53,6 @@ const double alpha0      	= 0.2;
 const double finc        	= 1.1;
 const double fdec        	= 0.5;
 const double falpha      	= 0.99;
-const double Ftol 			= 1e-14;
 
 const int NSKIP 			= 5e3;
 const int NMIN        		= 100;
@@ -92,7 +91,7 @@ int main(int argc, char const *argv[]){
 
 	// parameters to be read in 
 	int NCELLS, smallNV, largeNV, smallN, largeN, NVTOT, NVSMALL, cellDOF, vertDOF, seed;
-	double Ptol, phi0, dphi, T0, kl, kb, calA0, smallCalA0, largeCalA0;
+	double Ptol, Ftol, phi0, dphi, T0, kl, kb, calA0, smallCalA0, largeCalA0;
 
 	// read in parameters from command line input
 	string NCELLS_str 		= argv[1];
@@ -102,9 +101,10 @@ int main(int argc, char const *argv[]){
 	string kl_str 			= argv[5];
 	string kb_str 			= argv[6];
 	string Ptol_str 		= argv[7];
-	string seed_str 		= argv[8];
-	string positionFile 	= argv[9];
-	string vdosFile  		= argv[10];
+	string Ftol_str 		= argv[8];
+	string seed_str 		= argv[9];
+	string positionFile 	= argv[10];
+	string vdosFile  		= argv[11];
 
 	stringstream NCELLSss(NCELLS_str);
 	stringstream smallNVss(smallNV_str);
@@ -113,6 +113,7 @@ int main(int argc, char const *argv[]){
 	stringstream klss(kl_str);
 	stringstream kbss(kb_str);
 	stringstream Ptolss(Ptol_str);
+	stringstream Ftolss(Ftol_str);
 	stringstream seedss(seed_str);
 
 	NCELLSss >> NCELLS;
@@ -122,6 +123,7 @@ int main(int argc, char const *argv[]){
 	klss >> kl;
 	kbss >> kb;
 	Ptolss >> Ptol;
+	Ftolss >> Ftol;
 	seedss >> seed;
 
 	// open position file (jammed config)
