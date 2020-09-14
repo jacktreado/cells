@@ -98,6 +98,8 @@ for ss = 1:NSIM
     p = zeros(NCELLS,1);
     calA = zeros(NCELLS,1);
     calA0 = zeros(NCELLS,1);
+    phiJ = 0.0;
+    phi0J = 0.0;
     for nn = 1:NCELLS
         x = xpos{nn};
         y = ypos{nn};
@@ -110,9 +112,12 @@ for ss = 1:NSIM
         p(nn) = sum(l);
         calA(nn) = p(nn)^2/(4.0*pi*a(nn));
         calA0(nn) = (nv(nn)*l0(nn))^2/(4.0*pi*a0(nn));
+        
+        phiJ = phiJ + a(nn) + 0.25*pi*l0(nn)^2*(0.5*nv(nn) - 1);
+        phi0J = phi0J + a0(nn) + 0.25*pi*l0(nn)^2*(0.5*nv(nn) - 1);
     end
-    phiJ = sum(a)/(L(1)*L(2));
-    phi0J = sum(a0)/(L(1)*L(2));
+    phiJ = phiJ/(L(1)*L(2));
+    phi0J = phi0J/(L(1)*L(2));
     
     % save particle information to lists
     NCELLSList(ss)      = NCELLS;
