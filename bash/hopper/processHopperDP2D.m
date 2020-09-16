@@ -26,8 +26,8 @@ NFRAMES = zeros(NF,1);
 hopperInfo = zeros(NF,4);
 
 % particle statistics
-calA = cell(NF);
-calA0 = cell(NF);
+calA = cell(NF,1);
+calA0 = cell(NF,1);
 
 % wall forces
 wallFrc = cell(NF,4);
@@ -55,8 +55,8 @@ for ff = 1:NF
     dpHopperPosData = readDPHopperData(fstr);
     
     % -- get number of frames in simulation
-    NF              = dpHopperPosData.NF;
-    NFRAMES(ff)     = NF;
+    NT              = dpHopperPosData.NFRAMES;
+    NFRAMES(ff)     = NT;
     
     % -- get hopper geometry
     w               = dpHopperPosData.w;
@@ -81,10 +81,10 @@ for ff = 1:NF
     
     
     % save shape data and com position data
-    calA0tmp    = zeros(NFRAMES,N);
-    calAtmp     = zeros(NFRAMES,N);
-    cxpos       = zeros(NFRAMES,N);
-    for tt = 1:NF
+    calA0tmp    = zeros(NT,N);
+    calAtmp     = zeros(NT,N);
+    cxpos       = zeros(NT,N);
+    for tt = 1:NT
         for nn = 1:N
             % vertex positions
             x = xpos{tt,nn};
@@ -117,8 +117,8 @@ for ff = 1:NF
     
     % Loop over time, find outflow events
     fprintf('\t ** -- Computing outflow statistics\n');
-    dnout = zeros(NF-1,1);
-    for tt = 2:NF
+    dnout = zeros(NT-1,1);
+    for tt = 2:NT
         flowedOut = (cxpos(tt,:) > L & cxpos(tt-1,:) < L);
         dnout(tt-1) = sum(flowedOut);
     end
