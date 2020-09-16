@@ -35,7 +35,7 @@ const double smallRadius 		= 0.5;			// radius fo smaller particles (diameter is 
 const double sizeRatio 			= 1.4;			// ratio of small diameter to large diameter
 const double th 				= PI/4.0;		// hopper angle (pi - th = deflection angle from horizontal)
 const double b 					= 0.1;			// damping coefficient
-const double timeStepMag 		= 0.05;			// time step
+const double timeStepMag 		= 0.03;			// time step
 
 // force parameters
 const double ka 			= 1.0;				// area force constant (should be = 1)
@@ -105,7 +105,7 @@ int main(int argc, char const *argv[])
 	}
 
 	// determine scale of reservoir size to make sure that phi \approx 2 given width
-	Lmin = 0.2*w0;
+	Lmin = 0.1*w0;
 
 	// instantiate object
 	cout << "	** Instantiating object with NCELLS = " << NCELLS << endl;

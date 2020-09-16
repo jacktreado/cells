@@ -1209,14 +1209,36 @@ void deformableParticles2D::shapeForces(){
 void deformableParticles2D::gravityForces(double g, int dir){
 	// local variables
 	int i, im1, ip1;
+	double cx, cy, apoly, cm;
 	double xi, yi, xim1, yim1, xip1, yip1;
 	double fxtmp, fytmp;
+
+	// compute center of polygonal mass
+	cx = 0.0;
+	cy = 0.0;
+	apoly = polygonArea();
+	for (i=0; i<NV; i++){
+		// get neighboring indices
+		ip1 = (i+1) % NV;
+
+		// vertex coordinates
+		xi = vpos(i,0);
+		yi = vpos(i,1);
+
+		xip1 = vpos(ip1,0);
+		yip1 = vpos(ip1,1);
+
+		cx += (xi + xip1)*(xi*yip1 - xip1*yi);
+		cy += (yi + yip1)*(xi*yip1 - xip1*yi);
+	}
+	cx /= 6.0*apoly;
+	cy /= 6.0*apoly;
 
 	// loop over vertices
 	for (i=0; i<NV; i++){
 		// get neighboring indices
-		im1 = (i-1+NV) % NV;
 		ip1 = (i+1) % NV;
+		im1 = (i-1+NV) % NV; 
 
 		// vertex coordinates
 		xi = vpos(i,0);
@@ -1230,13 +1252,15 @@ void deformableParticles2D::gravityForces(double g, int dir){
 
 		// compute force on i
 		if (dir == 0){
-			fxtmp = -(g/6.0)*((xip1 - xim1)*yi - (2.0*xi + xip1)*yip1 + (2.0*xi + xim1)*yim1);
-			fytmp = -(g/6.0)*((xi + xip1)*xip1 - (xim1 + xi)*xim1);
+			fxtmp = (yip1 - yi)*xip1 + (yi - yim1)*xim1 + (yip1 - yim1)*(2.0*xi - 3.0*cx);
+			fytmp = -1.0*(xip1*xip1 - xim1*xim1 + (xip1 - xim1)*(xi - 3.0*cx));
 		}
 		else{
-			fxtmp = -(g/6.0)*((yi + yip1)*yip1 - (yim1 + yi)*yim1);
-			fytmp = -(g/6.0)*((yip1 - yim1)*xi - (2.0*yi + yip1)*xip1 + (2.0*yi + yim1)*xim1);
+			fxtmp = -1.0*(yip1*yip1 - yim1*yim1 + (yip1 - yim1)*(yi - 3.0*cy));
+			fytmp = (xip1 - xi)*yip1 + (xi - xim1)*yim1 + (xip1 - xim1)*(2.0*yi - 3.0*cy);
 		}
+		fxtmp *= (a0*g)/(6.0*apoly);
+		fytmp *= (a0*g)/(6.0*apoly);
 
 		// add to total force (factor of NV is to take mass into account)
 		setVForce(i,0,vforce(i,0) + fxtmp);

@@ -31,13 +31,13 @@ const double w 					= 1.5;			// orifice width (in units of small diameter)
 const double th 				= PI/4.0;		// hopper angle (pi - th = deflection angle from horizontal)
 const double phi0 				= 0.4;			// initial packing fraction
 const double T 					= 1e-4;			// constant temperature
-const double timeStepMag 		= 0.01;			// time step
+const double timeStepMag 		= 0.03;			// time step
 
 // force parameters
 const double ka 			= 1.0;				// area force constant (should be = 1)
-const double kl 			= 0.0;			// perimeter force constant
+const double kl 			= 1.0;			// perimeter force constant
 const double kb 			= 0.0;				// bending force constant
-const double gam 			= 0.01;				// surface tension force constant
+const double gam 			= 0.0;				// surface tension force constant
 const double kint 			= 1.0;				// interaction energy constant
 const double a 				= 0.0;				// attraction parameter 
 const double del 			= 1.0;				// radius of vertices in units of l0
@@ -63,7 +63,7 @@ int main()
 	// string posFile = "hopperSP_pos.test";
 
 	// initial number of cells
-	int NCELLS = 10;
+	int NCELLS = 12;
 
 	// initialize radii
 	vector<double> radii(NCELLS,0.0);
@@ -75,7 +75,7 @@ int main()
 	}
 
 	// determine scale of reservoir size to make sure that phi \approx 2 given width
-	double Lmin = 0.2*w0;
+	double Lmin = 0.1*w0;
 
 	// instantiate object
 	cout << "	** Instantiating object with NCELLS = " << NCELLS << endl;
@@ -97,10 +97,10 @@ int main()
 	packingObject.vertexDPMTimeScale(timeStepMag);
 
 	// check hopper NVE
-	double g = 0.005;
+	double g = 0.01;
 	cout << "	** Running hopper NVE with g = " << g << endl;
-	packingObject.hopperDPNVE(w0,w,th,g,T);
-	// packingObject.flowHopperDP(w0,w,th,g,b);
+	// packingObject.hopperDPNVE(w0,w,th,g,T);
+	packingObject.flowHopperDP(w0,w,th,g,b);
 
 	return 0;
 }

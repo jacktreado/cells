@@ -223,12 +223,21 @@ void cellPacking2D::initializeHopperDP(vector<double>& radii, double w0, double 
 	for (ci=0; ci<NCELLS; ci++){
 		// set min and max values of positions
 		xmin = -Lmin*L.at(0);
-		xmax = -radii.at(ci);
-		ymin = radii.at(ci);
-		ymax = w0 - radii.at(ci);
+		xmax = L.at(0);
+		
 
-		// get random location in hopper reservoir
+		// get random x location in hopper
 		xpos = (xmin-xmax)*drand48() + xmax;
+
+		// assign random y components
+		if (xpos < 0){
+			ymin = radii.at(ci);
+			ymax = w0 - radii.at(ci);
+		}
+		else{
+			ymin = xpos/tan(th) + cell(ci).getl0();
+			ymax = w0 - (xpos/tan(th)) - cell(ci).getl0();
+		}
 		ypos = (ymax-ymin)*drand48() + ymin;
 
 		// set as initial position of com
@@ -247,7 +256,7 @@ void cellPacking2D::initializeHopperDP(vector<double>& radii, double w0, double 
 	dt0 = dt;
 
 	// slightly increase radii to give more space for dp
-	double rscaleForDP = 1.1;
+	double rscaleForDP = 1.2;
 	for (ci=0; ci<NCELLS; ci++)
 		radii.at(ci) *= rscaleForDP;
 
@@ -295,14 +304,13 @@ void cellPacking2D::fireMinimizeHopperSP(vector<double>& radii, double w0, doubl
 	double alpha 			= alpha0;
 	double alphat 			= alpha;
 	double t 				= 0.0;
-	double Ptol 			= 1e-8;
-	double Ktol 			= 1e-24;
+	double Ftol 			= 1e-14;
 	bool converged 			= false;
 
 	// local variables
 	int ci,vi,d,itr,itrMax;
 	double P,vstarnrm,fstarnrm,vtmp,ftmp,ptmp;
-	double Knew, Pvirial;
+	double Fcheck;
 
 	// reset time step
 	dt = dt0;
@@ -312,12 +320,7 @@ void cellPacking2D::fireMinimizeHopperSP(vector<double>& radii, double w0, doubl
 	hopperForcesSP(radii,w0,w,th,0.0,closed);
 
 	// initialize virial pressure from pressure from last time
-	Pvirial = 0.5*(sigmaXX + sigmaYY);
-
-	// update kinetic energy based on com velocity
-	Knew = 0.0;
-	for (ci=0; ci<NCELLS; ci++)
-		Knew += 0.5*(PI*pow(radii.at(ci),2))*sqrt(pow(cell(ci).cvel(0),2) + pow(cell(ci).cvel(1),2));
+	Fcheck = 10*Ftol;
 
 	// reset velocities to 0
 	for (ci=0; ci<NCELLS; ci++){
@@ -335,12 +338,11 @@ void cellPacking2D::fireMinimizeHopperSP(vector<double>& radii, double w0, doubl
 			cout << " 	FIRE MINIMIZATION, itr = " << itr << endl << endl;
 			cout << "===================================================" << endl;
 			cout << "	* Run data:" << endl;
-			cout << "	* K 		= " << Knew << endl;
-			cout << "	* Pvirial 	= " << Pvirial << endl;
-			cout << "	* phi 		= " << phi << endl;
+			cout << "	* Fcheck 	= " << Fcheck << endl;
 			cout << "	* dt 		= " << dt << endl;
 			cout << "	* alpha 	= " << alpha << endl;
 			cout << "	* P 		= " << P << endl;
+			cout << "	* npPMIN 	= " << npPMIN << endl;
 			cout << endl << endl;
 		}
 
@@ -451,29 +453,26 @@ void cellPacking2D::fireMinimizeHopperSP(vector<double>& radii, double w0, doubl
 		// update t
 		t += dt;
 
-		// update virial pressure
-		Pvirial = 0.5*(sigmaXX + sigmaYY);
-
-		// update kinetic energy based on com velocity
-		Knew = 0.0;
+		// update forces
+		Fcheck = 0.0;
 		for (ci=0; ci<NCELLS; ci++)
-			Knew += 0.5*(PI*pow(radii.at(ci),2))*sqrt(pow(cell(ci).cvel(0),2) + pow(cell(ci).cvel(1),2));
+			Fcheck += sqrt(cell(ci).cforce(0)*cell(ci).cforce(0) + cell(ci).cforce(1)*cell(ci).cforce(1));
+		Fcheck /= (NDIM*NCELLS);
 
 		// update if Pvirial under tol
-		if (abs(Pvirial) < Ptol)
+		if (Fcheck < Ftol)
 			npPMIN++;
 		else
 			npPMIN = 0;
 
 		// check for convergence
-		converged = (abs(Pvirial) < Ptol && npPMIN > NMIN);
-		converged = (converged || (abs(Pvirial) > Ptol && Knew < Ktol));
+		converged = (Fcheck < Ftol && npPMIN > NMIN);
 
 		if (converged){
 			cout << "	** FIRE has converged!" << endl;
-			cout << "	** Knew = " << Knew << endl;
+			cout << "	** Fcheck = " << Fcheck << endl;
+			cout << "	** vnorm = " << vstarnrm << endl;
 			cout << "	** itr = " << itr << ", t = " << t << endl;
-			cout << "	** virial P = " << Pvirial << endl;
 			cout << "	** Breaking out of FIRE protocol." << endl;
 			break;
 		}
@@ -1433,7 +1432,7 @@ void cellPacking2D::hopperDPNVE(double w0, double w, double th, double g, double
 				}
 
 				// add to potential energy
-				utmp = -g*cxtmp;
+				utmp = -g*cxtmp*(cell(ci).geta0()/cell(ci).polygonArea());
 				for (vi=0; vi<nvtmp; vi++)
 					cell(ci).setUInt(vi,cell(ci).uInt(vi) + (utmp/nvtmp));
 			}
@@ -1446,7 +1445,7 @@ void cellPacking2D::hopperDPNVE(double w0, double w, double th, double g, double
 			
 			if (energyPrintObject.is_open()){
 				cout << "	* Printing DP energy to file" << endl;
-				printSystemEnergy();
+				energyPrintObject << totalPotentialEnergy() << " " << totalKineticEnergy() << endl;
 			}
 			
 			cout << "	* Run data:" << endl;
@@ -1788,8 +1787,7 @@ void cellPacking2D::flowHopperSP(vector<double>& radii, double w0, double w, dou
 // function to flow cells through hopper as deformable particles (DP) using body force of scale g
 void cellPacking2D::flowHopperDP(double w0, double w, double th, double g, double b){
 	// local variables
-	int closed = 0;
-	int t, ci, cj, vi, vip1, nvtmp, d;
+	int t, ci, cj, vi, vip1, nvtmp, d, closed;
 	double Pvirial, K;
 	double aH, aR, aT;
 	double cxtmp, cytmp, xi, xip1, yi, yip1, utmp;
@@ -1808,9 +1806,13 @@ void cellPacking2D::flowHopperDP(double w0, double w, double th, double g, doubl
 
 	// check that NT has been set 
 	if (NT <= 0){
-		cout << "	** ERROR: in hopper DP NVE, sim length NT = " << NT << ", which is <= 0. ending." << endl;
+		cout << "	** ERROR: in , flowHopperDP sim length NT = " << NT << ", which is <= 0. ending." << endl;
 		exit(1);
 	}
+
+	// outflow point is open
+	closed = 0;
+
 
 	// loop over time, run NVE dynamics
 	for (t=0; t<NT; t++){
@@ -1823,7 +1825,7 @@ void cellPacking2D::flowHopperDP(double w0, double w, double th, double g, doubl
 		// output some information to console
 		if (t % NPRINT == 0){
 			cout << "===================================================" << endl << endl;
-			cout << " 		Deformable Particle flow in hopper geometry, t = " << t << endl << endl;
+			cout << " Deformable Particle flow in hopper geometry, t = " << t << endl << endl;
 			cout << "===================================================" << endl;
 
 			// add gravitiational potential energy to uint
@@ -1847,7 +1849,7 @@ void cellPacking2D::flowHopperDP(double w0, double w, double th, double g, doubl
 				}
 
 				// add to potential energy
-				utmp = -g*cxtmp;
+				utmp = -g*cxtmp*(cell(ci).geta0()/cell(ci).polygonArea());
 				for (vi=0; vi<nvtmp; vi++)
 					cell(ci).setUInt(vi,cell(ci).uInt(vi) + (utmp/nvtmp));
 			}
@@ -1860,7 +1862,7 @@ void cellPacking2D::flowHopperDP(double w0, double w, double th, double g, doubl
 			
 			if (energyPrintObject.is_open()){
 				cout << "	* Printing DP energy to file" << endl;
-				printSystemEnergy();
+				energyPrintObject << totalPotentialEnergy() << " " << totalKineticEnergy() << endl;
 			}
 			
 			cout << "	* Run data:" << endl;
@@ -2112,10 +2114,13 @@ void cellPacking2D::printHopperSP(vector<double>& radii, double w0, double w, do
 	packingPrintObject << setw(w1) << left << "ENDFR" << " " << endl;
 }
 
+
+
+
 // function to print DP information to file
 void cellPacking2D::printHopperDP(double w0, double w, double th){
 	// local variables
-	int ci,d;
+	int ci,vi,d;
 	int w1 = 12;
 	int w2 = 6;
 	int w3 = 30;
@@ -2139,16 +2144,10 @@ void cellPacking2D::printHopperDP(double w0, double w, double th){
 
 	// print stress information
 	packingPrintObject << setw(w1) << left << "WLFRC";
-	packingPrintObject << setw(w3) << right << sigmaXX;
-	packingPrintObject << setw(w3) << right << sigmaXY;
-	packingPrintObject << setw(w3) << right << sigmaYX;
-	packingPrintObject << setw(w3) << right << sigmaYY;
-	packingPrintObject << endl;
-
-	// print contact information
-	packingPrintObject << setw(w1) << left << "NCNTS";
-	packingPrintObject << setw(w1) << right << Ncc;
-	packingPrintObject << setw(w1) << right << Nvv;
+	packingPrintObject << setw(w3) << right << sigmaXX;			// net X force on the TOP wall due to particles
+	packingPrintObject << setw(w3) << right << sigmaXY;			// net Y force on the TOP wall due to particles
+	packingPrintObject << setw(w3) << right << sigmaYX;			// net X force on the BOTTOM wall due to particles
+	packingPrintObject << setw(w3) << right << sigmaYY;			// net Y force on the BOTTOM wall due to particles
 	packingPrintObject << endl;
 
 	// print contact matrix
@@ -2162,8 +2161,21 @@ void cellPacking2D::printHopperDP(double w0, double w, double th){
 	packingPrintObject << endl;
 
 	// print info for rest of the cells
-	for (int ci=0; ci<NCELLS; ci++)
-		cell(ci).printVertexPositions(packingPrintObject,ci);
+	for (int ci=0; ci<NCELLS; ci++){
+		packingPrintObject << setw(w1) << left << "CINFO";
+		packingPrintObject << setw(w1) << right << ci;
+		packingPrintObject << setw(w1) << right << cell(ci).getNV();
+		packingPrintObject << setw(w3) << right << cell(ci).geta0();
+		packingPrintObject << setw(w3) << right << cell(ci).getl0();
+		packingPrintObject << endl;
+		for (vi=0; vi<cell(ci).getNV(); vi++){
+			packingPrintObject << setw(w1) << left << "VINFO";
+			packingPrintObject << setw(w1) << right << vi;
+			packingPrintObject << setw(w3) << setprecision(14) << right << cell(ci).vpos(vi,0);
+			packingPrintObject << setw(w3) << setprecision(14) << right << cell(ci).vpos(vi,1);
+			packingPrintObject << endl;
+		}
+	}
 
 	// print end frame
 	packingPrintObject << setw(w1) << left << "ENDFR" << " " << endl;
