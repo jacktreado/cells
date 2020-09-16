@@ -7,7 +7,7 @@ function processHopperDP2D(N,simstrpattern,savestr)
 %   -- speed data
 
 % get files
-flist   = dir([simstrpattern '*']);
+flist   = dir([simstrpattern '*.pos']);
 NF      = length(flist);
 if NF == 0
     fprintf('\t ** ERROR: no files found for simstrpattern = %s, ending.\n',simstrpattern);
