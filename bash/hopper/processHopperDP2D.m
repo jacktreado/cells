@@ -22,6 +22,7 @@ end
 rmvf = false(NF,1);
 
 % simulation info
+simFile = cell(NF,1);
 NFRAMES = zeros(NF,1);
 hopperInfo = zeros(NF,4);
 
@@ -49,6 +50,7 @@ for ff = 1:NF
         continue;
     else
         fprintf('\t** Reading in %s\n',fname);
+        simFile{ff} = fname;
     end
     
     % read in data
@@ -137,6 +139,7 @@ for ff = 1:NF
 end
 
 % remove extra slots
+simFile(rmvf)       = [];
 NFRAMES(rmvf)       = [];
 hopperInfo(rmvf,:)  = [];
 calA(rmvf,:)        = [];
@@ -146,7 +149,7 @@ nout(rmvf,:)        = [];
 
 %% Save to matfile
 save(savestr,...
-    'wallFrc','nout','calA0','calA','hopperInfo','NFRAMES');
+    'simFile','wallFrc','nout','calA0','calA','hopperInfo','NFRAMES');
 
 end
 
