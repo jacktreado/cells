@@ -43,8 +43,8 @@ const int wnum 				= 25;
 const int pnum 				= 14;
 
 // simulation constants
-const double phiInit 		= 0.7;
-const double timeStepMag 	= 0.01;
+const double phiInit 		= 0.4;
+const double timeStepMag 	= 0.005;
 const double sizeRatio 		= 1.4;
 const double sizeFraction 	= 0.5;
 
@@ -62,7 +62,6 @@ const int itmax       		= 1e7;
 
 
 // DP force constants
-const double ka 			= 1.0;			// area spring (should be = 1)
 const double eint 			= 1.0;			// interaction energy
 const double del 			= 1.0;			// radius of vertices in units of l0
 
@@ -277,7 +276,7 @@ int main(int argc, char const *argv[]){
 		a0.at(ci) 		= a0tmp;
 
 		// set disk radius
-		drad.at(ci) 	= 1.05*sqrt((2.0*a0tmp)/(nvtmp*sin(2.0*PI/nvtmp)));
+		drad.at(ci) 	= 1.5*sqrt((2.0*a0tmp)/(nvtmp*sin(2.0*PI/nvtmp)));
 
 		// set l0, vector radius
 		l0.at(ci) 	= 2.0*lenscale*sqrt(PI*calA0tmp)/nvtmp;
@@ -699,11 +698,15 @@ int main(int argc, char const *argv[]){
 	// total potential energy
 	double U = 0.0;
 
+	// length unit variable
+	double rho0 = 0.0;
+
 	// shape force variables
-	double Kl, Kb, l0tmp, atmp, li, lim1, kappai, cx, cy;
+	double fa, fl, fb, l0tmp, atmp, li, lim1, kappai, cx, cy;
 	double da, dli, dlim1;
 	double lim2x, lim2y, lim1x, lim1y, lix, liy, lip1x, lip1y;
 	double rim2x, rim2y, rim1x, rim1y, rix, riy, rip1x, rip1y, rip2x, rip2y;
+	double ua, ul, ub;
 
 	// contact variables
 	int Nvv, Ncc, nr;
@@ -728,6 +731,9 @@ int main(int argc, char const *argv[]){
 
 		fireit    	= 0;
 		fcheck  	= 10*Ftol;
+
+		// set length constant (variable due to particle growth)
+		rho0 = sqrt(a0.at(0));
 
 		// RELAX FORCES USING FIRE
 		while ((fcheck > Ftol || npPMin < NMIN) && fireit < itmax){
@@ -826,7 +832,7 @@ int main(int argc, char const *argv[]){
 								rij = sqrt(dx*dx + dy*dy);
 								if (rij < sij){
 									// force scale
-									ftmp 				= eint*(1 - (rij/sij))/sij;
+									ftmp 				= eint*(1 - (rij/sij))*(rho0/sij);
 									fx 					= ftmp*(dx/rij);
 									fy 					= ftmp*(dy/rij);
 
@@ -887,7 +893,7 @@ int main(int argc, char const *argv[]){
 									rij = sqrt(dx*dx + dy*dy);
 									if (rij < sij){
 										// force scale
-										ftmp 				= eint*(1 - (rij/sij))/sij;
+										ftmp 				= eint*(1 - (rij/sij))*(rho0/sij);
 										fx 					= ftmp*(dx/rij);
 										fy 					= ftmp*(dy/rij);
 
@@ -926,13 +932,15 @@ int main(int argc, char const *argv[]){
 				}
 			}
 
-			// normalize pressure by box area and number of particles
-			pcheck /= NCELLS*L[0]*L[1];
-
+			// normalize pressure by box area (make dimensionless with extra factor of rho)
+			pcheck *= (rho0/(2.0*L[0]*L[1]));
 
 
 			// shape forces (loop over global vertex labels)
 			ci = 0;
+			ua = 0.0;
+			ul = 0.0;
+			ub = 0.0;
 			for (gi=0; gi<NVTOT; gi++){
 
 				// -- Area force (and get cell index ci)
@@ -945,13 +953,16 @@ int main(int argc, char const *argv[]){
 
 						// compute area deviation
 						atmp = area(vpos,ci,L,nv,szList);
-						da = atmp - a0tmp;
+						da = (atmp/a0tmp) - 1.0;
 
-						// shape force parameters
-						Kl = nvtmp*l0tmp*kl;
-						Kb = kb/(nvtmp*pow(l0tmp,4.0));
-						// Kb = kb/(nvtmp*pow(l0tmp,2.0)); // NOTE: THIS FORM IS DONG'S ENERGY
+						if (ci==NCELLS-1)
+							ua = 0.5*da*da;
 
+						// shape force parameters (kl and kl are unitless energy ratios)
+						fa = da*(a0tmp/pow(rho0,3.0));
+						fl = kl*(rho0/l0tmp);
+						fb = kb*(rho0/(l0tmp*l0tmp));
+						
 						// compute cell center of mass
 						xi = vpos[NDIM*gi];
 						yi = vpos[NDIM*gi + 1];
@@ -1003,9 +1014,12 @@ int main(int argc, char const *argv[]){
 				rip1y = vpos.at(NDIM*ip1[gi] + 1) - cy;
 				rip1y -= L[1]*round(rip1y/L[1]);
 
-				// add to forces
-				vF[NDIM*gi] 		+= ka*0.5*da*(rim1y - rip1y);
-				vF[NDIM*gi + 1] 	+= ka*0.5*da*(rip1x - rim1x);
+
+
+				// -- Area force
+
+				vF[NDIM*gi] 		+= 0.5*fa*(rim1y - rip1y);
+				vF[NDIM*gi + 1] 	+= 0.5*fa*(rip1x - rim1x);
 
 
 				// -- Perimeter force
@@ -1026,8 +1040,12 @@ int main(int argc, char const *argv[]){
 				dli 	= (li/l0tmp) - 1.0;
 
 				// add to forces
-				vF[NDIM*gi] 		+= Kl*(dli*(lix/li) - dlim1*(lim1x/lim1));
-				vF[NDIM*gi + 1] 	+= Kl*(dli*(liy/li) - dlim1*(lim1y/lim1));
+				vF[NDIM*gi] 		+= fl*(dli*(lix/li) - dlim1*(lim1x/lim1));
+				vF[NDIM*gi + 1] 	+= fl*(dli*(liy/li) - dlim1*(lim1y/lim1));
+
+				// save energy and print to vdosout
+				if (ci==NCELLS)
+					ul += 0.5*kl*dli*dli;
 
 
 				// -- Bending force
@@ -1046,8 +1064,12 @@ int main(int argc, char const *argv[]){
 					lim2y = rim1y - rim2y;
 
 					// add to force
-					vF[NDIM*gi] 		+= Kb*(3.0*(lix - lim1x) + lim2x - lip1x);
-					vF[NDIM*gi + 1] 	+= Kb*(3.0*(liy - lim1y) + lim2y - lip1y);
+					vF[NDIM*gi] 		+= fb*(3.0*(lix - lim1x) + lim2x - lip1x);
+					vF[NDIM*gi + 1] 	+= fb*(3.0*(liy - lim1y) + lim2y - lip1y);
+
+					// save energy and print to vdosout
+					if (ci==NCELLS)
+						ub += 0.5*kl*((lix - lim1x)*(lix - lim1x) + (liy - lim1y)*(liy - lim1y))/(l0tmp*l0tmp);
 				}
 
 				// update old coordinates
@@ -1241,24 +1263,21 @@ int main(int argc, char const *argv[]){
 		cout << "	* overcompressed = " << overcompressed << endl;
 		cout << "	* jammed = " << jammed << endl << endl;
 
+		cout << "	* Large particle shape energies:" << endl;
+		cout << "	ua = " << ua << endl;
+		cout << "	ul = " << ul << endl;
+		cout << "	ub = " << ub << endl;
+		cout << endl;
+
 		// update particle sizes based on target check
 		if (rH < 0){
 			// if still undercompressed, then grow until overcompressed found
-			if (undercompressed){
-				// set scale to normal compression
+			if (undercompressed)
 				scaleFactor = drgrow;
-
-				// save state
-				r0 = sqrt(a0[0]);
-				vposSave = vpos;
-				vradSave = vrad;
-				a0Save = a0;
-				l0Save = l0;
-			}
 			// if first overcompressed, decompress by dphi/2 until unjamming
 			else if (overcompressed){
 				// current = upper bound length scale r
-	            rH = sqrt(a0[0]);
+	            rH = rho0;
 
 	            // save first overcompressed state
 				r0 = rH;
@@ -1279,7 +1298,7 @@ int main(int argc, char const *argv[]){
 				// if first undercompressed, save last overcompressed state, beging root search
 				if (undercompressed){
 					// current = new lower bound length scale r
-					rL = sqrt(a0[0]);
+					rL = rho0;
 
 					// load state
 					vpos = vposSave;
@@ -1297,7 +1316,7 @@ int main(int argc, char const *argv[]){
 				// if still overcompressed, decrement again
 				else if (overcompressed){
 					// current = upper bound length scale r
-		            rH = sqrt(a0[0]);
+		            rH = rho0;
 
 		            // save overcompressed state
 					r0 = rH;
@@ -1317,7 +1336,7 @@ int main(int argc, char const *argv[]){
 				// if found undercompressed state, go to state between undercompressed and last overcompressed states (from saved state)
 				if (undercompressed){
 					// current = new lower bound length scale r
-					rL = sqrt(a0[0]);
+					rL = rho0;
 
 					// load state
 					vpos = vposSave;
@@ -1334,7 +1353,7 @@ int main(int argc, char const *argv[]){
 				}
 				else if (overcompressed){
 					// current = new upper bound length scale r
-		            rH = sqrt(a0[0]);
+		            rH = rho0;
 
 					// load state
 					vpos = vposSave;
@@ -1449,7 +1468,7 @@ int main(int argc, char const *argv[]){
 	double kapim1, kapi, kapip1;
 	double dkapi_dxi, dkapi_dyi, dkapip1_dxi, dkapip1_dyi, dkapim1_dxi, dkapim1_dyi;
 	double dkapi_dxip1, dkapi_dyip1, dkapip1_dxip1, dkapip1_dyip1, dkapip1_dxip2, dkapip1_dyip2;
-	double eb, fb;
+	double Kl1, Kl2, Kb1, Kb2;
 	double kij, h;
 	double dr_dxi, dr_dyi;
 
@@ -1488,6 +1507,7 @@ int main(int argc, char const *argv[]){
 	// Loop over cells, compute shape forces for each individual cell and contributions from
 	// vertex-vertex interactions
 	cout << "	** COMPUTING VDOS ... " << endl;
+	rho0 = sqrt(a0.at(0));
 	for (ci=0; ci<NCELLS; ci++){
 
 		// print statement
@@ -1511,10 +1531,12 @@ int main(int argc, char const *argv[]){
 		// area deviations
 		delA = area(vpos,ci,L,nv,szList) - a0tmp;
 
-		// bending energy constants (use form where curvatures are dimensionless)
-		eb = kb/(nvtmp*pow(l0tmp,2.0)); 
-		// eb = kb/nvtmp; // NOTE: THIS FORM IS DONG'S ENERGY
-		fb = eb/pow(l0tmp,2.0);
+		// dimensionless stiffness constants
+		Kl1 = kl*(rho0*rho0)/l0tmp;				// units = L
+		Kl2 = Kl1/l0tmp;						// units = 1
+
+		Kb1 = kb*(rho0*rho0);					// units = L^2
+		Kb2 = Kb1/(l0tmp*l0tmp);				// units = 1
 
 		// loop over vertices, compute each DM element
 		for (vi=0; vi<nvtmp; vi++){
@@ -1596,18 +1618,18 @@ int main(int argc, char const *argv[]){
 			// 	STIFFNESS MATRIX
 
 			// main diagonal
-		    Hl(kx,kx)       = nvtmp*kl*(dlim1_dxi*dlim1_dxi + dli_dxi*dli_dxi);
-		    Hl(ky,ky)       = nvtmp*kl*(dlim1_dyi*dlim1_dyi + dli_dyi*dli_dyi);
+		    Hl(kx,kx)       = Kl2*(dlim1_dxi*dlim1_dxi + dli_dxi*dli_dxi);
+		    Hl(ky,ky)       = Kl2*(dlim1_dyi*dlim1_dyi + dli_dyi*dli_dyi);
 		    
-		    Hl(kx,ky)       = nvtmp*kl*(dlim1_dxi*dlim1_dyi + dli_dxi*dli_dyi);
+		    Hl(kx,ky)       = Kl2*(dlim1_dxi*dlim1_dyi + dli_dxi*dli_dyi);
 		    Hl(ky,kx)       = Hl(kx,ky);
 		    
 		    // 1off diagonal
-		    Hl(kx,kxp1)     = nvtmp*kl*dli_dxi*dli_dxip1;
-		    Hl(ky,kyp1)     = nvtmp*kl*dli_dyi*dli_dyip1;
+		    Hl(kx,kxp1)     = Kl2*dli_dxi*dli_dxip1;
+		    Hl(ky,kyp1)     = Kl2*dli_dyi*dli_dyip1;
 		    
-		    Hl(kx,kyp1)     = nvtmp*kl*dli_dxi*dli_dyip1;
-		    Hl(ky,kxp1)     = nvtmp*kl*dli_dyi*dli_dxip1;
+		    Hl(kx,kyp1)     = Kl2*dli_dxi*dli_dyip1;
+		    Hl(ky,kxp1)     = Kl2*dli_dyi*dli_dxip1;
 		    
 		    // enforce symmetry in lower triangle
 		    Hl(kxp1,kx)     = Hl(kx,kxp1);
@@ -1620,18 +1642,18 @@ int main(int argc, char const *argv[]){
 		    // 	STRESS MATRIX
 
 		    // main diagonal block
-		    Sl(kx,kx) 		= nvtmp*kl*l0tmp*( (delim1/lim1)*(1.0 - (dlim1_dxi*dlim1_dxi)) + (deli/li)*(1.0 - (dli_dxi*dli_dxi)) );
-		    Sl(ky,ky) 		= nvtmp*kl*l0tmp*( (delim1/lim1)*(1.0 - (dlim1_dyi*dlim1_dyi)) + (deli/li)*(1.0 - (dli_dyi*dli_dyi)) );
+		    Sl(kx,kx) 		= Kl1*( (delim1/lim1)*(1.0 - (dlim1_dxi*dlim1_dxi)) + (deli/li)*(1.0 - (dli_dxi*dli_dxi)) );
+		    Sl(ky,ky) 		= Kl1*( (delim1/lim1)*(1.0 - (dlim1_dyi*dlim1_dyi)) + (deli/li)*(1.0 - (dli_dyi*dli_dyi)) );
 
-		    Sl(kx,ky) 		= -nvtmp*kl*l0tmp*( (delim1/lim1)*dlim1_dxi*dlim1_dyi + (deli/li)*dli_dxi*dli_dyi );
+		    Sl(kx,ky) 		= -Kl1*( (delim1/lim1)*dlim1_dxi*dlim1_dyi + (deli/li)*dli_dxi*dli_dyi );
 		    Sl(ky,kx) 		= Sl(kx,ky);
 
 		    // 1off diagonal
-		    Sl(kx,kxp1) 	= nvtmp*kl*l0tmp*(deli/li)*((dli_dxip1*dli_dxip1) - 1.0);
-		    Sl(ky,kyp1)		= nvtmp*kl*l0tmp*(deli/li)*((dli_dyip1*dli_dyip1) - 1.0);
+		    Sl(kx,kxp1) 	= Kl1*(deli/li)*((dli_dxip1*dli_dxip1) - 1.0);
+		    Sl(ky,kyp1)		= Kl1*(deli/li)*((dli_dyip1*dli_dyip1) - 1.0);
 
-		    Sl(kx,kyp1) 	= nvtmp*kl*l0tmp*(deli/li)*dli_dxip1*dli_dyip1;
-		    Sl(ky,kxp1)		= nvtmp*kl*l0tmp*(deli/li)*dli_dyip1*dli_dxip1;
+		    Sl(kx,kyp1) 	= Kl1*(deli/li)*dli_dxip1*dli_dyip1;
+		    Sl(ky,kxp1)		= Kl1*(deli/li)*dli_dyip1*dli_dxip1;
 
 		    // enforce symmetry in lower triangle
 		    Sl(kxp1,kx)     = Sl(kx,kxp1);
@@ -1675,25 +1697,25 @@ int main(int argc, char const *argv[]){
     		// 	STIFFNESS MATRIX
 
     		// block-diagonal terms
-		    Hb(kx,kx)       = eb*(dkapim1_dxi*dkapim1_dxi + dkapi_dxi*dkapi_dxi + dkapip1_dxi*dkapip1_dxi);
-		    Hb(ky,ky)       = eb*(dkapim1_dyi*dkapim1_dyi + dkapi_dyi*dkapi_dyi + dkapip1_dyi*dkapip1_dyi);
+		    Hb(kx,kx)       = Kb1*(dkapim1_dxi*dkapim1_dxi + dkapi_dxi*dkapi_dxi + dkapip1_dxi*dkapip1_dxi);
+		    Hb(ky,ky)       = Kb1*(dkapim1_dyi*dkapim1_dyi + dkapi_dyi*dkapi_dyi + dkapip1_dyi*dkapip1_dyi);
 		    
-		    Hb(kx,ky)       = eb*(dkapim1_dxi*dkapim1_dyi + dkapi_dxi*dkapi_dyi + dkapip1_dxi*dkapip1_dyi);
+		    Hb(kx,ky)       = Kb1*(dkapim1_dxi*dkapim1_dyi + dkapi_dxi*dkapi_dyi + dkapip1_dxi*dkapip1_dyi);
 		    Hb(ky,kx)       = Hb(kx,ky);
 		    
 		    // 1off block-diagonal terms
-		    Hb(kx,kxp1)     = eb*(dkapi_dxi*dkapi_dxip1 + dkapip1_dxi*dkapip1_dxip1);
-		    Hb(ky,kyp1)     = eb*(dkapi_dyi*dkapi_dyip1 + dkapip1_dyi*dkapip1_dyip1);
+		    Hb(kx,kxp1)     = Kb1*(dkapi_dxi*dkapi_dxip1 + dkapip1_dxi*dkapip1_dxip1);
+		    Hb(ky,kyp1)     = Kb1*(dkapi_dyi*dkapi_dyip1 + dkapip1_dyi*dkapip1_dyip1);
 		    
-		    Hb(kx,kyp1)     = eb*(dkapi_dxi*dkapi_dyip1 + dkapip1_dxi*dkapip1_dyip1);
-		    Hb(ky,kxp1)     = eb*(dkapi_dyi*dkapi_dxip1 + dkapip1_dyi*dkapip1_dxip1);
+		    Hb(kx,kyp1)     = Kb1*(dkapi_dxi*dkapi_dyip1 + dkapip1_dxi*dkapip1_dyip1);
+		    Hb(ky,kxp1)     = Kb1*(dkapi_dyi*dkapi_dxip1 + dkapip1_dyi*dkapip1_dxip1);
 		    
 		    // 2off block-diagonal terms
-		    Hb(kx,kxp2)     = eb*dkapip1_dxi*dkapip1_dxip2;
-		    Hb(ky,kyp2)     = eb*dkapip1_dyi*dkapip1_dyip2;
+		    Hb(kx,kxp2)     = Kb1*dkapip1_dxi*dkapip1_dxip2;
+		    Hb(ky,kyp2)     = Kb1*dkapip1_dyi*dkapip1_dyip2;
 		    
-		    Hb(kx,kyp2)     = eb*dkapip1_dxi*dkapip1_dyip2;
-		    Hb(ky,kxp2)     = eb*dkapip1_dyi*dkapip1_dxip2;
+		    Hb(kx,kyp2)     = Kb1*dkapip1_dxi*dkapip1_dyip2;
+		    Hb(ky,kxp2)     = Kb1*dkapip1_dyi*dkapip1_dxip2;
 		    
 		    // enforce symmetry in lower triangle
 		    Hb(kxp1,kx)     = Hb(kx,kxp1);
@@ -1712,25 +1734,25 @@ int main(int argc, char const *argv[]){
 		    // 	STRESS MATRIX
 		    
 		    // block diagonal
-		    Sb(kx,kx)       = fb*(6.0 - (l0tmp*dkapim1_dxi)*(l0tmp*dkapim1_dxi) - (l0tmp*dkapi_dxi)*(l0tmp*dkapi_dxi) - (l0tmp*dkapip1_dxi)*(l0tmp*dkapip1_dxi));
-		    Sb(ky,ky)       = fb*(6.0 - (l0tmp*dkapim1_dyi)*(l0tmp*dkapim1_dyi) - (l0tmp*dkapi_dyi)*(l0tmp*dkapi_dyi) - (l0tmp*dkapip1_dyi)*(l0tmp*dkapip1_dyi));
+		    Sb(kx,kx)       = Kb2*(6.0 - (l0tmp*dkapim1_dxi)*(l0tmp*dkapim1_dxi) - (l0tmp*dkapi_dxi)*(l0tmp*dkapi_dxi) - (l0tmp*dkapip1_dxi)*(l0tmp*dkapip1_dxi));
+		    Sb(ky,ky)       = Kb2*(6.0 - (l0tmp*dkapim1_dyi)*(l0tmp*dkapim1_dyi) - (l0tmp*dkapi_dyi)*(l0tmp*dkapi_dyi) - (l0tmp*dkapip1_dyi)*(l0tmp*dkapip1_dyi));
 		    
-		    Sb(kx,ky)       = -eb*(dkapim1_dxi*dkapim1_dyi + dkapi_dxi*dkapi_dyi + dkapip1_dxi*dkapip1_dyi);
+		    Sb(kx,ky)       = -Kb1*(dkapim1_dxi*dkapim1_dyi + dkapi_dxi*dkapi_dyi + dkapip1_dxi*dkapip1_dyi);
 		    Sb(ky,kx)       = Sb(kx,ky);
 		    
 		    // 1off block diagonal
-		    Sb(kx,kxp1)     = -2*fb*(2.0 - (l0tmp*dkapi_dxip1)*(l0tmp*dkapi_dxip1) - (l0tmp*dkapip1_dxi)*(l0tmp*dkapip1_dxi));
-		    Sb(ky,kyp1)     = -2*fb*(2.0 - (l0tmp*dkapi_dyip1)*(l0tmp*dkapi_dyip1) - (l0tmp*dkapip1_dyi)*(l0tmp*dkapip1_dyi));
+		    Sb(kx,kxp1)     = -2*Kb2*(2.0 - (l0tmp*dkapi_dxip1)*(l0tmp*dkapi_dxip1) - (l0tmp*dkapip1_dxi)*(l0tmp*dkapip1_dxi));
+		    Sb(ky,kyp1)     = -2*Kb2*(2.0 - (l0tmp*dkapi_dyip1)*(l0tmp*dkapi_dyip1) - (l0tmp*dkapip1_dyi)*(l0tmp*dkapip1_dyi));
 		    
-		    Sb(kx,kyp1)     = -eb*(dkapi_dxi*dkapi_dyip1 + dkapip1_dxi*dkapip1_dyip1);
-		    Sb(ky,kxp1)     = -eb*(dkapi_dyi*dkapi_dxip1 + dkapip1_dyi*dkapip1_dxip1);
+		    Sb(kx,kyp1)     = -Kb1*(dkapi_dxi*dkapi_dyip1 + dkapip1_dxi*dkapip1_dyip1);
+		    Sb(ky,kxp1)     = -Kb1*(dkapi_dyi*dkapi_dxip1 + dkapip1_dyi*dkapip1_dxip1);
 		    
 		    // 2off block diagonal
-		    Sb(kx,kxp2)     = fb*(1.0 - (l0tmp*dkapip1_dxi)*(l0tmp*dkapip1_dxi));
-		    Sb(ky,kyp2)     = fb*(1.0 - (l0tmp*dkapip1_dyi)*(l0tmp*dkapip1_dyi));
+		    Sb(kx,kxp2)     = Kb2*(1.0 - (l0tmp*dkapip1_dxi)*(l0tmp*dkapip1_dxi));
+		    Sb(ky,kyp2)     = Kb2*(1.0 - (l0tmp*dkapip1_dyi)*(l0tmp*dkapip1_dyi));
 		    
-		    Sb(kx,kyp2)     = -eb*dkapip1_dxi*dkapip1_dyip2;
-		    Sb(ky,kxp2)     = -eb*dkapip1_dyi*dkapip1_dxip2;
+		    Sb(kx,kyp2)     = -Kb1*dkapip1_dxi*dkapip1_dyip2;
+		    Sb(ky,kxp2)     = -Kb1*dkapip1_dyi*dkapip1_dxip2;
 		    
 		    // enforce symmetry in lower triangle
 		    Sb(kxp1,kx)     = Sb(kx,kxp1);
@@ -1749,8 +1771,8 @@ int main(int argc, char const *argv[]){
     		
 
 		    // -- AREA SPRING (stress matrix)
-		    Sa(kx,kyp1) = 0.5*ka*delA;
-    		Sa(ky,kxp1) = -0.5*ka*delA;
+		    Sa(kx,kyp1) = 0.5*delA*((rho0*rho0)/a0tmp);
+    		Sa(ky,kxp1) = -0.5*delA*((rho0*rho0)/a0tmp);
 
     		Sa(kyp1,kx) = Sa(kx,kyp1);
     		Sa(kxp1,ky) = Sa(ky,kxp1);
@@ -1795,11 +1817,11 @@ int main(int argc, char const *argv[]){
     			da_dyj      = -0.5*(ljm1x + ljx);
 
     			// 	STIFFNESS MATRIX
-    			Ha(kx,lx) = ka*da_dxi*da_dxj;
-		        Ha(kx,ly) = ka*da_dxi*da_dyj;
+    			Ha(kx,lx) = da_dxi*da_dxj*((rho0*rho0)/pow(a0tmp,2.0));
+		        Ha(kx,ly) = da_dxi*da_dyj*((rho0*rho0)/pow(a0tmp,2.0));
 		        
-		        Ha(ky,lx) = ka*da_dyi*da_dxj;
-		        Ha(ky,ly) = ka*da_dyi*da_dyj;
+		        Ha(ky,lx) = da_dyi*da_dxj*((rho0*rho0)/pow(a0tmp,2.0));
+		        Ha(ky,ly) = da_dyi*da_dyj*((rho0*rho0)/pow(a0tmp,2.0));
 		        
 		        Ha(lx,kx) = Ha(kx,lx);
 		        Ha(ly,kx) = Ha(kx,ly);
