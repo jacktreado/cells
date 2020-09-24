@@ -32,7 +32,7 @@ numRuns=$9
 startSeed="${10}"
 
 # other variables
-dphi=1e-4
+dphi=1e-3
 Ptol=1e-8
 Ftol=5e-14
 
