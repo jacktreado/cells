@@ -53,7 +53,7 @@ const double alpha0      	= 0.2;
 const double finc        	= 1.1;
 const double fdec        	= 0.5;
 const double falpha      	= 0.99;
-const double Ftol 			= 1e-14;
+const double Ftol 			= 1e-13;
 
 const int NSKIP 			= 5e3;
 const int NMIN        		= 100;
@@ -898,7 +898,7 @@ int main(int argc, char const *argv[]){
 	// doubles
 	double delim1, deli, delA;
 	double ljm1x, ljm1y, ljx, ljy;
-	double dlim1_dxi, dlim1_dyi, dli_dxi, dli_dyi, dli_dxip1, dli_dyip1;
+	double ulim1x, ulim1y, ulix, uliy;
 	double da_dxi, da_dyi, da_dxj, da_dyj;
 	double kapim1, kapi, kapip1;
 	double dkapi_dxi, dkapi_dyi, dkapip1_dxi, dkapip1_dyi, dkapim1_dxi, dkapim1_dyi;
@@ -942,6 +942,7 @@ int main(int argc, char const *argv[]){
 	// Loop over cells, compute shape forces for each individual cell and contributions from
 	// vertex-vertex interactions
 	cout << "	** COMPUTING VDOS ... " << endl;
+	rho0 = sqrt(a0.at(0));
 	for (ci=0; ci<NCELLS; ci++){
 
 		// print statement
@@ -963,7 +964,7 @@ int main(int argc, char const *argv[]){
 		a0tmp = a0[ci];
 
 		// area deviations
-		delA = area(vpos,ci,L,nv,szList) - a0tmp;
+		delA = (area(vpos,ci,L,nv,szList)/a0tmp) - 1.0;
 
 		// dimensionless stiffness constants
 		Kl1 = kl*(rho0*rho0)/l0tmp;				// units = L
@@ -979,8 +980,7 @@ int main(int argc, char const *argv[]){
 			vim2 		= (vi - 2 + nvtmp) % nvtmp;
 			vim1 		= (vi - 1 + nvtmp) % nvtmp;
 			vip1 		= (vi + 1) % nvtmp;
-			vip2 		= (vi + 2) % nvtmp;
-			
+			vip2 		= (vi + 2) % nvtmp;			
 
 			// vertex elements
 			kxm2 		= NDIM*(szList.at(ci) + vim2);
@@ -1031,39 +1031,35 @@ int main(int argc, char const *argv[]){
 			lim1 		= sqrt(lim1x*lim1x + lim1y*lim1y);
 			li 			= sqrt(lix*lix + liy*liy);
 
+			// segment strains
+			deli 		= (li/l0tmp) - 1.0;
+			delim1 		= (lim1/l0tmp) - 1.0;
+
 
 			// -- PERIMETER SPRINGS
 
-			// derivatives of lim1
-			dlim1_dxi 	= lim1x/lim1;
-			dlim1_dyi 	= lim1y/lim1;
-
-			// derivatives of li
-			dli_dxip1 	= lix/li;
-			dli_dyip1 	= liy/li;
-
-			dli_dxi 	= -dli_dxip1;
-			dli_dyi 	= -dli_dyip1;
-
-			// spring strains
-			delim1 		= (lim1/l0tmp) - 1.0;
-			deli 		= (li/l0tmp) - 1.0;
+			// unit vectors
+    		ulim1x   = lim1x/lim1;
+    		ulim1y   = lim1y/lim1;
+    
+    		ulix   = lix/li;
+    		uliy   = liy/li;
 
 			// 	STIFFNESS MATRIX
 
 			// main diagonal
-		    Hl(kx,kx)       = Kl2*(dlim1_dxi*dlim1_dxi + dli_dxi*dli_dxi);
-		    Hl(ky,ky)       = Kl2*(dlim1_dyi*dlim1_dyi + dli_dyi*dli_dyi);
-		    
-		    Hl(kx,ky)       = Kl2*(dlim1_dxi*dlim1_dyi + dli_dxi*dli_dyi);
-		    Hl(ky,kx)       = Hl(kx,ky);
+		    Hl(kx,kx)       = Kl2*(ulix*ulix + ulim1x*ulim1x);
+    		Hl(ky,ky)       = Kl2*(uliy*uliy + ulim1y*ulim1y);
+    
+    		Hl(kx,ky)       = Kl2*(ulix*uliy + ulim1x*ulim1y);
+    		Hl(ky,kx)       = Hl(kx,ky);
 		    
 		    // 1off diagonal
-		    Hl(kx,kxp1)     = Kl2*dli_dxi*dli_dxip1;
-		    Hl(ky,kyp1)     = Kl2*dli_dyi*dli_dyip1;
-		    
-		    Hl(kx,kyp1)     = Kl2*dli_dxi*dli_dyip1;
-		    Hl(ky,kxp1)     = Kl2*dli_dyi*dli_dxip1;
+		    Hl(kx,kxp1)     = -Kl2*ulix*ulix;
+    		Hl(ky,kyp1)     = -Kl2*uliy*uliy;
+    
+    		Hl(kx,kyp1)     = -Kl2*ulix*uliy;
+    		Hl(ky,kxp1)     = Hl(kx,kyp1);
 		    
 		    // enforce symmetry in lower triangle
 		    Hl(kxp1,kx)     = Hl(kx,kxp1);
@@ -1075,19 +1071,19 @@ int main(int argc, char const *argv[]){
 
 		    // 	STRESS MATRIX
 
-		    // main diagonal block
-		    Sl(kx,kx) 		= Kl1*( (delim1/lim1)*(1.0 - (dlim1_dxi*dlim1_dxi)) + (deli/li)*(1.0 - (dli_dxi*dli_dxi)) );
-		    Sl(ky,ky) 		= Kl1*( (delim1/lim1)*(1.0 - (dlim1_dyi*dlim1_dyi)) + (deli/li)*(1.0 - (dli_dyi*dli_dyi)) );
-
-		    Sl(kx,ky) 		= -Kl1*( (delim1/lim1)*dlim1_dxi*dlim1_dyi + (deli/li)*dli_dxi*dli_dyi );
-		    Sl(ky,kx) 		= Sl(kx,ky);
-
+		    // main diagonal
+		    Sl(kx,kx)       = Kl1*(delim1*((ulim1y*ulim1y)/lim1) + deli*((uliy*uliy)/li));
+		    Sl(ky,ky)       = Kl1*(delim1*((ulim1x*ulim1x)/lim1) + deli*((ulix*ulix)/li));
+		    
+		    Sl(kx,ky)       = -Kl1*(delim1*((ulim1x*ulim1y)/lim1) + deli*((ulix*uliy)/li));
+		    Sl(ky,kx)       = Sl(kx,ky);
+		    
 		    // 1off diagonal
-		    Sl(kx,kxp1) 	= Kl1*(deli/li)*((dli_dxip1*dli_dxip1) - 1.0);
-		    Sl(ky,kyp1)		= Kl1*(deli/li)*((dli_dyip1*dli_dyip1) - 1.0);
-
-		    Sl(kx,kyp1) 	= Kl1*(deli/li)*dli_dxip1*dli_dyip1;
-		    Sl(ky,kxp1)		= Kl1*(deli/li)*dli_dyip1*dli_dxip1;
+		    Sl(kx,kxp1)     = -Kl1*deli*((uliy*uliy)/li);
+		    Sl(ky,kyp1)     = -Kl1*deli*((ulix*ulix)/li);
+		    
+		    Sl(kx,kyp1)     = Kl1*deli*((ulix*uliy)/li);
+		    Sl(ky,kxp1)     = Sl(kx,kyp1);
 
 		    // enforce symmetry in lower triangle
 		    Sl(kxp1,kx)     = Sl(kx,kxp1);
@@ -1175,8 +1171,8 @@ int main(int argc, char const *argv[]){
 		    Sb(ky,kx)       = Sb(kx,ky);
 		    
 		    // 1off block diagonal
-		    Sb(kx,kxp1)     = -2*Kb2*(2.0 - (l0tmp*dkapi_dxip1)*(l0tmp*dkapi_dxip1) - (l0tmp*dkapip1_dxi)*(l0tmp*dkapip1_dxi));
-		    Sb(ky,kyp1)     = -2*Kb2*(2.0 - (l0tmp*dkapi_dyip1)*(l0tmp*dkapi_dyip1) - (l0tmp*dkapip1_dyi)*(l0tmp*dkapip1_dyi));
+		    Sb(kx,kxp1)     = -2.0*Kb2*(2.0 - (l0tmp*dkapi_dxip1)*(l0tmp*dkapi_dxip1) - (l0tmp*dkapip1_dxi)*(l0tmp*dkapip1_dxi));
+		    Sb(ky,kyp1)     = -2.0*Kb2*(2.0 - (l0tmp*dkapi_dyip1)*(l0tmp*dkapi_dyip1) - (l0tmp*dkapip1_dyi)*(l0tmp*dkapip1_dyi));
 		    
 		    Sb(kx,kyp1)     = -Kb1*(dkapi_dxi*dkapi_dyip1 + dkapip1_dxi*dkapip1_dyip1);
 		    Sb(ky,kxp1)     = -Kb1*(dkapi_dyi*dkapi_dxip1 + dkapip1_dyi*dkapip1_dxip1);
@@ -1251,11 +1247,11 @@ int main(int argc, char const *argv[]){
     			da_dyj      = -0.5*(ljm1x + ljx);
 
     			// 	STIFFNESS MATRIX
-    			Ha(kx,lx) = da_dxi*da_dxj*((rho*rho)/pow(a0tmp,2.0));
-		        Ha(kx,ly) = da_dxi*da_dyj*((rho*rho)/pow(a0tmp,2.0));
+    			Ha(kx,lx) = da_dxi*da_dxj*((rho0*rho0)/pow(a0tmp,2.0));
+		        Ha(kx,ly) = da_dxi*da_dyj*((rho0*rho0)/pow(a0tmp,2.0));
 		        
-		        Ha(ky,lx) = da_dyi*da_dxj*((rho*rho)/pow(a0tmp,2.0));
-		        Ha(ky,ly) = da_dyi*da_dyj*((rho*rho)/pow(a0tmp,2.0));
+		        Ha(ky,lx) = da_dyi*da_dxj*((rho0*rho0)/pow(a0tmp,2.0));
+		        Ha(ky,ly) = da_dyi*da_dyj*((rho0*rho0)/pow(a0tmp,2.0));
 		        
 		        Ha(lx,kx) = Ha(kx,lx);
 		        Ha(ly,kx) = Ha(kx,ly);
@@ -1318,7 +1314,7 @@ int main(int argc, char const *argv[]){
 								rij = sqrt(dx*dx + dy*dy);
 								if (rij < sij){
 									// spring constant
-									kij = eint/(sij*rij);
+									kij = (eint*rho0*rho0)/(sij*rij);
 
 									// dimensionless overlap
 									h = rij/sij;
@@ -1330,10 +1326,10 @@ int main(int argc, char const *argv[]){
 									// compute stiffness and stress matrices (off diagonal, enforce symmetry in lower triangles)
 
 									// -- stiffness matrix
-									Hvv(mxi,mxj) = -(eint/(sij*sij))*(dr_dxi*dr_dxi);
-									Hvv(myi,myj) = -(eint/(sij*sij))*(dr_dyi*dr_dyi);
-									Hvv(mxi,myj) = -(eint/(sij*sij))*(dr_dxi*dr_dyi);
-									Hvv(myi,mxj) = -(eint/(sij*sij))*(dr_dyi*dr_dxi);
+									Hvv(mxi,mxj) = -((eint*rho0*rho0)/(sij*sij))*(dr_dxi*dr_dxi);
+									Hvv(myi,myj) = -((eint*rho0*rho0)/(sij*sij))*(dr_dyi*dr_dyi);
+									Hvv(mxi,myj) = -((eint*rho0*rho0)/(sij*sij))*(dr_dxi*dr_dyi);
+									Hvv(myi,mxj) = -((eint*rho0*rho0)/(sij*sij))*(dr_dyi*dr_dxi);
 
 									Hvv(mxj,mxi) = Hvv(mxi,mxj);
 									Hvv(myj,myi) = Hvv(myi,myj);
@@ -1438,7 +1434,6 @@ int main(int argc, char const *argv[]){
 
 
 	// close open objects
-	posout.close();
 	vdosout.close();
 
 	// end
