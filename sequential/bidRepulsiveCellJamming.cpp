@@ -55,10 +55,10 @@ const double fdec        	= 0.5;
 const double falpha      	= 0.99;
 
 const int NSKIP 			= 5e3;
-const int NMIN        		= 100;
+const int NMIN        		= 1000;
 const int NNEGMAX     		= 10000;
 const int NDELAY      		= 1000;
-const int itmax       		= 1e7;
+const int itmax       		= 5e7;
 
 
 // DP force constants
@@ -276,7 +276,7 @@ int main(int argc, char const *argv[]){
 		a0.at(ci) 		= a0tmp;
 
 		// set disk radius
-		drad.at(ci) 	= 1.5*sqrt((2.0*a0tmp)/(nvtmp*sin(2.0*PI/nvtmp)));
+		drad.at(ci) 	= 1.1*sqrt((2.0*a0tmp)/(nvtmp*sin(2.0*PI/nvtmp)));
 
 		// set l0, vector radius
 		l0.at(ci) 	= 2.0*lenscale*sqrt(PI*calA0tmp)/nvtmp;
@@ -938,9 +938,6 @@ int main(int argc, char const *argv[]){
 
 			// shape forces (loop over global vertex labels)
 			ci = 0;
-			ua = 0.0;
-			ul = 0.0;
-			ub = 0.0;
 			for (gi=0; gi<NVTOT; gi++){
 
 				// -- Area force (and get cell index ci)
@@ -955,11 +952,8 @@ int main(int argc, char const *argv[]){
 						atmp = area(vpos,ci,L,nv,szList);
 						da = (atmp/a0tmp) - 1.0;
 
-						if (ci==NCELLS-1)
-							ua = 0.5*da*da;
-
 						// shape force parameters (kl and kl are unitless energy ratios)
-						fa = da*(a0tmp/pow(rho0,3.0));
+						fa = da*(rho0/a0tmp);
 						fl = kl*(rho0/l0tmp);
 						fb = kb*(rho0/(l0tmp*l0tmp));
 						
@@ -1017,7 +1011,6 @@ int main(int argc, char const *argv[]){
 
 
 				// -- Area force
-
 				vF[NDIM*gi] 		+= 0.5*fa*(rim1y - rip1y);
 				vF[NDIM*gi + 1] 	+= 0.5*fa*(rip1x - rim1x);
 
@@ -1043,10 +1036,6 @@ int main(int argc, char const *argv[]){
 				vF[NDIM*gi] 		+= fl*(dli*(lix/li) - dlim1*(lim1x/lim1));
 				vF[NDIM*gi + 1] 	+= fl*(dli*(liy/li) - dlim1*(lim1y/lim1));
 
-				// save energy and print to vdosout
-				if (ci==NCELLS)
-					ul += 0.5*kl*dli*dli;
-
 
 				// -- Bending force
 				if (kb > 0){
@@ -1066,10 +1055,6 @@ int main(int argc, char const *argv[]){
 					// add to force
 					vF[NDIM*gi] 		+= fb*(3.0*(lix - lim1x) + lim2x - lip1x);
 					vF[NDIM*gi + 1] 	+= fb*(3.0*(liy - lim1y) + lim2y - lip1y);
-
-					// save energy and print to vdosout
-					if (ci==NCELLS)
-						ub += 0.5*kl*((lix - lim1x)*(lix - lim1x) + (liy - lim1y)*(liy - lim1y))/(l0tmp*l0tmp);
 				}
 
 				// update old coordinates
@@ -1262,18 +1247,15 @@ int main(int argc, char const *argv[]){
 		cout << "	* undercompressed = " << undercompressed << endl;
 		cout << "	* overcompressed = " << overcompressed << endl;
 		cout << "	* jammed = " << jammed << endl << endl;
-
-		cout << "	* Large particle shape energies:" << endl;
-		cout << "	ua = " << ua << endl;
-		cout << "	ul = " << ul << endl;
-		cout << "	ub = " << ub << endl;
 		cout << endl;
 
 		// update particle sizes based on target check
 		if (rH < 0){
 			// if still undercompressed, then grow until overcompressed found
-			if (undercompressed)
+			if (undercompressed){
+				r0 = rho0;
 				scaleFactor = drgrow;
+			}
 			// if first overcompressed, decompress by dphi/2 until unjamming
 			else if (overcompressed){
 				// current = upper bound length scale r
@@ -1470,7 +1452,7 @@ int main(int argc, char const *argv[]){
 	double dkapi_dxip1, dkapi_dyip1, dkapip1_dxip1, dkapip1_dyip1, dkapip1_dxip2, dkapip1_dyip2;
 	double Kl1, Kl2, Kb1, Kb2;
 	double kij, h;
-	double dr_dxi, dr_dyi;
+	double uxij, uyij;
 
 
 	// initialize matrices
@@ -1485,7 +1467,7 @@ int main(int argc, char const *argv[]){
 	Eigen::MatrixXd Svv(vertDOF,vertDOF);		// stress matrix for interaction terms
 	Eigen::MatrixXd H(vertDOF,vertDOF);			// stiffness matrix
 	Eigen::MatrixXd S(vertDOF,vertDOF);			// stress matrix
-	Eigen::MatrixXd M(vertDOF,vertDOF);			// full dynamical matrix
+	Eigen::MatrixXd M(vertDOF,vertDOF);			// full dynamical matrix	
 
 	// initialize all matrices to be 0 initially
 	for (k=0; k<vertDOF; k++){
@@ -1522,7 +1504,7 @@ int main(int argc, char const *argv[]){
 		// ------------------------------------------
 
 		// number of vertices of cell ci
-		nvtmp 			= nv[ci];
+		nvtmp = nv[ci];
 
 		// geometric factors
 		l0tmp = l0[ci];
@@ -1545,8 +1527,7 @@ int main(int argc, char const *argv[]){
 			vim2 		= (vi - 2 + nvtmp) % nvtmp;
 			vim1 		= (vi - 1 + nvtmp) % nvtmp;
 			vip1 		= (vi + 1) % nvtmp;
-			vip2 		= (vi + 2) % nvtmp;
-			
+			vip2 		= (vi + 2) % nvtmp;			
 
 			// vertex elements
 			kxm2 		= NDIM*(szList.at(ci) + vim2);
@@ -1737,8 +1718,8 @@ int main(int argc, char const *argv[]){
 		    Sb(ky,kx)       = Sb(kx,ky);
 		    
 		    // 1off block diagonal
-		    Sb(kx,kxp1)     = -2*Kb2*(2.0 - (l0tmp*dkapi_dxip1)*(l0tmp*dkapi_dxip1) - (l0tmp*dkapip1_dxi)*(l0tmp*dkapip1_dxi));
-		    Sb(ky,kyp1)     = -2*Kb2*(2.0 - (l0tmp*dkapi_dyip1)*(l0tmp*dkapi_dyip1) - (l0tmp*dkapip1_dyi)*(l0tmp*dkapip1_dyi));
+		    Sb(kx,kxp1)     = -2.0*Kb2*(2.0 - (l0tmp*dkapi_dxip1)*(l0tmp*dkapi_dxip1) - (l0tmp*dkapip1_dxi)*(l0tmp*dkapip1_dxi));
+		    Sb(ky,kyp1)     = -2.0*Kb2*(2.0 - (l0tmp*dkapi_dyip1)*(l0tmp*dkapi_dyip1) - (l0tmp*dkapip1_dyi)*(l0tmp*dkapip1_dyi));
 		    
 		    Sb(kx,kyp1)     = -Kb1*(dkapi_dxi*dkapi_dyip1 + dkapip1_dxi*dkapip1_dyip1);
 		    Sb(ky,kxp1)     = -Kb1*(dkapi_dyi*dkapi_dxip1 + dkapip1_dyi*dkapip1_dxip1);
@@ -1762,8 +1743,6 @@ int main(int argc, char const *argv[]){
 		    
 		    Sb(kxp2,ky)     = Sb(ky,kxp2);
 		    Sb(kyp2,kx)     = Sb(kx,kyp2);
-
-
     		
 
 		    // -- AREA SPRING (stress matrix)
@@ -1886,16 +1865,16 @@ int main(int argc, char const *argv[]){
 									h = rij/sij;
 
 									// derivatives of distance w.r.t. coordinates
-									dr_dxi = -dx/rij;
-									dr_dyi = -dy/rij;
+									uxij = dx/rij;
+									uyij = dy/rij;
 
 									// compute stiffness and stress matrices (off diagonal, enforce symmetry in lower triangles)
 
 									// -- stiffness matrix
-									Hvv(mxi,mxj) = -((eint*rho0*rho0)/(sij*sij))*(dr_dxi*dr_dxi);
-									Hvv(myi,myj) = -((eint*rho0*rho0)/(sij*sij))*(dr_dyi*dr_dyi);
-									Hvv(mxi,myj) = -((eint*rho0*rho0)/(sij*sij))*(dr_dxi*dr_dyi);
-									Hvv(myi,mxj) = -((eint*rho0*rho0)/(sij*sij))*(dr_dyi*dr_dxi);
+									Hvv(mxi,mxj) = -((eint*rho0*rho0)/(sij*sij))*(uxij*uxij);
+									Hvv(myi,myj) = -((eint*rho0*rho0)/(sij*sij))*(uyij*uyij);
+									Hvv(mxi,myj) = -((eint*rho0*rho0)/(sij*sij))*(uxij*uyij);
+									Hvv(myi,mxj) = -((eint*rho0*rho0)/(sij*sij))*(uyij*uxij);
 
 									Hvv(mxj,mxi) = Hvv(mxi,mxj);
 									Hvv(myj,myi) = Hvv(myi,myj);
@@ -1905,10 +1884,10 @@ int main(int argc, char const *argv[]){
 
 
 									// -- stress matrix
-									Svv(mxi,mxj) = kij*(1.0 - h)*(dr_dyi*dr_dyi);
-									Svv(myi,myj) = kij*(1.0 - h)*(dr_dxi*dr_dxi);
-									Svv(mxi,myj) = -kij*(1.0 - h)*(dr_dxi*dr_dyi);
-									Svv(myi,mxj) = -kij*(1.0 - h)*(dr_dxi*dr_dyi);
+									Svv(mxi,mxj) = kij*(1.0 - h)*(uyij*uyij);
+									Svv(myi,myj) = kij*(1.0 - h)*(uxij*uxij);
+									Svv(mxi,myj) = -kij*(1.0 - h)*(uxij*uyij);
+									Svv(myi,mxj) = -kij*(1.0 - h)*(uxij*uyij);
 
 									Svv(mxj,mxi) = Svv(mxi,mxj);
 					                Svv(myj,myi) = Svv(myi,myj);
@@ -1947,6 +1926,7 @@ int main(int argc, char const *argv[]){
 					}
 				}
 			}
+
 		}	
 	}
 
@@ -1955,11 +1935,10 @@ int main(int argc, char const *argv[]){
 	for (k=0; k<vertDOF; k++){
 		for (l=0; l<vertDOF; l++){
 			H(k,l) = Ha(k,l) + Hl(k,l) + Hb(k,l) + Hvv(k,l);
-			S(k,l) = -1.0*Sa(k,l) - Sl(k,l) - Sb(k,l) - Svv(k,l);
+			S(k,l) = -Sa(k,l) - Sl(k,l) - Sb(k,l) - Svv(k,l);
 			M(k,l) = H(k,l) - S(k,l);
 		}
 	}
-
 
 	// compute eigenvalues
 	cout << "\t** Computing eigenvalues and eigenvectors of M, H and S matrices" << endl;
@@ -1977,25 +1956,6 @@ int main(int argc, char const *argv[]){
 	vdosout << hModes.eigenvalues() << endl;
 	vdosout << sModes.eigenvalues() << endl;
 	vdosout << evecs << endl;
-
-	// // print projections onto stiffness and stress directions
-	// cout << "\t** Printing projections onto stiffness and stress directions" << endl;
-	// double stiffProj, stressProj, v1, v2;
-	// int l1, l2;
-	// for (k=0; k<vertDOF; k++){
-	// 	stiffProj = 0.0;
-	// 	stressProj = 0.0;
-	// 	for (l1=0; l1<vertDOF; l1++){
-	// 		v1 = evecs(l1,k);
-	// 		for (l2=0; l2<vertDOF; l2++){
-	// 			v2 			= evecs(l2,k);
-	// 			stiffProj 	+= H(l1,l2)*v1*v2;
-	// 			stressProj 	+= S(l1,l2)*v1*v2;
-	// 		}
-	// 	}
-	// 	vdosout << setprecision(14) << stiffProj << endl;
-	// 	vdosout << setprecision(14) << stressProj << endl;
-	// }
 
 
 	// close open objects

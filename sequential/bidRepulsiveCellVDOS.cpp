@@ -46,7 +46,7 @@ const int pnum 				= 14;
 const int seed 				= 1;
 
 // simulation constants
-const double timeStepMag 	= 0.005;
+const double timeStepMag 	= 0.01;
 
 // FIRE constants for initial minimizations (SP + DP)
 const double alpha0      	= 0.2;
@@ -56,7 +56,7 @@ const double falpha      	= 0.99;
 const double Ftol 			= 1e-13;
 
 const int NSKIP 			= 5e3;
-const int NMIN        		= 100;
+const int NMIN        		= 500;
 const int NNEGMAX     		= 10000;
 const int NDELAY      		= 1000;
 const int itmax       		= 1e7;
@@ -353,6 +353,19 @@ int main(int argc, char const *argv[]){
 	vector<double> vF(vertDOF,0.0);
 	vector<double> vFold(vertDOF,0.0);
 
+	// draw initial velocities from Maxwell-Boltzmann distribution
+	double r1, r2, grv;
+	cout << endl;
+	for (i=0; i<vertDOF; i++){
+		// box muller transform
+		r1 = drand48();
+		r2 = drand48();
+		grv = sqrt(-2.0*log(r1))*cos(2.0*PI*r2);
+
+		// draw random velocity
+		vvel[i] = sqrt(1e-10)*grv;
+	}
+
 	// FIRE VARIABLES
 	double P  		= 0;	
 	double fnorm 	= 0;
@@ -605,7 +618,7 @@ int main(int argc, char const *argv[]){
 					da = (atmp/a0tmp) - 1.0;
 
 					// shape force parameters (kl and kl are unitless energy ratios)
-					fa = da*(a0tmp/pow(rho0,3.0));
+					fa = da*(rho0/a0tmp);
 					fl = kl*(rho0/l0tmp);
 					fb = kb*(rho0/(l0tmp*l0tmp));
 					
@@ -663,7 +676,6 @@ int main(int argc, char const *argv[]){
 
 
 			// -- Area force
-
 			vF[NDIM*gi] 		+= 0.5*fa*(rim1y - rip1y);
 			vF[NDIM*gi + 1] 	+= 0.5*fa*(rip1x - rim1x);
 
@@ -905,7 +917,7 @@ int main(int argc, char const *argv[]){
 	double dkapi_dxip1, dkapi_dyip1, dkapip1_dxip1, dkapip1_dyip1, dkapip1_dxip2, dkapip1_dyip2;
 	double Kl1, Kl2, Kb1, Kb2;
 	double kij, h;
-	double dr_dxi, dr_dyi;
+	double uxij, uyij;
 
 
 	// initialize matrices
@@ -920,7 +932,7 @@ int main(int argc, char const *argv[]){
 	Eigen::MatrixXd Svv(vertDOF,vertDOF);		// stress matrix for interaction terms
 	Eigen::MatrixXd H(vertDOF,vertDOF);			// stiffness matrix
 	Eigen::MatrixXd S(vertDOF,vertDOF);			// stress matrix
-	Eigen::MatrixXd M(vertDOF,vertDOF);			// full dynamical matrix
+	Eigen::MatrixXd M(vertDOF,vertDOF);			// full dynamical matrix	
 
 	// initialize all matrices to be 0 initially
 	for (k=0; k<vertDOF; k++){
@@ -957,7 +969,7 @@ int main(int argc, char const *argv[]){
 		// ------------------------------------------
 
 		// number of vertices of cell ci
-		nvtmp 			= nv[ci];
+		nvtmp = nv[ci];
 
 		// geometric factors
 		l0tmp = l0[ci];
@@ -1198,6 +1210,26 @@ int main(int argc, char const *argv[]){
 		    Sb(kyp2,kx)     = Sb(kx,kyp2);
 
 
+
+		    // // check on bending energy: use full M
+		    // Mbcheck(kx,kx) 		= 6.0*Kb2;
+		    // Mbcheck(ky,ky) 		= 6.0*Kb2;
+
+		    // Mbcheck(kx,kxp1) 	= -4.0*Kb2;
+		    // Mbcheck(ky,kyp1) 	= -4.0*Kb2;
+
+		    // Mbcheck(kx,kxp2) 	= Kb2;
+		    // Mbcheck(ky,kyp2) 	= Kb2;
+
+
+		    // // enforce symmetry
+		    // Mbcheck(kxp1,kx) 	= Mbcheck(kx,kxp1);
+		    // Mbcheck(kyp1,ky) 	= Mbcheck(ky,kyp1);
+
+		    // Mbcheck(kxp2,kx) 	= Mbcheck(kx,kxp2);
+		    // Mbcheck(kyp2,ky) 	= Mbcheck(ky,kyp2);
+
+
     		
 
 		    // -- AREA SPRING (stress matrix)
@@ -1283,6 +1315,8 @@ int main(int argc, char const *argv[]){
 			else
 				inContact = cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]; 
 
+			cout << "ci = " << ci << ", cj = " << cj << ", inContact = " << inContact << endl;
+
 			if (inContact > 0){
 
 				// loop over pairs of vertices on both cells, check for overlap, compute matrix elements
@@ -1320,16 +1354,16 @@ int main(int argc, char const *argv[]){
 									h = rij/sij;
 
 									// derivatives of distance w.r.t. coordinates
-									dr_dxi = -dx/rij;
-									dr_dyi = -dy/rij;
+									uxij = dx/rij;
+									uyij = dy/rij;
 
 									// compute stiffness and stress matrices (off diagonal, enforce symmetry in lower triangles)
 
 									// -- stiffness matrix
-									Hvv(mxi,mxj) = -((eint*rho0*rho0)/(sij*sij))*(dr_dxi*dr_dxi);
-									Hvv(myi,myj) = -((eint*rho0*rho0)/(sij*sij))*(dr_dyi*dr_dyi);
-									Hvv(mxi,myj) = -((eint*rho0*rho0)/(sij*sij))*(dr_dxi*dr_dyi);
-									Hvv(myi,mxj) = -((eint*rho0*rho0)/(sij*sij))*(dr_dyi*dr_dxi);
+									Hvv(mxi,mxj) = -((eint*rho0*rho0)/(sij*sij))*(uxij*uxij);
+									Hvv(myi,myj) = -((eint*rho0*rho0)/(sij*sij))*(uyij*uyij);
+									Hvv(mxi,myj) = -((eint*rho0*rho0)/(sij*sij))*(uxij*uyij);
+									Hvv(myi,mxj) = -((eint*rho0*rho0)/(sij*sij))*(uyij*uxij);
 
 									Hvv(mxj,mxi) = Hvv(mxi,mxj);
 									Hvv(myj,myi) = Hvv(myi,myj);
@@ -1339,10 +1373,10 @@ int main(int argc, char const *argv[]){
 
 
 									// -- stress matrix
-									Svv(mxi,mxj) = kij*(1.0 - h)*(dr_dyi*dr_dyi);
-									Svv(myi,myj) = kij*(1.0 - h)*(dr_dxi*dr_dxi);
-									Svv(mxi,myj) = -kij*(1.0 - h)*(dr_dxi*dr_dyi);
-									Svv(myi,mxj) = -kij*(1.0 - h)*(dr_dxi*dr_dyi);
+									Svv(mxi,mxj) = kij*(1.0 - h)*(uyij*uyij);
+									Svv(myi,myj) = kij*(1.0 - h)*(uxij*uxij);
+									Svv(mxi,myj) = -kij*(1.0 - h)*(uxij*uyij);
+									Svv(myi,mxj) = -kij*(1.0 - h)*(uxij*uyij);
 
 									Svv(mxj,mxi) = Svv(mxi,mxj);
 					                Svv(myj,myi) = Svv(myi,myj);
@@ -1390,11 +1424,10 @@ int main(int argc, char const *argv[]){
 	for (k=0; k<vertDOF; k++){
 		for (l=0; l<vertDOF; l++){
 			H(k,l) = Ha(k,l) + Hl(k,l) + Hb(k,l) + Hvv(k,l);
-			S(k,l) = -1.0*Sa(k,l) - Sl(k,l) - Sb(k,l) - Svv(k,l);
+			S(k,l) = -Sa(k,l) - Sl(k,l) - Sb(k,l) - Svv(k,l);
 			M(k,l) = H(k,l) - S(k,l);
 		}
 	}
-
 
 	// compute eigenvalues
 	cout << "\t** Computing eigenvalues and eigenvectors of M, H and S matrices" << endl;
@@ -1412,6 +1445,293 @@ int main(int argc, char const *argv[]){
 	vdosout << hModes.eigenvalues() << endl;
 	vdosout << sModes.eigenvalues() << endl;
 	vdosout << evecs << endl;
+
+
+	// print contact matrix
+	cout << "\t** Printing contact matrix:" << endl;
+	for (ci=0; ci<NCELLS; ci++){
+		for (cj=0; cj<NCELLS; cj++){
+			if (ci == cj)
+				inContact = 0;
+			else if (ci > cj)
+				inContact = cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2];
+			else
+				inContact = cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]; 
+
+			cout << inContact << "  ";
+		}
+		cout << endl;
+	}
+
+
+
+	// // print energy along second eigenvector
+	// double Upert = 0.0;
+	// double dvplot = 0;
+	// double dv = 1e-10;
+	// double ddv = 2.0;
+	// int mi = 2;
+	// vector<double> vpos0 = vpos;
+	// cout << "printing change to energy along mode " << mi << endl;
+	// while (dv < 1e-1){
+	// 	// reset linked list 
+	// 	for (gi=0; gi<NVTOT+1; gi++)
+	// 		list[gi] = 0;
+
+	// 	// reset linked list head
+	// 	for (i=0; i<NBX; i++){
+	// 		head[i] = 0;
+	// 		last[i] = 0;
+	// 	}
+
+	// 	// sort vertices into linked list
+	// 	for (gi=0; gi<NVTOT; gi++){
+	// 		// 1. get cell id of current particle position
+	// 		boxid = 0;
+	// 		sbtmp = 1;
+	// 		for (d=0; d<NDIM; d++){
+	// 			// add d index to 1d list
+	// 			boxid += floor(vpos[NDIM*gi + d]/lb[d])*sbtmp;
+
+	// 			// increment dimensional factor
+	// 			sbtmp *= sb[d];
+	// 		}
+
+	// 		// 2. add to head list or link within list
+	// 		// NOTE: particle ids are labelled starting from 1, setting to 0 means end of linked list
+	// 		if (head[boxid] == 0){
+	// 			head[boxid] = gi + 1;
+	// 			last[boxid] = gi + 1;
+	// 		}
+	// 		else{
+	// 			list[last[boxid]] = gi + 1;
+	// 			last[boxid] = gi + 1;
+	// 		}
+	// 	}
+
+	// 	// interaction forces (USE BOX LINKED LIST)
+	// 	Upert = 0.0;
+	// 	for (bi=0; bi<NBX; bi++){
+
+	// 		// get start of list of particles
+	// 		pi = head[bi];
+
+	// 		// loop over linked list
+	// 		while (pi > 0){
+	// 			// real particle index
+	// 			gi = pi - 1;
+
+	// 			// next particle in list
+	// 			pj = list[pi];
+
+	// 			// loop down neighbors of pi in same cell
+	// 			while (pj > 0){
+	// 				// real index of pj
+	// 				gj = pj - 1;
+
+	// 				if (gj == ip1[gi] || gj == im1[gi]){
+	// 					pj = list[pj];
+	// 					continue;
+	// 				}
+
+	// 				// contact distance
+	// 				sij = vrad[gi] + vrad[gj];
+
+	// 				// particle distance
+	// 				dx = vpos[NDIM*gj] - vpos[NDIM*gi];
+	// 				dx -= L[0]*round(dx/L[0]);
+	// 				if (dx < sij){
+	// 					dy = vpos[NDIM*gj + 1] - vpos[NDIM*gi + 1];
+	// 					dy -= L[1]*round(dy/L[1]);
+	// 					if (dy < sij){
+	// 						rij = sqrt(dx*dx + dy*dy);
+	// 						if (rij < sij){
+	// 							// increase potential energy
+	// 							Upert += 0.5*eint*pow((1 - (rij/sij)),2.0);
+	// 						}
+	// 					}
+	// 				}
+
+	// 				// update pj
+	// 				pj = list[pj];
+	// 			}
+
+	// 			// test overlaps with forward neighboring cells
+	// 			for (bj=0; bj<NNN; bj++){
+	// 				// get first particle in neighboring cell
+	// 				pj = head[nn[bi][bj]];
+
+	// 				// loop down neighbors of pi in same cell
+	// 				while (pj > 0){
+	// 					// real index of pj
+	// 					gj = pj - 1;
+
+	// 					if (gj == ip1[gi] || gj == im1[gi]){
+	// 						pj = list[pj];
+	// 						continue;
+	// 					}
+
+	// 					// contact distance
+	// 					sij = vrad[gi] + vrad[gj];
+
+	// 					// particle distance
+	// 					dx = vpos[NDIM*gj] - vpos[NDIM*gi];
+	// 					dx -= L[0]*round(dx/L[0]);
+	// 					if (dx < sij){
+	// 						dy = vpos[NDIM*gj + 1] - vpos[NDIM*gi + 1];
+	// 						dy -= L[1]*round(dy/L[1]);
+	// 						if (dy < sij){
+	// 							rij = sqrt(dx*dx + dy*dy);
+	// 							if (rij < sij){
+	// 								// increase potential energy
+	// 								Upert += 0.5*eint*pow((1 - (rij/sij)),2.0);
+	// 							}
+	// 						}
+	// 					}
+
+	// 					// update pj
+	// 					pj = list[pj];
+	// 				}
+	// 			}
+
+	// 			// update pi index to be next
+	// 			pi = list[pi];
+	// 		}
+	// 	}
+
+	// 	// shape forces (loop over global vertex labels)
+	// 	ci = 0;
+	// 	for (gi=0; gi<NVTOT; gi++){
+
+	// 		// -- Area force (and get cell index ci)
+	// 		if (ci < NCELLS){
+	// 			if (gi == szList[ci]){
+	// 				// compute shape parameter
+	// 				nvtmp = nv[ci];
+	// 				a0tmp = a0[ci];
+	// 				l0tmp = l0[ci];
+
+	// 				// compute area deviation
+	// 				atmp = area(vpos,ci,L,nv,szList);
+	// 				da = (atmp/a0tmp) - 1.0;
+
+	// 				Upert += 0.5*da*da;
+					
+	// 				// compute cell center of mass
+	// 				xi = vpos[NDIM*gi];
+	// 				yi = vpos[NDIM*gi + 1];
+	// 				cx = xi; 
+	// 				cy = yi;
+	// 				for (vi=1; vi<nvtmp; vi++){
+	// 					dx = vpos.at(NDIM*(gi+vi)) - xi;
+	// 					dx -= L[0]*round(dx/L[0]);
+
+	// 					dy = vpos.at(NDIM*(gi+vi) + 1) - yi;
+	// 					dy -= L[1]*round(dy/L[1]);
+
+	// 					xi += dx;
+	// 					yi += dy;
+
+	// 					cx += xi;
+	// 					cy += yi;
+	// 				}
+	// 				cx /= nvtmp;
+	// 				cy /= nvtmp;
+
+	// 				// get coordinates relative to center of mass
+	// 				rix = vpos[NDIM*gi] - cx;
+	// 				riy = vpos[NDIM*gi + 1] - cy;
+
+	// 				// get (prior) adjacent vertices
+	// 				rim1x = vpos[NDIM*im1[gi]] - cx;
+	// 				rim1x -= L[0]*round(rim1x/L[0]);
+
+	// 				rim1y = vpos[NDIM*im1[gi] + 1] - cy;
+	// 				rim1y -= L[1]*round(rim1y/L[1]);
+
+	// 				rim2x = vpos[NDIM*im1[im1[gi]]] - cx;
+	// 				rim2x -= L[0]*round(rim2x/L[0]);
+
+	// 				rim2y = vpos[NDIM*im1[im1[gi]] + 1] - cy;
+	// 				rim2y -= L[1]*round(rim2y/L[1]);
+
+	// 				// increment cell index
+	// 				ci++;
+	// 			}
+	// 		}
+
+
+	// 		// get next adjacent vertices
+	// 		rip1x = vpos.at(NDIM*ip1[gi]) - cx;
+	// 		rip1x -= L[0]*round(rip1x/L[0]);
+
+	// 		rip1y = vpos.at(NDIM*ip1[gi] + 1) - cy;
+	// 		rip1y -= L[1]*round(rip1y/L[1]);
+
+
+	// 		// -- Perimeter force
+
+	// 		// segment vector elements
+	// 		lim1x 	= rix - rim1x;
+	// 		lim1y 	= riy - rim1y;
+
+	// 		lix 	= rip1x - rix;
+	// 		liy 	= rip1y - riy;
+
+	// 		// segment lengths
+	// 		lim1 	= sqrt(lim1x*lim1x + lim1y*lim1y);
+	// 		li 		= sqrt(lix*lix + liy*liy);
+
+	// 		// segment deviations
+	// 		dlim1  	= (lim1/l0tmp) - 1.0;
+	// 		dli 	= (li/l0tmp) - 1.0;
+
+	// 		Upert += 0.5*kl*dli*dli;
+
+
+	// 		// -- Bending force
+	// 		if (kb > 0){
+	// 			// segment vectors for ip2
+	// 			rip2x = vpos[NDIM*ip1[ip1[gi]]] - cx;
+	// 			rip2x -= L[0]*round(rip2x/L[0]);
+
+	// 			rip2y = vpos[NDIM*ip1[ip1[gi]] + 1] - cy;
+	// 			rip2y -= L[1]*round(rip2y/L[1]);
+
+	// 			lip1x = rip2x - rip1x;
+	// 			lip1y = rip2y - rip1y;
+
+	// 			lim2x = rim1x - rim2x;
+	// 			lim2y = rim1y - rim2y;
+
+	// 			Upert += 0.5*kb*((lix - lim1x)*(lix - lim1x) + (liy - lim1y)*(liy - lim1y))/(l0tmp*l0tmp);
+	// 		}
+
+	// 		// update old coordinates
+	// 		rim2x = rim1x;
+	// 		rim1x = rix;
+	// 		rix = rip1x;
+
+	// 		rim2y = rim1y;
+	// 		rim1y = riy;
+	// 		riy = rip1y;
+	// 	}
+
+	// 	// print 
+	// 	cout << setw(10) << dvplot;
+	// 	cout << setw(25) << setprecision(16) << Upert;
+	// 	cout << endl;
+
+	// 	// update positions along eigenvector
+	// 	for (i=0; i<vertDOF; i++)
+	// 		vpos[i] = vpos0[i] + dv*evecs(i,mi);
+
+	// 	// update perturbation scale
+	// 	dvplot = dv;
+	// 	dv *= ddv;
+	// }
+
+
 
 	// // print projections onto stiffness and stress directions
 	// cout << "\t** Printing projections onto stiffness and stress directions" << endl;

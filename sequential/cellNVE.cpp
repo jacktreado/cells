@@ -32,7 +32,7 @@ const int wnum 				= 25;
 const int pnum 				= 14;
 
 // simulation constants
-const double timeStepMag 	= 0.01;
+const double timeStepMag 	= 0.005;
 const double sizeRatio 		= 1.4;
 const double sizeFraction 	= 0.5;
 
@@ -264,7 +264,7 @@ int main(int argc, char const *argv[]){
 		a0.at(ci) 		= a0tmp;
 
 		// set disk radius
-		drad.at(ci) 	= 1.05*sqrt((2.0*a0tmp)/(nvtmp*sin(2.0*PI/nvtmp)));
+		drad.at(ci) 	= 1.3*sqrt((2.0*a0tmp)/(nvtmp*sin(2.0*PI/nvtmp)));
 
 		// set l0, vector radius
 		l0.at(ci) 	= 2.0*lenscale*sqrt(PI*calA0tmp)/nvtmp;
@@ -298,7 +298,6 @@ int main(int argc, char const *argv[]){
 				BOX-LINKED-LIST
 
 	 * * * * * * * * * * * * * * * * * */
-
 
 	// Cell-linked-list variables
 
@@ -614,21 +613,24 @@ int main(int argc, char const *argv[]){
 	// 
 	// ----------------------------
 
+	// change output precision
+	cout << setprecision(6);
 
 
-	// initialize disk velocity and force vectors
+	// initialize velocity and force vectors
 	vector<double> vvel(vertDOF,0.0);
 	vector<double> vF(vertDOF,0.0);
 	vector<double> vFold(vertDOF,0.0);
 
-	// RESET FIRE VARIABLES
+	// FIRE VARIABLES
 	P  			= 0;	
 	fnorm 		= 0;
 	vnorm 		= 0;
 	alpha   	= alpha0;
 
 	dtmax   	= 10*dt0;
-	dtmin   	= 1e-1*dt0;
+	dtmin   	= 1e-6*dt0;
+	dt 			= dt0;
 
 	npPos      	= 0;
 	npNeg      	= 0;
@@ -641,14 +643,18 @@ int main(int argc, char const *argv[]){
 	int boxid, bi, bj, pi, pj, sbtmp;
 	int d0, dend;
 	double U = 0.0;
+	double pcheck = 0.0;
 
 	// shape force variables
-	double Kl, Kb, l0tmp, atmp, li, lim1, kappai, cx, cy;
+	double fa, fl, fb, atmp, l0tmp, li, lim1, kappai, cx, cy;
 	double da, dli, dlim1;
 	double lim2x, lim2y, lim1x, lim1y, lix, liy, lip1x, lip1y;
 	double rim2x, rim2y, rim1x, rim1y, rix, riy, rip1x, rip1y, rip2x, rip2y;
 
-	// loop until force relaxes
+	// length scale
+	double rho0 = sqrt(a0.at(0));
+
+	// RELAX FORCES USING FIRE
 	while ((fcheck > Ftol || npPMin < NMIN) && fireit < itmax){
 		// VV POSITION UPDATE
 		for (i=0; i<vertDOF; i++){
@@ -704,6 +710,7 @@ int main(int argc, char const *argv[]){
 
 		// interaction forces (USE BOX LINKED LIST)
 		U = 0.0;
+		pcheck = 0.0;
 		for (bi=0; bi<NBX; bi++){
 
 			// get start of list of particles
@@ -740,7 +747,7 @@ int main(int argc, char const *argv[]){
 							rij = sqrt(dx*dx + dy*dy);
 							if (rij < sij){
 								// force scale
-								ftmp 				= eint*(1 - (rij/sij))/sij;
+								ftmp 				= eint*(1 - (rij/sij))*(rho0/sij);
 								fx 					= ftmp*(dx/rij);
 								fy 					= ftmp*(dy/rij);
 
@@ -753,6 +760,9 @@ int main(int argc, char const *argv[]){
 
 								// increae potential energy
 								U += 0.5*eint*pow((1 - (rij/sij)),2.0);
+
+								// add to virial expression for pressure
+								pcheck += dx*fx + dy*fy;
 							}
 						}
 					}
@@ -789,7 +799,7 @@ int main(int argc, char const *argv[]){
 								rij = sqrt(dx*dx + dy*dy);
 								if (rij < sij){
 									// force scale
-									ftmp 				= eint*(1 - (rij/sij))/sij;
+									ftmp 				= eint*(1 - (rij/sij))*(rho0/sij);
 									fx 					= ftmp*(dx/rij);
 									fy 					= ftmp*(dy/rij);
 
@@ -802,6 +812,9 @@ int main(int argc, char const *argv[]){
 
 									// increae potential energy
 									U += 0.5*eint*pow((1 - (rij/sij)),2.0);
+
+									// add to virial expression for pressure
+									pcheck += dx*fx + dy*fy;
 								}
 							}
 						}
@@ -816,8 +829,8 @@ int main(int argc, char const *argv[]){
 			}
 		}
 
-
-
+		// normalize pressure by box area (make dimensionless with extra factor of rho)
+		pcheck *= (rho0/(2.0*L[0]*L[1]));
 
 
 		// shape forces (loop over global vertex labels)
@@ -834,12 +847,13 @@ int main(int argc, char const *argv[]){
 
 					// compute area deviation
 					atmp = area(vpos,ci,L,nv,szList);
-					da = atmp - a0tmp;
+					da = (atmp/a0tmp) - 1.0;
 
-					// shape force parameters
-					Kl = nvtmp*l0tmp*kl;
-					Kb = kb/(nvtmp*pow(l0tmp,2.0));
-
+					// shape force parameters (kl and kl are unitless energy ratios)
+					fa = da*(a0tmp/pow(rho0,3.0));
+					fl = kl*(rho0/l0tmp);
+					fb = kb*(rho0/(l0tmp*l0tmp));
+					
 					// compute cell center of mass
 					xi = vpos[NDIM*gi];
 					yi = vpos[NDIM*gi + 1];
@@ -891,9 +905,12 @@ int main(int argc, char const *argv[]){
 			rip1y = vpos.at(NDIM*ip1[gi] + 1) - cy;
 			rip1y -= L[1]*round(rip1y/L[1]);
 
-			// add to forces
-			vF[NDIM*gi] 		+= ka*0.5*da*(rim1y - rip1y);
-			vF[NDIM*gi + 1] 	+= ka*0.5*da*(rip1x - rim1x);
+
+
+			// -- Area force
+
+			vF[NDIM*gi] 		+= 0.5*fa*(rim1y - rip1y);
+			vF[NDIM*gi + 1] 	+= 0.5*fa*(rip1x - rim1x);
 
 
 			// -- Perimeter force
@@ -914,8 +931,8 @@ int main(int argc, char const *argv[]){
 			dli 	= (li/l0tmp) - 1.0;
 
 			// add to forces
-			vF[NDIM*gi] 		+= Kl*(dli*(lix/li) - dlim1*(lim1x/lim1));
-			vF[NDIM*gi + 1] 	+= Kl*(dli*(liy/li) - dlim1*(lim1y/lim1));
+			vF[NDIM*gi] 		+= fl*(dli*(lix/li) - dlim1*(lim1x/lim1));
+			vF[NDIM*gi + 1] 	+= fl*(dli*(liy/li) - dlim1*(lim1y/lim1));
 
 
 			// -- Bending force
@@ -934,8 +951,8 @@ int main(int argc, char const *argv[]){
 				lim2y = rim1y - rim2y;
 
 				// add to force
-				vF[NDIM*gi] 		+= Kb*(3.0*(lix - lim1x) + lim2x - lip1x);
-				vF[NDIM*gi + 1] 	+= Kb*(3.0*(liy - lim1y) + lim2y - lip1y);
+				vF[NDIM*gi] 		+= fb*(3.0*(lix - lim1x) + lim2x - lip1x);
+				vF[NDIM*gi + 1] 	+= fb*(3.0*(liy - lim1y) + lim2y - lip1y);
 			}
 
 			// update old coordinates
@@ -983,19 +1000,20 @@ int main(int argc, char const *argv[]){
 		if (fireit % NSKIP == 0){
 			cout << endl << endl;
 			cout << "===========================================" << endl;
-			cout << "		I N I T I A L 				" << endl;
 			cout << " 	F I R E 						" << endl;
 			cout << "		M I N I M I Z A T I O N 	" << endl;
 			cout << "===========================================" << endl;
 			cout << endl;
-			cout << "	** fireit = " << fireit << endl;
-			cout << "	** fcheck = " << fcheck << endl;
-			cout << "	** vnorm = " << vnorm << endl;
-			cout << "	** dt = " << dt << endl;
-			cout << "	** P = " << P << endl;
-			cout << "	** Pdir = " << P/(fnorm*vnorm) << endl;
-			cout << "	** alpha = " << alpha << endl;
-			cout << "	** Uint = " << U << endl;
+			cout << "	** fireit 	= " << fireit << endl;
+			cout << "	** fcheck 	= " << fcheck << endl;
+			cout << "	** pcheck 	= " << pcheck << endl;
+			cout << "	** U 		= " << U << endl;
+
+			cout << "	** vnorm 	= " << vnorm << endl;
+			cout << "	** dt 		= " << dt << endl;
+			cout << "	** P 		= " << P << endl;
+			cout << "	** Pdir 	= " << P/(fnorm*vnorm) << endl;
+			cout << "	** alpha 	= " << alpha << endl;
 		}
 
 		// Step 1. adjust simulation based on net motion of degrees of freedom
@@ -1065,6 +1083,7 @@ int main(int argc, char const *argv[]){
 		return 1;
 	}
 	else{
+
 		cout << endl << endl;
 		cout << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&" << endl;
 		cout << "===========================================" << endl;
@@ -1076,14 +1095,16 @@ int main(int argc, char const *argv[]){
 		cout << "===========================================" << endl;
 		cout << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&" << endl;
 		cout << endl;
-		cout << "	** fireit = " << fireit << endl;
-		cout << "	** fcheck = " << fcheck << endl;
-		cout << "	** vnorm = " << vnorm << endl;
-		cout << "	** dt = " << dt << endl;
-		cout << "	** P = " << P << endl;
-		cout << "	** Pdir = " << P/(fnorm*vnorm) << endl;
-		cout << "	** alpha = " << alpha << endl;
-		cout << "	** Uint = " << U << endl;
+		cout << "	** fireit 	= " << fireit << endl;
+		cout << "	** fcheck 	= " << fcheck << endl;
+		cout << "	** pcheck 	= " << pcheck << endl;
+		cout << "	** U 		= " << U << endl;
+
+		cout << "	** vnorm 	= " << vnorm << endl;
+		cout << "	** dt 		= " << dt << endl;
+		cout << "	** P 		= " << P << endl;
+		cout << "	** Pdir 	= " << P/(fnorm*vnorm) << endl;
+		cout << "	** alpha 	= " << alpha << endl << endl;
 	}
 
 
@@ -1141,7 +1162,7 @@ int main(int argc, char const *argv[]){
 		}
 
 		// reset linked list 
-		for (gi=0; gi<(NVTOT+1); gi++)
+		for (gi=0; gi<NVTOT+1; gi++)
 			list[gi] = 0;
 
 		// reset linked list head
@@ -1179,6 +1200,7 @@ int main(int argc, char const *argv[]){
 
 		// interaction forces (USE BOX LINKED LIST)
 		U = 0.0;
+		pcheck = 0.0;
 		for (bi=0; bi<NBX; bi++){
 
 			// get start of list of particles
@@ -1215,7 +1237,7 @@ int main(int argc, char const *argv[]){
 							rij = sqrt(dx*dx + dy*dy);
 							if (rij < sij){
 								// force scale
-								ftmp 				= eint*(1 - (rij/sij))/sij;
+								ftmp 				= eint*(1 - (rij/sij))*(rho0/sij);
 								fx 					= ftmp*(dx/rij);
 								fy 					= ftmp*(dy/rij);
 
@@ -1228,6 +1250,9 @@ int main(int argc, char const *argv[]){
 
 								// increae potential energy
 								U += 0.5*eint*pow((1 - (rij/sij)),2.0);
+
+								// add to virial expression for pressure
+								pcheck += dx*fx + dy*fy;
 							}
 						}
 					}
@@ -1264,7 +1289,7 @@ int main(int argc, char const *argv[]){
 								rij = sqrt(dx*dx + dy*dy);
 								if (rij < sij){
 									// force scale
-									ftmp 				= eint*(1 - (rij/sij))/sij;
+									ftmp 				= eint*(1 - (rij/sij))*(rho0/sij);
 									fx 					= ftmp*(dx/rij);
 									fy 					= ftmp*(dy/rij);
 
@@ -1277,6 +1302,9 @@ int main(int argc, char const *argv[]){
 
 									// increae potential energy
 									U += 0.5*eint*pow((1 - (rij/sij)),2.0);
+
+									// add to virial expression for pressure
+									pcheck += dx*fx + dy*fy; 
 								}
 							}
 						}
@@ -1291,8 +1319,8 @@ int main(int argc, char const *argv[]){
 			}
 		}
 
-
-
+		// normalize pressure by box area (make dimensionless with extra factor of rho)
+		pcheck *= (rho0/(2.0*L[0]*L[1]));
 
 
 		// shape forces (loop over global vertex labels)
@@ -1309,12 +1337,16 @@ int main(int argc, char const *argv[]){
 
 					// compute area deviation
 					atmp = area(vpos,ci,L,nv,szList);
-					da = atmp - a0tmp;
+					da = (atmp/a0tmp) - 1.0;
 
-					// shape force parameters
-					Kl = nvtmp*l0tmp*kl;
-					Kb = kb/(nvtmp*pow(l0tmp,2.0));
+					// add to potential energy
+					U += 0.5*da*da;
 
+					// shape force parameters (kl and kl are unitless energy ratios)
+					fa = da*(a0tmp/pow(rho0,3.0));
+					fl = kl*(rho0/l0tmp);
+					fb = kb*(rho0/(l0tmp*l0tmp));
+					
 					// compute cell center of mass
 					xi = vpos[NDIM*gi];
 					yi = vpos[NDIM*gi + 1];
@@ -1353,9 +1385,6 @@ int main(int argc, char const *argv[]){
 					rim2y = vpos[NDIM*im1[im1[gi]] + 1] - cy;
 					rim2y -= L[1]*round(rim2y/L[1]);
 
-					// add area deviation to shape energy
-					U += 0.5*ka*pow(da,2.0);
-
 					// increment cell index
 					ci++;
 				}
@@ -1369,9 +1398,11 @@ int main(int argc, char const *argv[]){
 			rip1y = vpos.at(NDIM*ip1[gi] + 1) - cy;
 			rip1y -= L[1]*round(rip1y/L[1]);
 
-			// add to forces
-			vF[NDIM*gi] 		+= ka*0.5*da*(rim1y - rip1y);
-			vF[NDIM*gi + 1] 	+= ka*0.5*da*(rip1x - rim1x);
+
+
+			// -- Area force
+			vF[NDIM*gi] 		+= 0.5*fa*(rim1y - rip1y);
+			vF[NDIM*gi + 1] 	+= 0.5*fa*(rip1x - rim1x);
 
 
 			// -- Perimeter force
@@ -1392,11 +1423,11 @@ int main(int argc, char const *argv[]){
 			dli 	= (li/l0tmp) - 1.0;
 
 			// add to forces
-			vF[NDIM*gi] 		+= Kl*(dli*(lix/li) - dlim1*(lim1x/lim1));
-			vF[NDIM*gi + 1] 	+= Kl*(dli*(liy/li) - dlim1*(lim1y/lim1));
+			vF[NDIM*gi] 		+= fl*(dli*(lix/li) - dlim1*(lim1x/lim1));
+			vF[NDIM*gi + 1] 	+= fl*(dli*(liy/li) - dlim1*(lim1y/lim1));
 
 			// add to potential energy
-			U += 0.5*Kl*l0tmp*pow(dli,2.0);
+			U += 0.5*kl*dli*dli;
 
 
 			// -- Bending force
@@ -1415,11 +1446,11 @@ int main(int argc, char const *argv[]){
 				lim2y = rim1y - rim2y;
 
 				// add to force
-				vF[NDIM*gi] 		+= Kb*(3.0*(lix - lim1x) + lim2x - lip1x);
-				vF[NDIM*gi + 1] 	+= Kb*(3.0*(liy - lim1y) + lim2y - lip1y);
+				vF[NDIM*gi] 		+= fb*(3.0*(lix - lim1x) + lim2x - lip1x);
+				vF[NDIM*gi + 1] 	+= fb*(3.0*(liy - lim1y) + lim2y - lip1y);
 
-				// add to bending energy
-				U += 0.5*Kb*(pow(lix - lim1x,2.0) + pow(liy - lim1y,2.0));
+				// add to potential energy
+				U += 0.5*kb*((lix - lim1x)*(lix - lim1x) + (liy - lim1y)*(liy - lim1y))/(l0tmp*l0tmp);
 			}
 
 			// update old coordinates
@@ -1455,6 +1486,7 @@ int main(int argc, char const *argv[]){
 			cout << "	** U = " << U << endl;
 			cout << "	** K = " << K << endl;
 			cout << "	** E = " << U + K << endl;
+			cout << "	** p = " << pcheck << endl;
 
 			// print vertex positions to check placement
 			cout << "\t** PRINTING POSITIONS TO FILE... " << endl;
