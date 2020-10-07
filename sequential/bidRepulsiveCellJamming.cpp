@@ -44,7 +44,7 @@ const int pnum 				= 14;
 
 // simulation constants
 const double phiInit 		= 0.6;
-const double timeStepMag 	= 0.005;
+const double timeStepMag 	= 0.01;
 const double sizeRatio 		= 1.4;
 const double sizeFraction 	= 0.5;
 
@@ -953,7 +953,7 @@ int main(int argc, char const *argv[]){
 						da = (atmp/a0tmp) - 1.0;
 
 						// shape force parameters (kl and kl are unitless energy ratios)
-						fa = da*(rho0/a0tmp);
+						fa = da*(rho0/a0tmp);		// derivation from the fact that rho0^2 does not necessarily cancel a0tmp
 						fl = kl*(rho0/l0tmp);
 						fb = kb*(rho0/(l0tmp*l0tmp));
 						
@@ -1369,7 +1369,7 @@ int main(int argc, char const *argv[]){
 		for (ci=0; ci<NCELLS; ci++){
 			// scale preferred lengths
 			l0[ci] *= scaleFactor;
-			a0[ci] *= pow(scaleFactor,NDIM);
+			a0[ci] *= scaleFactor*scaleFactor;
 
 			// first global index for ci
 			gi = szList.at(ci);
