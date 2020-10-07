@@ -18,7 +18,6 @@ mkdir -p bin
 mkdir -p tasks
 mkdir -p slurm
 mkdir -p out
-
 # inputs
 NCELLS=$1
 NV=$2
@@ -34,7 +33,7 @@ startSeed="${10}"
 # other variables
 dphi=1e-3
 Ptol=1e-8
-Ftol=5e-13
+Ftol=1e-12
 
 let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1

@@ -44,20 +44,20 @@ const int pnum 				= 14;
 
 // simulation constants
 const double phiInit 		= 0.6;
-const double timeStepMag 	= 0.005;
+const double timeStepMag 	= 0.01;
 const double sizeRatio 		= 1.4;
 const double sizeFraction 	= 0.5;
 
 // FIRE constants for initial minimizations (SP + DP)
-const double alpha0      	= 0.25;
+const double alpha0      	= 0.2;
 const double finc        	= 1.1;
 const double fdec        	= 0.5;
 const double falpha      	= 0.99;
 
 const int NSKIP 			= 2e4;
-const int NMIN        		= 1000;
-const int NNEGMAX     		= 10000;
-const int NDELAY      		= 1000;
+const int NMIN        		= 50;
+const int NNEGMAX     		= 1000;
+const int NDELAY      		= 10;
 const int itmax       		= 5e7;
 
 
@@ -276,7 +276,7 @@ int main(int argc, char const *argv[]){
 		a0.at(ci) 		= a0tmp;
 
 		// set disk radius
-		drad.at(ci) 	= 1.1*sqrt((2.0*a0tmp)/(nvtmp*sin(2.0*PI/nvtmp)));
+		drad.at(ci) 	= 1.5*sqrt((2.0*a0tmp)/(nvtmp*sin(2.0*PI/nvtmp)));
 
 		// set l0, vector radius
 		l0.at(ci) 	= 2.0*lenscale*sqrt(PI*calA0tmp)/nvtmp;
@@ -322,7 +322,7 @@ int main(int argc, char const *argv[]){
 	int NBX = 1;
 	for (d=0; d<NDIM; d++){
 		// determine number of cells along given dimension by rmax
-		sb[d] = round(L[d]/(2.0*l0.at(NCELLS-1)));
+		sb[d] = round(L[d]/(1.5*l0.at(NCELLS-1)));
 
 		// just in case, if < 3, change to 3 so box neighbor checking will work
 		if (sb[d] < 3)
@@ -723,7 +723,8 @@ int main(int argc, char const *argv[]){
 		alpha   	= alpha0;
 
 		dtmax   	= 10*dt0;
-		dtmin   	= 1e-1*dt0;
+		dtmin   	= 1e-8*dt0;
+		dt 			= dt0;
 
 		npPos      	= 0;
 		npNeg      	= 0;
@@ -731,6 +732,13 @@ int main(int argc, char const *argv[]){
 
 		fireit    	= 0;
 		fcheck  	= 10*Ftol;
+
+		// reset forces
+		for (i=0; i<vertDOF; i++){
+			vF[i] = 0.0;
+			vFold[i] = 0.0;
+			vvel[i] = 0.0;
+		}
 
 		// set length constant (variable due to particle growth)
 		rho0 = sqrt(a0.at(0));
@@ -1127,7 +1135,7 @@ int main(int argc, char const *argv[]){
 				npNeg = 0;
 
 				// alter simulation if enough positive steps have been taken
-				if (npPos > NMIN){
+				if (npPos > NDELAY){
 					// change time step
 					if (dt*finc < dtmax)
 						dt *= finc;
