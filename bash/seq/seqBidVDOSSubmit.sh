@@ -6,7 +6,7 @@ srcdir=$cellsdir/src
 maindir=$cellsdir/sequential
 
 # directory for all output for cell simulations
-outputdir=/gpfs/project/fas/ohern/jdt45/cells
+outputdir=/gpfs/loomis/project/fas/ohern/jdt45/cells
 
 # directory for simulations specific to jamming
 simtypedir=$outputdir/seqBidCells
