@@ -44,17 +44,17 @@ const int pnum 				= 14;
 
 // simulation constants
 const double phiInit 		= 0.6;
-const double timeStepMag 	= 0.01;
+const double timeStepMag 	= 0.005;
 const double sizeRatio 		= 1.4;
 const double sizeFraction 	= 0.5;
 
 // FIRE constants for initial minimizations (SP + DP)
-const double alpha0      	= 0.2;
+const double alpha0      	= 0.25;
 const double finc        	= 1.1;
 const double fdec        	= 0.5;
 const double falpha      	= 0.99;
 
-const int NSKIP 			= 5e3;
+const int NSKIP 			= 2e4;
 const int NMIN        		= 1000;
 const int NNEGMAX     		= 10000;
 const int NDELAY      		= 1000;
