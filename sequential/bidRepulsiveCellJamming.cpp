@@ -1227,9 +1227,9 @@ int main(int argc, char const *argv[]){
 		}
 
 		// boolean check for jamming
-		undercompressed = ((pcheck < 2.0*Ptol && rH < 0) || (pcheck < Ptol && rH > 0));
-		overcompressed = (pcheck > 2.0*Ptol);
-		jammed = (pcheck < 2.0*Ptol && pcheck > Ptol && rH > 0);
+		undercompressed = ((pcheck < 5.0*Ptol && rH < 0) || (pcheck < Ptol && rH > 0));
+		overcompressed = (pcheck > 5.0*Ptol);
+		jammed = (pcheck < 5.0*Ptol && pcheck > Ptol && rH > 0);
 
 		// output to console
 		cout << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&" << endl;
