@@ -43,7 +43,7 @@ const int wnum 				= 25;
 const int pnum 				= 14;
 
 // simulation constants
-const double phiInit 		= 0.6;
+const double phiInit 		= 0.1;
 const double timeStepMag 	= 0.01;
 const double sizeRatio 		= 1.4;
 const double sizeFraction 	= 0.5;
@@ -54,10 +54,10 @@ const double finc        	= 1.1;
 const double fdec        	= 0.5;
 const double falpha      	= 0.99;
 
-const int NSKIP 			= 2e4;
-const int NMIN        		= 100;
+const int NSKIP 			= 1e3;
+const int NMIN        		= 10;
 const int NNEGMAX     		= 1000;
-const int NDELAY      		= 100;
+const int NDELAY      		= 20;
 const int itmax       		= 5e7;
 
 
@@ -276,11 +276,11 @@ int main(int argc, char const *argv[]){
 		a0.at(ci) 		= a0tmp;
 
 		// set disk radius
-		drad.at(ci) 	= 1.1*sqrt((2.0*a0tmp)/(nvtmp*sin(2.0*PI/nvtmp)));
+		drad.at(ci) 	= 1.5*sqrt((2.0*a0tmp)/(nvtmp*sin(2.0*PI/nvtmp)));
 
 		// set l0, vector radius
-		l0.at(ci) 	= 2.0*lenscale*sqrt(PI*calA0tmp)/nvtmp;
-		gi 			= szList.at(ci);
+		l0.at(ci) 		= 2.0*lenscale*sqrt(PI*calA0tmp)/nvtmp;
+		gi 				= szList.at(ci);
 		for (vi=0; vi<nvtmp; vi++)
 			vrad.at(gi+vi)	= 0.5*l0.at(ci)*del;
 
@@ -315,7 +315,6 @@ int main(int argc, char const *argv[]){
 
 
 	// Cell-linked-list variables
-	double boxLengthScale = 2.0;
 
 	// box lengths in each direction
 	vector<int> sb(NDIM,0);
@@ -323,7 +322,7 @@ int main(int argc, char const *argv[]){
 	int NBX = 1;
 	for (d=0; d<NDIM; d++){
 		// determine number of cells along given dimension by rmax
-		sb[d] = round(L[d]/(boxLengthScale*l0.at(NCELLS-1)));
+		sb[d] = round(L[d]/(5.0*l0.at(NCELLS-1)));
 
 		// just in case, if < 3, change to 3 so box neighbor checking will work
 		if (sb[d] < 3)
@@ -724,7 +723,7 @@ int main(int argc, char const *argv[]){
 		alpha   	= alpha0;
 
 		dtmax   	= 10*dt0;
-		dtmin   	= 1e-8*dt0;
+		dtmin   	= 1e-6*dt0;
 		dt 			= dt0;
 
 		npPos      	= 0;
@@ -962,7 +961,7 @@ int main(int argc, char const *argv[]){
 						da = (atmp/a0tmp) - 1.0;
 
 						// shape force parameters (kl and kl are unitless energy ratios)
-						fa = da*(rho0/a0tmp);		// derivation from the fact that rho0^2 does not necessarily cancel a0tmp
+						fa = da*(a0tmp/(rho0*rho0*rho0));		// derivation from the fact that rho0^2 does not necessarily cancel a0tmp
 						fl = kl*(rho0/l0tmp);
 						fb = kb*(rho0/(l0tmp*l0tmp));
 						
@@ -1256,6 +1255,8 @@ int main(int argc, char const *argv[]){
 		cout << "	* undercompressed = " << undercompressed << endl;
 		cout << "	* overcompressed = " << overcompressed << endl;
 		cout << "	* jammed = " << jammed << endl << endl;
+		cout << "	* PRINTING CONFIG TO FILE " << positionFile << endl;
+		printPos(posout, vpos, a0, l0, L, cij, nv, szList, phi0, NCELLS);
 		cout << endl;
 
 		// update particle sizes based on target check
