@@ -34,7 +34,7 @@ startSeed="${10}"
 # other variables
 dphi=5e-3
 Ptol=5e-7
-Ftol=1e-11
+Ftol=1e-12
 
 let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
