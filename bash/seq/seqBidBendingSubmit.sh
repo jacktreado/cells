@@ -23,7 +23,7 @@ mkdir -p out
 NCELLS=$1
 NV=$2
 calA0=$3
-dphi=$4
+kl=$4
 kb=$5
 partition=$6
 time=$7
@@ -32,15 +32,15 @@ numRuns=$9
 startSeed="${10}"
 
 # other variables
-kl=1.0
-Ptol=1e-10
-Ftol=1e-14
+dphi=5e-3
+Ptol=5e-7
+Ftol=1e-12
 
 let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=seqbidcells_N"$NCELLS"_NV"$NV"_calA"$calA0"_kl"$kl"_kb"$kb"_dphi"$dphi"_Ptol"$Ptol"_Ftol"$Ftol"
+basestr=seqbidcells_N"$NCELLS"_NV"$NV"_calA"$calA0"_kl"$kl"_kb"$kb"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation
@@ -153,7 +153,7 @@ sbatch -t $time $slurmf
 # 1. NCELLS
 # 2. NV
 # 3. calA0
-# 4. compression step size (dphi)
+# 4. perimeter energy (kl)
 # 5. bending energy (kb)
 # 6. partition
 # 7. time

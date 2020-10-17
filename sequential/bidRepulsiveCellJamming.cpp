@@ -43,8 +43,8 @@ const int wnum 				= 25;
 const int pnum 				= 14;
 
 // simulation constants
-const double phiInit 		= 0.6;
-const double timeStepMag 	= 0.01;
+const double phiInit 		= 0.2;
+const double timeStepMag 	= 0.02;
 const double sizeRatio 		= 1.4;
 const double sizeFraction 	= 0.5;
 
@@ -55,9 +55,9 @@ const double fdec        	= 0.5;
 const double falpha      	= 0.99;
 
 const int NSKIP 			= 2e4;
-const int NMIN        		= 100;
+const int NMIN        		= 10;
 const int NNEGMAX     		= 1000;
-const int NDELAY      		= 100;
+const int NDELAY      		= 50;
 const int itmax       		= 5e7;
 
 
@@ -315,7 +315,7 @@ int main(int argc, char const *argv[]){
 
 
 	// Cell-linked-list variables
-	double boxLengthScale = 2.0;
+	double boxLengthScale = 4.0;
 
 	// box lengths in each direction
 	vector<int> sb(NDIM,0);
@@ -616,8 +616,8 @@ int main(int argc, char const *argv[]){
 			lenscale = sqrt((2.0*a0.at(ci))/(nv.at(ci)*sin((2.0*PI)/nv.at(ci))));
 
 			// set vertex positions
-			vpos.at(NDIM*gi) 		= lenscale*cos((2.0*PI*vi)/nv.at(ci)) + dpos.at(NDIM*ci);
-			vpos.at(NDIM*gi + 1)	= lenscale*sin((2.0*PI*vi)/nv.at(ci)) + dpos.at(NDIM*ci + 1);
+			vpos.at(NDIM*gi) 		= lenscale*cos((2.0*PI*vi)/nv.at(ci)) + dpos.at(NDIM*ci) + 1e-2*l0[ci]*drand48();
+			vpos.at(NDIM*gi + 1)	= lenscale*sin((2.0*PI*vi)/nv.at(ci)) + dpos.at(NDIM*ci + 1) + 1e-2*l0[ci]*drand48();
 		}
 	}
 
@@ -696,6 +696,9 @@ int main(int argc, char const *argv[]){
 	int boxid, bi, bj, pi, pj, sbtmp;
 	int d0, dend;
 
+	// temporary tolerance (to speed initial compression)
+	double Ftoltmp = 0.1*Ptol;
+
 	// total potential energy
 	double U = 0.0;
 
@@ -717,6 +720,10 @@ int main(int argc, char const *argv[]){
 		// update iterator
 		k++;
 
+		// update tolerance
+		if (phi0 > 0.6)
+			Ftoltmp = Ftol;
+
 		// RESET FIRE VARIABLES
 		P  			= 0;	
 		fnorm 		= 0;
@@ -732,7 +739,7 @@ int main(int argc, char const *argv[]){
 		npPMin      = 0;
 
 		fireit    	= 0;
-		fcheck  	= 10*Ftol;
+		fcheck  	= 10*Ftoltmp;
 
 		// reset forces
 		for (i=0; i<vertDOF; i++){
@@ -745,7 +752,7 @@ int main(int argc, char const *argv[]){
 		rho0 = sqrt(a0.at(0));
 
 		// RELAX FORCES USING FIRE
-		while ((fcheck > Ftol || npPMin < NMIN) && fireit < itmax){
+		while ((fcheck > Ftoltmp || npPMin < NMIN) && fireit < itmax){
 			// VV POSITION UPDATE
 			for (i=0; i<vertDOF; i++){
 				// update position
@@ -1102,7 +1109,7 @@ int main(int argc, char const *argv[]){
 			fcheck = fnorm/(NDIM*NCELLS);
 
 			// update npPMin
-			if (fcheck < Ftol)
+			if (fcheck < Ftoltmp)
 				npPMin++;
 			else
 				npPMin = 0;
@@ -1228,9 +1235,9 @@ int main(int argc, char const *argv[]){
 		}
 
 		// boolean check for jamming
-		undercompressed = ((pcheck < 5.0*Ptol && rH < 0) || (pcheck < Ptol && rH > 0));
-		overcompressed = (pcheck > 5.0*Ptol);
-		jammed = (pcheck < 5.0*Ptol && pcheck > Ptol && rH > 0);
+		undercompressed = ((pcheck < 2.0*Ptol && rH < 0) || (pcheck < Ptol && rH > 0));
+		overcompressed = (pcheck > 2.0*Ptol);
+		jammed = (pcheck < 2.0*Ptol && pcheck > Ptol && rH > 0);
 
 		// output to console
 		cout << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&" << endl;
