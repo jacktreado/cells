@@ -44,9 +44,11 @@ const int pnum 				= 14;
 
 // simulation constants
 const double phiInit 		= 0.2;
+const double phiJMin 		= 0.6;
 const double timeStepMag 	= 0.02;
 const double sizeRatio 		= 1.4;
 const double sizeFraction 	= 0.5;
+
 
 // FIRE constants for initial minimizations (SP + DP)
 const double alpha0      	= 0.2;
@@ -697,7 +699,7 @@ int main(int argc, char const *argv[]){
 	int d0, dend;
 
 	// temporary tolerance (to speed initial compression)
-	double Ftoltmp = 0.1*Ptol;
+	double Ftoltmp = 0.01*Ptol;
 
 	// total potential energy
 	double U = 0.0;
@@ -721,7 +723,7 @@ int main(int argc, char const *argv[]){
 		k++;
 
 		// update tolerance
-		if (phi0 > 0.6)
+		if (phi0 > 0.95*phiJMin)
 			Ftoltmp = Ftol;
 
 		// RESET FIRE VARIABLES
@@ -1236,7 +1238,7 @@ int main(int argc, char const *argv[]){
 
 		// boolean check for jamming
 		undercompressed = ((pcheck < 2.0*Ptol && rH < 0) || (pcheck < Ptol && rH > 0));
-		overcompressed = (pcheck > 2.0*Ptol);
+		overcompressed = (pcheck > 2.0*Ptol && phi0 > phiJMin);
 		jammed = (pcheck < 2.0*Ptol && pcheck > Ptol && rH > 0);
 
 		// output to console
