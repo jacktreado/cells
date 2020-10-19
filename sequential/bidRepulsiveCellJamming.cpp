@@ -97,6 +97,7 @@ int main(int argc, char const *argv[]){
 	// read in parameters from command line input
 	string NCELLS_str 		= argv[1];
 	string smallNV_str 		= argv[2];
+	string calA0_str 		= argv[3];
 	string dphi_str 		= argv[4];
 	string kl_str 			= argv[5];
 	string kb_str 			= argv[6];
