@@ -45,7 +45,7 @@ const int pnum 				= 14;
 // simulation constants
 const double phiInit 		= 0.2;
 const double phiJMin 		= 0.6;
-const double timeStepMag 	= 0.02;
+const double timeStepMag 	= 0.002;
 const double sizeRatio 		= 1.4;
 const double sizeFraction 	= 0.5;
 

@@ -1926,6 +1926,8 @@ void cellPacking2D::flowHopperDP(double w0, double w, double th, double g, doubl
 }
 
 
+
+
 // calculate packing fraction in hopper geometry (GIVEN RADII)
 double cellPacking2D::hopperPackingFraction(vector<double>& radii, double w0, double w, double th){
 	// local variables
