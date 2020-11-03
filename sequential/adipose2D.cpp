@@ -33,34 +33,34 @@ const int pnum 				= 14;
 
 // simulation constants
 const double timeStepMag 	= 0.01;
-const double sizeRatio 		= 3.0;
+const double sizeRatio 		= 2.0;
 const double phiT 			= 0.85;
-const double dphi0 			= 1e-3;
+const double dphi0 			= 5e-3;
 
 // FIRE constants for initial minimizations (SP + DP)
 const double alpha0      	= 0.2;
 const double finc        	= 1.1;
 const double fdec        	= 0.5;
 const double falpha      	= 0.99;
-const double Ftol0 			= 1e-6;
+const double Ftol0 			= 1e-4;
 
 const int NSKIP 			= 1e3;
-const int NMIN        		= 100;
-const int NNEGMAX     		= 10000;
-const int NDELAY      		= 1000;
-const int itmax       		= 1e7;
+const int NMIN        		= 10;
+const int NNEGMAX     		= 1000;
+const int NDELAY      		= 50;
+const int itmax       		= 5e7;
 
 const int NACTIVESKIP 		= 5e2;
 
 // DP force constants
 const double ka 			= 1.0;			// area spring (should be = 1)
-const double kl 			= 1.0;			// contractility
+const double kl 			= 0.01;			// contractility
 const double eint 			= 1.0;			// interaction energy 
 const double del 			= 1.0;			// radius of vertices in units of l0
 
 // active tumor cell
-const double v0 			= 0.1;			// tumor velocity velocity (in units of sqrt(a0)/tau)
-const double Ds 			= 0.1;			// spread of velocity coupling along tumor cell boundary
+const double v0 			= 0.01;			// tumor velocity velocity (in units of sqrt(a0)/tau)
+const double Ds 			= 0.2;			// spread of velocity coupling along tumor cell boundary
 const double vmin 			= 1e-2*v0;			// minimum velocity of any given vertex along tc boundary 
 
 
@@ -274,12 +274,39 @@ int main(int argc, char const *argv[]){
 	for (d=0; d<NDIM; d++)
 		L.at(d) = sqrt(areaSum/phi0);
 
-	// initialize cell centers randomly
-	for (ci=0; ci<cellDOF; ci += 2)
-		dpos.at(ci) = L[ci % 2]*drand48();
-	for (ci=cellDOF-1; ci>0; ci -= 2)
-		dpos.at(ci) = L[ci % 2]*drand48();
+	// initialize tumor cells in center of packing
+	for (ci=0; ci<tN; ci++){
+		dpos.at(NDIM*ci) = 0.1*L[0]*drand48() + 0.45*L[0];
+		dpos.at(NDIM*ci + 1) = 0.1*L[0]*drand48() + 0.45*L[0];
+	}
 
+	// initialize WAT cell centers randomly (but outside of center)
+	double xtmp, ytmp; 
+	int centerIt;
+	int centerItMax = 1e3;
+	bool inCenter = false;
+	for (ci=tN; ci<NCELLS; ci++){
+		centerIt = 0;
+		do {
+			// generate test points
+			xtmp = L[0]*drand48();
+			ytmp = L[1]*drand48();
+
+			// check to see if in center box
+			inCenter = xtmp < 0.55*L[0] && xtmp > 0.45*L[0];
+			inCenter = inCenter && ytmp < 0.55*L[1] && ytmp > 0.45*L[1];
+
+		} 
+		while (inCenter && centerIt < centerItMax);
+		if (centerIt == centerItMax){
+			cout << "\t ERROR: WAT cells could not be placed correctly. Ending.\n\n";
+			return 1;
+		}
+		else{
+			dpos.at(NDIM*ci) = xtmp;
+			dpos.at(NDIM*ci + 1) = ytmp;
+		}	
+	}
 
 
 
@@ -573,8 +600,8 @@ int main(int argc, char const *argv[]){
 			lenscale = sqrt((2.0*a0.at(ci))/(nv.at(ci)*sin((2.0*PI)/nv.at(ci))));
 
 			// set vertex positions
-			vpos.at(NDIM*gi) 		= lenscale*cos((2.0*PI*vi)/nv.at(ci)) + dpos.at(NDIM*ci);
-			vpos.at(NDIM*gi + 1)	= lenscale*sin((2.0*PI*vi)/nv.at(ci)) + dpos.at(NDIM*ci + 1);
+			vpos.at(NDIM*gi) 		= lenscale*cos((2.0*PI*vi)/nv.at(ci)) + dpos.at(NDIM*ci) + 1e-2*l0[ci]*drand48();
+			vpos.at(NDIM*gi + 1)	= lenscale*sin((2.0*PI*vi)/nv.at(ci)) + dpos.at(NDIM*ci + 1) + 1e-2*l0[ci]*drand48();
 		}
 	}
 
@@ -599,7 +626,8 @@ int main(int argc, char const *argv[]){
 	alpha   	= alpha0;
 
 	dtmax   	= 10*dt0;
-	dtmin   	= 1e-1*dt0;
+	dtmin   	= 1e-4*dt0;
+	dt 			= dt0;
 
 	npPos      	= 0;
 	npNeg      	= 0;
@@ -1057,10 +1085,6 @@ int main(int argc, char const *argv[]){
 
 
 
-
-
-
-
 	/* * * * * * * * * * * * * * * * * * 
 
 		COMPRESS TO TARGET
@@ -1085,7 +1109,7 @@ int main(int argc, char const *argv[]){
 	dphi = (phiT - phi0)/kmax;
 
 	// compress to jamming, relax U and F using FIRE
-	for (k=0; k<kmax; k++){
+	for (k=0; k<kmax+1; k++){
 
 		// grow or shrink particles by scale factor
 		scaleFactor = sqrt((phi0 + dphi)/phi0);
@@ -1151,7 +1175,8 @@ int main(int argc, char const *argv[]){
 		alpha   	= alpha0;
 
 		dtmax   	= 10*dt0;
-		dtmin   	= 1e-1*dt0;
+		dtmin   	= 1e-6*dt0;
+		dt 			= dt0;
 
 		npPos      	= 0;
 		npNeg      	= 0;
@@ -1615,7 +1640,6 @@ int main(int argc, char const *argv[]){
 
 
 
-
 	/* * * * * * * * * * * * * * * * * * 
 
 		OVERDAMPED DYNAMICS
@@ -1630,6 +1654,8 @@ int main(int argc, char const *argv[]){
 
 	// initial directors
 	vector<double> psi(tN,0.0);
+	for (ci=0; ci<tN; ci++)
+		psi.at(ci) = 2.0*PI*drand48();
 
 	// reset for active dynamocs
 	dt = dt0;
