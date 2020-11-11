@@ -56,8 +56,8 @@ echo Running $numSeeds mesophyll sims of $NCELLS cells with $NV verts, polydispe
 
 # run compiler
 rm -f $binf
-g++ --std=c++11 -Wall -O3 $mainf -o $binf 
-echo compiling with : g++ --std=c++11 -Wall -O3 $mainf -o $binf 
+g++ --std=c++11 -O3 $mainf -o $binf 
+echo compiling with : g++ --std=c++11 -O3 $mainf -o $binf  
 
 # check compilation
 if [[ ! -f $binf ]]
@@ -141,7 +141,7 @@ cat $slurmf
 
 # run sbatch file
 echo -- running on slurm in partition $partition
-echo sbatch -t $time $slurmf
+sbatch -t $time $slurmf
 
 
 
