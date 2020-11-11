@@ -1,11 +1,15 @@
 
 /* 
 
-	MAIN FILE FOR THERMAL NVE SIMULATION OF NCELLS
-		USING LINKED-LIST SPEED UP
+	MAIN FILE FOR TUMOR INVASION INTO
+		A MODEL ADIPOSE TISSUE
+
+	** 	FIRST tN cells are tumor cells
+		NEXT NCELLS - tN cells are adipocites
+		Total number of cells = NCELLS
 
 	Jack Treado
-	08/05/2020, in the time of covid
+	10/20/2020, in the time of covid
 
 */
 
