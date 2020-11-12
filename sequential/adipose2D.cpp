@@ -38,7 +38,7 @@ const int pnum 				= 14;
 // simulation constants
 const double timeStepMag 	= 0.01;
 const double sizeRatio 		= 2.0;
-const double phiT 			= 0.85;
+const double phiT 			= 0.95;
 const double dphi0 			= 5e-3;
 
 // FIRE constants for initial minimizations (SP + DP)
@@ -46,7 +46,7 @@ const double alpha0      	= 0.2;
 const double finc        	= 1.1;
 const double fdec        	= 0.5;
 const double falpha      	= 0.99;
-const double Ftol0 			= 1e-4;
+const double Ftol0 			= 1e-6;
 
 const int NSKIP 			= 1e3;
 const int NMIN        		= 10;
@@ -54,18 +54,18 @@ const int NNEGMAX     		= 1000;
 const int NDELAY      		= 50;
 const int itmax       		= 5e7;
 
-const int NACTIVESKIP 		= 5e2;
+const int NACTIVESKIP 		= 2e3;
 
 // DP force constants
 const double ka 			= 1.0;			// area spring (should be = 1)
-const double kl 			= 0.01;			// contractility
+const double kl 			= 0.1;			// contractility
 const double eint 			= 1.0;			// interaction energy 
 const double del 			= 1.0;			// radius of vertices in units of l0
 
 // active tumor cell
-const double v0 			= 0.01;			// tumor velocity velocity (in units of sqrt(a0)/tau)
-const double Ds 			= 0.2;			// spread of velocity coupling along tumor cell boundary
-const double vmin 			= 1e-2*v0;			// minimum velocity of any given vertex along tc boundary 
+const double v0 			= 0.05;			// tumor velocity velocity (in units of sqrt(a0)/tau)
+const double Ds 			= 0.1;			// spread of velocity coupling along tumor cell boundary
+const double vmin 			= 1e-2*v0;		// minimum velocity of any given vertex along tc boundary 
 
 
 // FUNCTION PROTOTYPES
@@ -331,7 +331,7 @@ int main(int argc, char const *argv[]){
 	int NBX = 1;
 	for (d=0; d<NDIM; d++){
 		// determine number of cells along given dimension by rmax
-		sb[d] = round(L[d]/(2.0*l0.at(NCELLS-1)));
+		sb[d] = round(L[d]/(2.5*l0.at(NCELLS-1)));
 
 		// just in case, if < 3, change to 3 so box neighbor checking will work
 		if (sb[d] < 3)
