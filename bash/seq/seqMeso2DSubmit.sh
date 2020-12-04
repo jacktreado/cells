@@ -35,7 +35,7 @@ startSeed="${11}"
 # other variables
 calA0=1.02
 polyd=0.05
-phiMax=1.0
+phiMax=1.1
 phiMin=0.4
 
 let numSeeds=$numSeedsPerRun*$numRuns
