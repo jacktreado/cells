@@ -2,13 +2,29 @@
 
 	MAIN FILE FOR 2D MESOPHYLL TISSUE
 
-	NCELLS monodisperse DPb particles
+	NCELLS polydisperse disperse DPb particles
 
 	Features:
 		-- contact dependent adhesion
 		-- crosslinking with binding kinetics
 		-- perimeter aging
 		-- quasistatic decompression
+
+	ADDED 
+
+	01/13/21
+		-- RIGIDIFICATION: cells all have preferred curvature that lags
+			behind instantaneous curvature, will rigidify shape
+			as decompression progresses
+
+	01/14/21
+		-- LOCALIZED CONTRACTILITY: each perimeter spring will have an l0
+			localized to it, rather than an l0 for each cell
+		-- CONTACT-DEPENDENT AGING: The perimeter will age twice as fast
+			on contacts that are engaged vs void contacts
+		-- SHAPE LIMIT: There is an upper limit to cell preferred shape
+
+
 
 	Jack Treado
 	11/03/2020, in the time of covid
@@ -63,6 +79,11 @@ const double ka 			= 1.0;			// area spring (should be = 1)
 const double eint 			= 1.0;			// baseline interaction energy 
 const double del 			= 1.0;			// radius of vertices in units of l0
 
+// shape aging constants
+const double contactScale 	= 2.0;			// rate of growth rel. to lambdal of contact vertices
+const double voidScale 		= 0.1;			// rate of growth rel. to lambdal of void-facing vertices
+const double calA0Thresh 	= 2.0;			// max preferred shape parameter allowable
+
 // FUNCTION PROTOTYPES
 
 // indexing
@@ -88,7 +109,7 @@ int main(int argc, char const *argv[]){
 
 	// parameters to be read in 
 	int NCELLS, NV, NVTOT, cellDOF, vertDOF, seed;
-	double polyd, calA0, phi, phiMax, phiMin, kl, kb, espring, agep, betaEff;
+	double polyd, calA0Input, phi, phiMax, phiMin, kl, kb, espring, lambdaL, lambdaB, betaEff;
 
 	// set spring energy
 	espring = eint;
@@ -102,10 +123,11 @@ int main(int argc, char const *argv[]){
 	string phiMin_str 			= argv[6];
 	string kl_str 				= argv[7];
 	string kb_str 				= argv[8];
-	string agep_str 			= argv[9];
-	string betaEff_str 			= argv[10];
-	string seed_str 			= argv[11];
-	string positionFile 		= argv[12];
+	string lambdaL_str 			= argv[9];
+	string lambdaB_str			= argv[10];
+	string betaEff_str 			= argv[11];
+	string seed_str 			= argv[12];
+	string positionFile 		= argv[13];
 
 	stringstream NCELLSss(NCELLS_str);
 	stringstream NVss(NV_str);
@@ -115,19 +137,21 @@ int main(int argc, char const *argv[]){
 	stringstream phiMinss(phiMin_str);
 	stringstream klss(kl_str);
 	stringstream kbss(kb_str);
-	stringstream agepss(agep_str);
+	stringstream lambdaLss(lambdaL_str);
+	stringstream lambdaBss(lambdaB_str);
 	stringstream betaEffss(betaEff_str);
 	stringstream seedss(seed_str);
 
 	NCELLSss >> NCELLS;
 	NVss >> NV;
-	calA0ss >> calA0;
+	calA0ss >> calA0Input;
 	polydss >> polyd;
 	phiMaxss >> phiMax;
 	phiMinss >> phiMin;
 	klss >> kl;
 	kbss >> kb;
-	agepss >> agep;
+	lambdaLss >> lambdaL;
+	lambdaBss >> lambdaB;
 	betaEffss >> betaEff;
 	seedss >> seed;
 
@@ -204,14 +228,15 @@ int main(int argc, char const *argv[]){
 	cout << "       NV (all) 	= " << NV << "						" << endl;
 	cout << "		NVTOT 		= " << NVTOT << "					" << endl << endl;
 
-	cout << "		calA0 		= " << calA0 << "					" << endl;
+	cout << "		calA0 		= " << calA0Input << "				" << endl;
 
 	cout << "		phiInit 	= " << phiInit << " 				" << endl;
 	cout << "		phiMax 		= " << phiMax << " 					" << endl;
 	cout << "		phiMin 		= " << phiMin << "					" << endl;
 	cout << "		kl 			= " << kl << "						" << endl;
 	cout << "		kb 			= " << kb << "						" << endl;
-	cout << "		agep 		= " << agep << " 					" << endl;
+	cout << "		lambdaL 	= " << lambdaL << " 				" << endl;
+	cout << "		lambdaB 	= " << lambdaB << " 				" << endl;
 	cout << "		betaEff 	= " << betaEff << " 				" << endl;
 	cout << "		seed 		= " << seed << "					" << endl << endl;
 
@@ -273,8 +298,8 @@ int main(int argc, char const *argv[]){
 		a0.at(ci) 		= a0tmp;
 
 		// scale calA0 tmp by calAv
-		calA0tmp 		= calA0*(nvtmp*tan(PI/nvtmp)/PI);
-		calA0.at(ci)	= calA0tmp;
+		calA0tmp 		= calA0Input*(nvtmp*tan(PI/nvtmp)/PI);
+		calA0.at(ci) 	= calA0tmp;
 
 		// set disk radius
 		drad.at(ci) 	= 1.05*sqrt((2.0*a0tmp)/(nvtmp*sin(2.0*PI/nvtmp)));
@@ -373,14 +398,6 @@ int main(int argc, char const *argv[]){
 	vector<int> head(NBX,0);
 	vector<int> last(NBX,0);
 	vector<int> list(NVTOT+1,0);
-
-
-
-
-
-
-
-
 
 
 
@@ -647,6 +664,9 @@ int main(int argc, char const *argv[]){
 	vector<double> vF(vertDOF,0.0);
 	vector<double> vFold(vertDOF,0.0);
 
+	// RIGIDIFY SIM: initialize preferred curvatures (unit of length)
+	vector<double> s0(NVTOT,0.0);
+
 	// jamming check variables
 	int k, kmax, xind, yind;
 	double pcheck;
@@ -686,7 +706,7 @@ int main(int argc, char const *argv[]){
 
 		// update tolerance
 		if (phi > 0.9*phiMax)
-			Ftoltmp = Ftol;
+			Ftoltmp = Ftol;	
 
 		// RESET FIRE VARIABLES
 		P  			= 0;	
@@ -1309,6 +1329,18 @@ int main(int argc, char const *argv[]){
 
 	 * * * * * * * * * * * * * * * * * */
 
+	// aging parameters
+	double sip1, sip1x, sip1y, si, six, siy, sim1, sim1x, sim1y;
+	double s0tmp, d0tmp, p0tmp, meanSegLength, meanPrefCurv;
+	int Nb, NbRmv;
+
+	// vector of perimeter segment length
+	vector<double> linst(NVTOT,0.0);
+	vector<int> contactVert(NVTOT,0);
+	vector<double> delta0(NVTOT,1.0);
+
+	// vector of instantaneous curvatures
+	vector<double> sinst(NVTOT,0.0);
 
 	// new scale factor
 	scaleFactor = sqrt((phi - dphiShrink)/phi);
@@ -1339,9 +1371,6 @@ int main(int argc, char const *argv[]){
 
 	// MC variables: pon = min(1, exp(-\beta * F * l0 * z\mu\nu))
 	double rdraw, pon;
-
-	// vector of mean perimeter lengths
-	vector<double> meanl(NCELLS,0.0);
 
 	// loop until phi is below phiMin
 	double lastPrintPhi = phi;
@@ -1571,6 +1600,7 @@ int main(int argc, char const *argv[]){
 
 
 			// SPRING NETWORK FORCES
+			fill(contactVert.begin(), contactVert.end(), 0);
 			for (gi=0; gi<NVTOT; gi++){
 					
 				// loop over other vertices and check connections					
@@ -1581,6 +1611,10 @@ int main(int argc, char const *argv[]){
 
 					// if connected, compute spring force based on z_\mu\nu
 					if (gtmp){
+
+						// label gi and gj as vertices in contact
+						contactVert[gi] = 1;
+						contactVert[gj] = 1;
 
 						// contact distance
 						sij = vrad[gi] + vrad[gj];
@@ -1633,7 +1667,6 @@ int main(int argc, char const *argv[]){
 
 
 			// shape forces (loop over global vertex labels)
-			fill(meanl.begin(), meanl.end(), 0.0);
 			ci = 0;
 			for (gi=0; gi<NVTOT; gi++){
 
@@ -1715,22 +1748,22 @@ int main(int argc, char const *argv[]){
 				// -- Perimeter force
 
 				// segment vector elements
-				lim1x 	= rix - rim1x;
-				lim1y 	= riy - rim1y;
+				lim1x 		= rix - rim1x;
+				lim1y 		= riy - rim1y;
 
-				lix 	= rip1x - rix;
-				liy 	= rip1y - riy;
+				lix 		= rip1x - rix;
+				liy 		= rip1y - riy;
 
 				// segment lengths
-				lim1 	= sqrt(lim1x*lim1x + lim1y*lim1y);
-				li 		= sqrt(lix*lix + liy*liy);
+				lim1 		= sqrt(lim1x*lim1x + lim1y*lim1y);
+				li 			= sqrt(lix*lix + liy*liy);
 
-				// add to mean segment length
-				meanl[ci-1] += li;
+				// update instantaneous segment length
+				linst[gi] 	= li;
 
 				// segment deviations
-				dlim1  	= (lim1/l0tmp) - 1.0;
-				dli 	= (li/l0tmp) - 1.0;
+				dlim1  		= (lim1/l0tmp) - delta0[im1[gi]];
+				dli 		= (li/l0tmp) - delta0[gi];
 
 				// add to forces
 				vF[NDIM*gi] 		+= fl*(dli*(lix/li) - dlim1*(lim1x/lim1));
@@ -1738,6 +1771,14 @@ int main(int argc, char const *argv[]){
 
 
 				// -- Bending force
+
+				// update instantaneous curvature
+				six 		= lix - lim1x;
+				siy 		= liy - lim1y;
+				si 			= sqrt(six*six + siy*siy);
+				sinst[gi] 	= si;
+
+				// update forces
 				if (kb > 0){
 					// segment vectors for ip2
 					rip2x = vpos[NDIM*ip1[ip1[gi]]] - cx;
@@ -1752,9 +1793,18 @@ int main(int argc, char const *argv[]){
 					lim2x = rim1x - rim2x;
 					lim2y = rim1y - rim2y;
 
+					// compute instantaneous curvatures
+					sim1x = lim1x - lim2x;
+					sim1y = lim1y - lim2y;
+					sim1 = sqrt(sim1x*sim1x + sim1y*sim1y);
+
+					sip1x = lip1x - lix;
+					sip1y = lip1y - liy;
+					sip1 = sqrt(sip1x*sip1x + sip1y*sip1y);
+
 					// add to force
-					vF[NDIM*gi] 		+= fb*(3.0*(lix - lim1x) + lim2x - lip1x);
-					vF[NDIM*gi + 1] 	+= fb*(3.0*(liy - lim1y) + lim2y - lip1y);
+					vF[NDIM*gi] 		+= fb*((sim1x/sim1)*(s0[im1[gi]] - sim1) - 2.0*(six/si)*(s0[gi] - si) + (sip1x/sip1)*(s0[ip1[gi]] - sip1));
+					vF[NDIM*gi + 1] 	+= fb*((sim1y/sim1)*(s0[im1[gi]] - sim1) - 2.0*(siy/si)*(s0[gi] - si) + (sip1y/sip1)*(s0[ip1[gi]] - sip1));
 				}
 
 				// update old coordinates
@@ -1906,8 +1956,8 @@ int main(int argc, char const *argv[]){
 		}
 
 		// BOND MC AND CONTACT NETWORK UPDATE
-		int Nb 		= 0;
-		int NbRmv 	= 0;
+		Nb 		= 0;
+		NbRmv 	= 0;
 		for (gi=0; gi<NVTOT; gi++){	
 			cindices(ci, vi, gi, NCELLS, szList);				
 			for (gj=gi+1; gj<NVTOT; gj++){
@@ -1940,9 +1990,6 @@ int main(int argc, char const *argv[]){
 					else if (rij > sij && gtmp){
 						// update number of bonds
 						Nb++;
-
-						if (gtmp)
-							cout << gi << " " << gj << endl;
 
 						// check probability of staying on, edit network using MC
 						pon = exp(-betaEff*0.5*eint*pow((1 - (rij/sij)),2.0));
@@ -1991,28 +2038,52 @@ int main(int argc, char const *argv[]){
 		}
 
 
-
-		// AGING OF PERIMETER CONTRACTILITY
-		double l0tmp = 0.0;
-		double meanLChange = 0.0;
+		// SHAPE AGING
+		fill(calA0.begin(), calA0.end(), 0.0);
+		meanPrefCurv = 0.0;
+		meanSegLength = 0.0;
+		gi = 0;
 		for (ci=0; ci<NCELLS; ci++){
-			// get mean segment length
-			meanl[ci] /= nv[ci];
 
-			// update l0
-			l0tmp = l0[ci];
-			if (meanl[ci] > l0tmp){
-				l0[ci] += agep*(meanl[ci] - l0tmp);
+			// loop over vertices, age curvature and perimeter rest values
+			p0tmp = 0.0;
+			for (vi=0; vi<nv[ci]; vi++){
+				// update s0 (preferred curvature)
+				s0tmp = s0[gi];
+				s0[gi] += lambdaB*(sinst[gi] - s0tmp);
 
-				// measure mean change in 
-				meanLChange += l0[ci] - l0tmp;
+				// update mean preferred curvature
+				meanPrefCurv += s0[gi];
+
+				// perimeter tmp variables
+				l0tmp = l0[ci];
+				d0tmp = delta0[gi];
+
+				// only grow if calA0 below threshold
+				if (calA0[ci] < calA0Thresh && l0tmp*d0tmp < linst[gi]){
+					// update delta0 (preferred segment length) based on if between contact verts
+					// otherwise, treat as void contact
+					if (contactVert[gi] == 1 && contactVert[ip1[gi]] == 1)					
+						delta0[gi] += contactScale*lambdaL*((linst[gi]/l0tmp) - d0tmp);
+					else
+						delta0[gi] += voidScale*lambdaL*((linst[gi]/l0tmp) - d0tmp);
+				}
+
+				// update total preferred perimeter
+				p0tmp += delta0[gi]*l0tmp;
+
+				// update mean preferred segment length
+				meanSegLength += delta0[gi]*l0tmp;
+
+				// update global vertex index
+				gi++;
 			}
-		}
-		meanLChange /= NCELLS;
 
-		// update preferred shape parameter
-		for (ci=0; ci<NCELLS; ci++)
-			calA0[ci] = pow(nv[ci]*l0[ci],2.0)/(4.0*PI*a0[ci]);
+			// update preferred shape parameter calA0
+			calA0[ci] = pow(p0tmp,2.0)/(4.0*PI*a0[ci]);
+		}
+		meanPrefCurv /= NVTOT;
+		meanSegLength /= NVTOT;
 
 
 		// output to console
@@ -2037,8 +2108,9 @@ int main(int argc, char const *argv[]){
 		cout << "	* Nb 			= " << Nb << endl;
 		cout << "	* NbCurr 		= " << Nb - NbRmv << endl;
 		cout << "	* NbRmv 		= " << NbRmv << endl;
-		cout << "	* Perimeter aging: " << endl;
-		cout << "	* meanLChange 	= " << meanLChange << endl;
+		cout << "	* Shape aging: " << endl;
+		cout << "	* meanPrefCurv 	= " << meanPrefCurv << endl;
+		cout << "	* meanSegLength = " << meanSegLength << endl;
 		cout << endl;
 
 		if ((lastPrintPhi - phi) > dphiPrint){

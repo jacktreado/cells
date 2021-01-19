@@ -1737,22 +1737,23 @@ void cellPacking2D::flowHopperSP(vector<double>& radii, double w0, double w, dou
 				// get velocities (= forces in overdamped regime)
 				veltmp = cell(ci).cvel(d);
 
-				// if new position in outflow region, place back in hopper
+				// update positions
 				postmp = cell(ci).cpos(d) + dt*veltmp;
 
-				if (d == 0 && postmp > L.at(0) + 2.0*radii.at(ci)){
-					// put particle somewhere near back of reservoir
-					postmp = xmin + radii.at(ci);
+				// // replace in hopper
+				// if (d == 0 && postmp > L.at(0) + 2.0*radii.at(ci)){
+				// 	// put particle somewhere near back of reservoir
+				// 	postmp = xmin + radii.at(ci);
 
-					// pick random y value
-					cell(ci).setCPos(1,drand48()*w0);
+				// 	// pick random y value
+				// 	cell(ci).setCPos(1,drand48()*w0);
 
-					// set x value
-					veltmp = 2.0*g*pow(radii.at(ci),2);
+				// 	// set x value
+				// 	veltmp = 2.0*g*pow(radii.at(ci),2);
 
-					// set new y velocity to 0
-					cell(ci).setCVel(1,0.0);
-				}
+				// 	// set new y velocity to 0
+				// 	cell(ci).setCVel(1,0.0);
+				// }
 
 				// update positions (EULER STEP)
 				cell(ci).setCPos(d,postmp);

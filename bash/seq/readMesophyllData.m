@@ -25,8 +25,9 @@ xpos    = cell(NFRAMES,NCELLS);
 ypos    = cell(NFRAMES,NCELLS);
 zc      = zeros(NFRAMES,NCELLS);
 zv      = zeros(NFRAMES,NCELLS);
-l0      = zeros(NFRAMES,NCELLS);
 a0      = zeros(NFRAMES,NCELLS);
+l0      = zeros(NFRAMES,NCELLS);
+calA0   = zeros(NFRAMES,NCELLS);
 L       = zeros(NFRAMES,2);
 
 % number of frames found
@@ -41,15 +42,18 @@ while ~feof(fid)
     % get info about deformable particle
     for nn = 1:NCELLS
         % get cell pos and asphericity
-        cInfoTmp = textscan(fid,'CINFO %f %f %f %f %f',1);   
-        fline = fgetl(fid);     % goes to next line in file
+        cInfoTmp        = textscan(fid,'CINFO %f %f %f %f %f',1);   
+        fline           = fgetl(fid);     % goes to next line in file
 
-        NVTMP = cInfoTmp{1};
-        nv(nf,nn) = NVTMP;
-        zc(nf,nn) = cInfoTmp{2};
-        zv(nf,nn) = cInfoTmp{3};
-        a0(nf,nn) = cInfoTmp{4};
-        l0(nf,nn) = cInfoTmp{5};
+        NVTMP           = cInfoTmp{1};
+        nv(nf,nn)       = NVTMP;
+        zc(nf,nn)       = cInfoTmp{2};
+        zv(nf,nn)       = cInfoTmp{3};
+        a0(nf,nn)       = cInfoTmp{4};
+        calA0(nf,nn)    = cInfoTmp{5};
+        
+        % compute l0 from calA0 and a0
+        l0(nf,nn)       = sqrt(4.0*pi*calA0(nf,nn)*a0(nf,nn))/nv(nf,nn);
         
         % get vertex positions
         vPosTmp = textscan(fid,'VINFO %*f %*f %f %f %f',NVTMP); 
@@ -115,8 +119,8 @@ if (nf < NFRAMES)
     nv(nf:end,:) = [];
     zc(nf:end,:) = [];
     zv(nf:end,:) = [];
-    l0(nf:end,:) = [];
     a0(nf:end,:) = [];
+    calA0(nf:end,:) = [];
     L(nf:end,:) = [];
 end
 
@@ -132,8 +136,9 @@ cellTrajectoryData.ypos         = ypos;
 cellTrajectoryData.nv           = nv;
 cellTrajectoryData.zc           = zc;
 cellTrajectoryData.zv           = zv;
-cellTrajectoryData.l0           = l0;
+cellTrajectoryData.calA0        = calA0;
 cellTrajectoryData.a0           = a0;
+cellTrajectoryData.l0           = l0;
 cellTrajectoryData.L            = L;
 
 end
