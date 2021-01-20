@@ -401,9 +401,6 @@ int main(int argc, char const *argv[]){
 
 
 
-
-
-
 	/* * * * * * * * * * * * * * * * * * 
 
 			INITIAL FIRE
