@@ -29,7 +29,7 @@ lambdaB=$6
 betaEff=$7
 partition=$8
 time=$9
-numSeedsPerRun=$10
+numSeedsPerRun="${10}"
 numRuns="${11}"
 startSeed="${12}"
 
