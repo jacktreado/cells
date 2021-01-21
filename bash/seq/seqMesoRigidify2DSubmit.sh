@@ -43,7 +43,7 @@ let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=mesoRigidify2D_N"$NCELLS"_NV"$NV"_kl"$kl"_kb"$kb"_lL"$agep"_lB"$betaEff"_bE"$betaEff"
+basestr=mesoRigidify2D_N"$NCELLS"_NV"$NV"_kl"$kl"_kb"$kb"_lL"$lambdaL"_lB"$lambdaB"_bE"$betaEff"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation

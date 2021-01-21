@@ -173,6 +173,9 @@ int main(int argc, char const *argv[]){
 	vector<int> nv(NCELLS,0);
 	nv.at(0) = NV;
 	NVTOT = NV;
+	int imin, imax, rmin, rmax;
+	rmin = 1e4;
+	rmax = 0;
 	for (ci=1; ci<NCELLS; ci++){
 		// use Box-Muller to generate polydisperse sample
 		r1 = drand48();
@@ -182,6 +185,17 @@ int main(int argc, char const *argv[]){
 		if (nvtmp < nvmin)
 			nvtmp = nvmin;
 
+		if (nvtmp < rmin){
+			rmin = nvtmp;
+			imin = ci;
+		}
+		else if(nvtmp > rmax){
+			rmax = nvtmp;
+			imax = ci;
+		}
+
+		cout << "num = " << polyd*NV*grv + NV << ", nvtmp = " << nvtmp << endl;
+
 		// store size of cell ci
 		nv.at(ci) = nvtmp;
 		szList.at(ci) = szList.at(ci-1) + nv.at(ci-1);
@@ -189,6 +203,9 @@ int main(int argc, char const *argv[]){
 		// add to total NV count
 		NVTOT += nvtmp;
 	}
+	cout << "** minimum: at i = " << imin << ", rmin = " << rmin << endl;
+	cout << "** maximum: at i = " << imax << ", rmax = " << rmax << endl;
+	return 0;
 
 	// degree of freedom counts
 	cellDOF = NDIM*NCELLS;
