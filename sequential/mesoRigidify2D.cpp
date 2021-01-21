@@ -194,7 +194,7 @@ int main(int argc, char const *argv[]){
 			imax = ci;
 		}
 
-		cout << "num = " << polyd*NV*grv + NV << ", nvtmp = " << nvtmp << endl;
+		cout << "ci = " << ci < <";  nvtmp = " << nvtmp << endl;
 
 		// store size of cell ci
 		nv.at(ci) = nvtmp;
@@ -205,7 +205,6 @@ int main(int argc, char const *argv[]){
 	}
 	cout << "** minimum: at i = " << imin << ", rmin = " << rmin << endl;
 	cout << "** maximum: at i = " << imax << ", rmax = " << rmax << endl;
-	return 0;
 
 	// degree of freedom counts
 	cellDOF = NDIM*NCELLS;
