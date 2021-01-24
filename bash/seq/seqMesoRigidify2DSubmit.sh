@@ -35,15 +35,15 @@ startSeed="${12}"
 
 # other variables
 calA0=1.01
-polyd=0.1
-phiMax=1.1
+polyd=0.05
+phiMax=1.05
 phiMin=0.4
 
 let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=mesoRigidify2D_N"$NCELLS"_NV"$NV"_kl"$kl"_kb"$kb"_lL"$lambdaL"_lB"$lambdaB"_bE"$betaEff"
+basestr=mesoRigidify2D_N"$NCELLS"_NV"$NV"_kl"$kl"_kb"$kb"_lL"$lambdaL"_lB"$lambdaB"_be"$betaEff"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation

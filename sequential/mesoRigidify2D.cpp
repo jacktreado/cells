@@ -79,9 +79,12 @@ const double ka 			= 1.0;			// area spring (should be = 1)
 const double eint 			= 1.0;			// baseline interaction energy 
 const double del 			= 1.0;			// radius of vertices in units of l0
 
+// displacement magnitude for MC bonds
+const double bondDisp 		= 1.0;
+
 // shape aging constants
 const double contactScale 	= 2.0;			// rate of growth rel. to lambdal of contact vertices
-const double voidScale 		= 0.1;			// rate of growth rel. to lambdal of void-facing vertices
+const double voidScale 		= 1.0;			// rate of growth rel. to lambdal of void-facing vertices
 const double calA0Thresh 	= 2.0;			// max preferred shape parameter allowable
 
 // FUNCTION PROTOTYPES
@@ -93,6 +96,22 @@ void cindices(int& ci, int& vi, int gi, int NCELLS, vector<int>& szList);
 // particle geometry
 double area(vector<double>& dpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList);
 double perimeter(vector<double>& dpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList);
+
+// system potential energy without spring network (for Metropolis choice)
+double potentialEnergyNoNetwork(vector<double>& vpos, 
+	vector<double>& vrad, 
+	vector<double>& a0, 
+	vector<double>& l0, 
+	vector<double>& delta0,
+	vector<double>& s0,
+	vector<double>& L, 
+	vector<int>& nv, 
+	vector<int>& szList, 
+	vector<int> im1, 
+	vector<int> ip1, 
+	double kl, 
+	double kb, 
+	int NCELLS);
 
 // remove rattlers from contact network, return rattler number
 int removeRattlers(vector<int>& cij);
@@ -115,6 +134,8 @@ int main(int argc, char const *argv[]){
 	espring = eint;
 
 	// read in parameters from command line input
+	// test: g++ -O3 sequential/mesoRigidify2D.cpp -o meso.cpp
+	// test: ./meso.o 16 32 1.01 0.1 1.05 0.4 1.0 0.01 0.01 0.01 1.0 1 pos.test
 	string NCELLS_str 			= argv[1];
 	string NV_str 				= argv[2];
 	string calA0_str 			= argv[3];
@@ -194,7 +215,8 @@ int main(int argc, char const *argv[]){
 			imax = ci;
 		}
 
-		cout << "ci = " << ci < <";  nvtmp = " << nvtmp << endl;
+		// print vertex info
+		cout << "ci = " << ci << ";  nvtmp = " << nvtmp << endl;
 
 		// store size of cell ci
 		nv.at(ci) = nvtmp;
@@ -1382,8 +1404,9 @@ int main(int argc, char const *argv[]){
 		}
 	}
 
-	// MC variables: pon = min(1, exp(-\beta * F * l0 * z\mu\nu))
-	double rdraw, pon;
+	// MC variables
+	double rdraw, dU, dUtot, poff;
+	vector<double> altpos(vertDOF,0.0);
 
 	// loop until phi is below phiMin
 	double lastPrintPhi = phi;
@@ -1695,6 +1718,9 @@ int main(int argc, char const *argv[]){
 						atmp = area(vpos,ci,L,nv,szList);
 						da = (atmp/a0tmp) - 1.0;
 
+						// update potential energy
+						U += 0.5*ka*da*da;
+
 						// shape force parameters (kl and kl are unitless energy ratios)
 						fa = ka*da*(rho0/a0tmp);		// derivation from the fact that rho0^2 does not necessarily cancel a0tmp
 						fl = kl*(rho0/l0tmp);
@@ -1782,6 +1808,9 @@ int main(int argc, char const *argv[]){
 				vF[NDIM*gi] 		+= fl*(dli*(lix/li) - dlim1*(lim1x/lim1));
 				vF[NDIM*gi + 1] 	+= fl*(dli*(liy/li) - dlim1*(lim1y/lim1));
 
+				// update potential energy
+				U += 0.5*kl*dli*dli;
+
 
 				// -- Bending force
 
@@ -1791,34 +1820,34 @@ int main(int argc, char const *argv[]){
 				si 			= sqrt(six*six + siy*siy);
 				sinst[gi] 	= si;
 
-				// update forces
-				if (kb > 0){
-					// segment vectors for ip2
-					rip2x = vpos[NDIM*ip1[ip1[gi]]] - cx;
-					rip2x -= L[0]*round(rip2x/L[0]);
+				// segment vectors for ip2
+				rip2x = vpos[NDIM*ip1[ip1[gi]]] - cx;
+				rip2x -= L[0]*round(rip2x/L[0]);
 
-					rip2y = vpos[NDIM*ip1[ip1[gi]] + 1] - cy;
-					rip2y -= L[1]*round(rip2y/L[1]);
+				rip2y = vpos[NDIM*ip1[ip1[gi]] + 1] - cy;
+				rip2y -= L[1]*round(rip2y/L[1]);
 
-					lip1x = rip2x - rip1x;
-					lip1y = rip2y - rip1y;
+				lip1x = rip2x - rip1x;
+				lip1y = rip2y - rip1y;
 
-					lim2x = rim1x - rim2x;
-					lim2y = rim1y - rim2y;
+				lim2x = rim1x - rim2x;
+				lim2y = rim1y - rim2y;
 
-					// compute instantaneous curvatures
-					sim1x = lim1x - lim2x;
-					sim1y = lim1y - lim2y;
-					sim1 = sqrt(sim1x*sim1x + sim1y*sim1y);
+				// compute instantaneous curvatures
+				sim1x = lim1x - lim2x;
+				sim1y = lim1y - lim2y;
+				sim1 = sqrt(sim1x*sim1x + sim1y*sim1y);
 
-					sip1x = lip1x - lix;
-					sip1y = lip1y - liy;
-					sip1 = sqrt(sip1x*sip1x + sip1y*sip1y);
+				sip1x = lip1x - lix;
+				sip1y = lip1y - liy;
+				sip1 = sqrt(sip1x*sip1x + sip1y*sip1y);
 
-					// add to force
-					vF[NDIM*gi] 		+= fb*((sim1x/sim1)*(s0[im1[gi]] - sim1) - 2.0*(six/si)*(s0[gi] - si) + (sip1x/sip1)*(s0[ip1[gi]] - sip1));
-					vF[NDIM*gi + 1] 	+= fb*((sim1y/sim1)*(s0[im1[gi]] - sim1) - 2.0*(siy/si)*(s0[gi] - si) + (sip1y/sip1)*(s0[ip1[gi]] - sip1));
-				}
+				// add to force
+				vF[NDIM*gi] 		+= fb*((sim1x/sim1)*(s0[im1[gi]] - sim1) - 2.0*(six/si)*(s0[gi] - si) + (sip1x/sip1)*(s0[ip1[gi]] - sip1));
+				vF[NDIM*gi + 1] 	+= fb*((sim1y/sim1)*(s0[im1[gi]] - sim1) - 2.0*(siy/si)*(s0[gi] - si) + (sip1y/sip1)*(s0[ip1[gi]] - sip1));
+
+				// add to potential energy
+				U += 0.5*(kb/(l0tmp*l0tmp))*pow(si - s0[gi],2.0);
 
 				// update old coordinates
 				rim2x = rim1x;
@@ -1871,7 +1900,7 @@ int main(int argc, char const *argv[]){
 				cout << "	** fireit 	= " << fireit << endl;
 				cout << "	** fcheck 	= " << fcheck << endl;
 				cout << "	** pcheck 	= " << pcheck << endl;
-				cout << "	** U 		= " << U << endl;
+				cout << "	** total U 	= " << U << endl;
 
 				cout << "	** vnorm 	= " << vnorm << endl;
 				cout << "	** dt 		= " << dt << endl;
@@ -1971,6 +2000,7 @@ int main(int argc, char const *argv[]){
 		// BOND MC AND CONTACT NETWORK UPDATE
 		Nb 		= 0;
 		NbRmv 	= 0;
+		dUtot 	= 0.0;
 		for (gi=0; gi<NVTOT; gi++){	
 			cindices(ci, vi, gi, NCELLS, szList);				
 			for (gj=gi+1; gj<NVTOT; gj++){
@@ -1990,33 +2020,71 @@ int main(int argc, char const *argv[]){
 					// true distance
 					rij = sqrt(dx*dx + dy*dy);
 
+					// mean contact number
+					zij = 0.5*(z[ci] + z[cj]) + 1.0;
+
 					// get current contact status
 					gtmp = gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2];
 
+					// reconnect bond if vertices come into contact
 					if (rij <= sij && !gtmp){
 						// update number of bonds
 						Nb++;
 
 						// add connection
 						gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 1;
-					}
-					else if (rij > sij && gtmp){
-						// update number of bonds
-						Nb++;
 
-						// check probability of staying on, edit network using MC
-						pon = exp(-betaEff*0.5*eint*pow((1 - (rij/sij)),2.0));
-						rdraw = drand48();
-						if (rdraw > pon){
-							// remove connected spring
+						// add bond to global contact network
+						if (ci > cj)
+							cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
+						else
+							cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++; 
+					}
+					// if extended and bond exists, detach if distance exceeds threshold
+					else if (rij > sij && gtmp){
+						// construct proposed configuration with displaced vertices
+						altpos = vpos;
+
+						// displace vertices in alternative configuration
+						altpos[NDIM*gi] 		-= (bondDisp*sij)*(dx/rij);
+						altpos[NDIM*gi + 1] 	-= (bondDisp*sij)*(dy/rij);
+
+						altpos[NDIM*gj] 		+= (bondDisp*sij)*(dx/rij);
+						altpos[NDIM*gj + 1] 	+= (bondDisp*sij)*(dy/rij);
+
+						// compute change in potential energy
+						dU = potentialEnergyNoNetwork(altpos, vrad, a0, l0, delta0, s0, L, nv, szList, im1, ip1, kl, kb, NCELLS);
+						dU -= U;
+
+						// add in change to potential energy based on bond displacement 
+						// 	-- note in prefactor, sij cancels out based on def of bondDisp vs delta in notes
+						dU += ((2.0*bondDisp*espring)/zij)*(((bondDisp*sij + rij)/sij) - 1.0);
+
+						// add to total possible change in U
+						dUtot += dU;
+
+						// remove if bond detaching decreases energy
+						if (dU < 0){
 							gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 0;
 							NbRmv++;
 						}
+						// else, remove conditionally
 						else{
-							if (ci > cj)
-								cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
-							else
-								cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++; 
+							poff = exp(-betaEff*dU);
+							rdraw = drand48();
+
+							// detach
+							if (poff > rdraw){
+								gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 0;
+								NbRmv++;
+							}
+							// else, keep and add bond to global contact network
+							else{
+								if (ci > cj)
+									cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
+								else
+									cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++; 
+							}
 						}
 					}
 				}
@@ -2118,9 +2186,10 @@ int main(int argc, char const *argv[]){
 		cout << "	* Nvv 			= " << Nvv << endl;
 		cout << "	* Ncc 			= " << Ncc << endl << endl;
 		cout << "	* Spring network: " << endl;
+		cout << "	* dUtot 		= " << dUtot << endl;
 		cout << "	* Nb 			= " << Nb << endl;
 		cout << "	* NbCurr 		= " << Nb - NbRmv << endl;
-		cout << "	* NbRmv 		= " << NbRmv << endl;
+		cout << "	* NbRmv 		= " << NbRmv << endl << endl;
 		cout << "	* Shape aging: " << endl;
 		cout << "	* meanPrefCurv 	= " << meanPrefCurv << endl;
 		cout << "	* meanSegLength = " << meanSegLength << endl;
@@ -2221,15 +2290,17 @@ int main(int argc, char const *argv[]){
 
 	FUNCTIONS DEFINED
 
-	gindex 			: returns global vertex index (gi) given cell (ci) and local vertex index (vi)
-	cindex 			: returns cell index (ci) given global vertex index (gi)
+	gindex 				: returns global vertex index (gi) given cell (ci) and local vertex index (vi)
+	cindex 				: returns cell index (ci) given global vertex index (gi)
 
-	area 			: returns area of cell ci
-	perimeter 		: returns perimeter of cell ci
+	area 				: returns area of cell ci
+	perimeter 			: returns perimeter of cell ci
 
-	removeRattlers	: remove all rattlers from a contact network
+	potentialEnergy 	: returns total potential energy of entire system given any configuration
 
-	printPos 		: output vertex positions to .pos file for processing and visualization
+	removeRattlers		: remove all rattlers from a contact network
+
+	printPos 			: output vertex positions to .pos file for processing and visualization
 
 	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& 
 
@@ -2354,6 +2425,166 @@ double perimeter(vector<double>& vpos, int ci, vector<double>& L, vector<int>& n
 }
 
 
+
+
+// TOTAL SYSTEM POTENTIAL ENERGY WITHOUT SPRING NETWORK
+double potentialEnergyNoNetwork(vector<double>& vpos, 
+	vector<double>& vrad, 
+	vector<double>& a0, 
+	vector<double>& l0, 
+	vector<double>& delta0,
+	vector<double>& s0,
+	vector<double>& L, 
+	vector<int>& nv, 
+	vector<int>& szList, 
+	vector<int> im1, 
+	vector<int> ip1, 
+	double kl, 
+	double kb, 
+	int NCELLS){
+
+	// local variables
+	int ci, vi, gi, gj, nvtmp;
+	double atmp, a0tmp, l0tmp;
+	double dx, dy, rij, ri, rj, sij;
+	double xi, yi, cx, cy, da, dli;
+	double rix, riy, rim1x, rim1y, rip1x, rip1y, lim1x, lim1y, lix, liy, li, six, siy, si;
+	double U = 0.0;
+
+	// compute variables from input
+	int NVTOT = 0;
+	for (ci=0; ci<NCELLS; ci++)
+		NVTOT += nv[ci];
+
+	// add up potential energy contributions
+	ci = 0;
+	for (gi=0; gi<NVTOT; gi++){
+		// radius of i
+		ri = vrad[gi];
+
+		// interactions with other repulsive vertices
+		for (gj=gi+1; gj<NVTOT; gj++){
+			// only if not adjacent
+			if (gj != im1[gi] && gj != ip1[gi]){
+				// radius of j
+				rj = vrad[gj];
+
+				// contact distance
+				sij = ri + rj;
+
+				// vertex-vertex distance
+				dx = vpos[NDIM*gj] - vpos[NDIM*gi];
+				dx -= L[0]*round(dx/L[0]);
+				if (dx < sij){
+					dy = vpos[NDIM*gj + 1] - vpos[NDIM*gi + 1];
+					dy -= L[1]*round(dy/L[1]);
+					if (dy < sij){
+						rij = sqrt(dx*dx + dy*dy);
+
+						// if overlaps, add to potential
+						if (rij < sij)
+							U += 0.5*eint*pow((1 - (rij/sij)),2.0);
+					}
+				}
+			}
+		}
+
+		// shape potential energy
+		if (ci < NCELLS){
+			if (gi == szList[ci]){
+				// compute shape parameter
+				nvtmp = nv[ci];
+				l0tmp = l0[ci];
+				a0tmp = a0[ci];
+
+				// compute area deviation
+				atmp = area(vpos,ci,L,nv,szList);
+				da = (atmp/a0tmp) - 1.0;
+
+				// add area energy
+				U += 0.5*ka*da*da;
+				
+				// compute cell center of mass
+				xi = vpos[NDIM*gi];
+				yi = vpos[NDIM*gi + 1];
+				cx = xi; 
+				cy = yi;
+				for (vi=1; vi<nvtmp; vi++){
+					dx = vpos.at(NDIM*(gi+vi)) - xi;
+					dx -= L[0]*round(dx/L[0]);
+
+					dy = vpos.at(NDIM*(gi+vi) + 1) - yi;
+					dy -= L[1]*round(dy/L[1]);
+
+					xi += dx;
+					yi += dy;
+
+					cx += xi;
+					cy += yi;
+				}
+				cx /= nvtmp;
+				cy /= nvtmp;
+
+				// get coordinates relative to center of mass
+				rix = vpos[NDIM*gi] - cx;
+				riy = vpos[NDIM*gi + 1] - cy;
+
+				// get (prior) adjacent vertices
+				rim1x = vpos[NDIM*im1[gi]] - cx;
+				rim1x -= L[0]*round(rim1x/L[0]);
+
+				rim1y = vpos[NDIM*im1[gi] + 1] - cy;
+				rim1y -= L[1]*round(rim1y/L[1]);
+
+				// increment cell index
+				ci++;
+			}
+
+			// get next adjacent vertices
+			rip1x = vpos.at(NDIM*ip1[gi]) - cx;
+			rip1x -= L[0]*round(rip1x/L[0]);
+
+			rip1y = vpos.at(NDIM*ip1[gi] + 1) - cy;
+			rip1y -= L[1]*round(rip1y/L[1]);
+
+			// -- Perimeter force
+
+			// segments
+			lim1x 		= rix - rim1x;
+			lim1y 		= riy - rim1y;
+
+			lix 		= rip1x - rix;
+			liy 		= rip1y - riy;
+
+			// segment length (just li for energy)
+			li 			= sqrt(lix*lix + liy*liy);
+			dli 		= (li/l0tmp) - delta0[gi];
+
+			// add to potential energy
+			U += 0.5*kl*dli*dli;
+
+			// -- Bending force
+
+			// get instantaneous curvature
+			six 		= lix - lim1x;
+			siy 		= liy - lim1y;
+			si 			= sqrt(six*six + siy*siy);
+
+			// add to potential energy
+			U += 0.5*(kb/(l0tmp*l0tmp))*pow(si - s0[gi],2.0);
+
+			// update old coordinates for next vertex
+			rim1x = rix;
+			rix = rip1x;
+
+			rim1y = riy;
+			riy = rip1y;
+		}
+	}
+
+	// return potential energy
+	return U;
+}
 
 
 
