@@ -255,8 +255,6 @@ int main(int argc, char const *argv[]){
 		}
 	}
 
-	return 0;
-
 	// fundamental MD time units
 	double dtMD, dt0, dt;
 
