@@ -265,11 +265,11 @@ int main(int argc, char const *argv[]){
 	// output opening statement to console
 	cout << "=======================================================" << endl << endl;
 
-	cout << "		mesophyll2D.cpp 								" << endl;
-	cout << "		Jack Treado, 2020   							" << endl;
+	cout << "		mesoRigidify2D.cpp 								" << endl;
+	cout << "		Jack Treado, 2021   							" << endl;
 
 	cout << "		NCELLS 		= " << NCELLS << "					" << endl;
-	cout << "       NV (all) 	= " << NV << "						" << endl;
+	cout << "		NV (mean)	= " << NV << "						" << endl;
 	cout << "		NVTOT 		= " << NVTOT << "					" << endl;
 	cout << "		max NV 		= " << rmax << " at ci 	= " << imax << endl;
 	cout << "		min NV 		= " << rmin << " at ci 	= " << imin << endl;
