@@ -131,6 +131,9 @@ int main(int argc, char const *argv[]){
 	betaEffss >> betaEff;
 	seedss >> seed;
 
+	// seed random number generator
+	srand48(seed);
+
 	// open xyz file
 	ofstream posout;
 	posout.open(positionFile.c_str());
@@ -218,9 +221,6 @@ int main(int argc, char const *argv[]){
 	cout << "		pos file 	= " << positionFile << "			" << endl << endl;;
 	
 	cout << "=======================================================" << endl << endl;
-
-	// seed random number generator
-	srand48(seed);
 
 
 

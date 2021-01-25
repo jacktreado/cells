@@ -226,9 +226,6 @@ int main(int argc, char const *argv[]){
 			imax = ci;
 		}
 
-		// print vertex info
-		cout << "ci = " << ci << ";  nvtmp = " << nvtmp << ";  r1 = " << r1 << ", r2 = " << r2 << endl;
-
 		// store size of cell ci
 		nv.at(ci) = nvtmp;
 		szList.at(ci) = szList.at(ci-1) + nv.at(ci-1);
@@ -236,8 +233,6 @@ int main(int argc, char const *argv[]){
 		// add to total NV count
 		NVTOT += nvtmp;
 	}
-	cout << "** minimum: at i = " << imin << ", rmin = " << rmin << endl;
-	cout << "** maximum: at i = " << imax << ", rmax = " << rmax << endl;
 
 	// degree of freedom counts
 	cellDOF = NDIM*NCELLS;
@@ -277,7 +272,10 @@ int main(int argc, char const *argv[]){
 
 	cout << "		NCELLS 		= " << NCELLS << "					" << endl;
 	cout << "       NV (all) 	= " << NV << "						" << endl;
-	cout << "		NVTOT 		= " << NVTOT << "					" << endl << endl;
+	cout << "		NVTOT 		= " << NVTOT << "					" << endl;
+	cout << "		max NV 		= " << rmax << " at ci 	= " << imax << endl;
+	cout << "		min NV 		= " << rmin << " at ci 	= " << imin << endl;
+	cout << endl;
 
 	cout << "		calA0 		= " << calA0Input << "				" << endl;
 
