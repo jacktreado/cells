@@ -224,7 +224,7 @@ int main(int argc, char const *argv[]){
 		}
 
 		// print vertex info
-		cout << "ci = " << ci << ";  nvtmp = " << nvtmp << ";  r1 = " << r1 << ", r2 = " r2 << endl;
+		cout << "ci = " << ci << ";  nvtmp = " << nvtmp << ";  r1 = " << r1 << ", r2 = " << r2 << endl;
 
 		// store size of cell ci
 		nv.at(ci) = nvtmp;
