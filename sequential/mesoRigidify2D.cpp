@@ -26,6 +26,10 @@
 
 
 
+	NOTE 01/24/21
+		-- Look into effect of contactScale and voidScale, deformation vs void size scaling??
+		-- Should these be variable inputs?
+
 	Jack Treado
 	11/03/2020, in the time of covid
 
@@ -194,9 +198,13 @@ int main(int argc, char const *argv[]){
 	vector<int> nv(NCELLS,0);
 	nv.at(0) = NV;
 	NVTOT = NV;
+
+	// draw random number of vertices for each particle, add to NVTOT
 	int imin, imax, rmin, rmax;
-	rmin = 1e4;
-	rmax = 0;
+	rmin = NV;
+	imin = 0;
+	rmax = NV;
+	imax = 0;
 	for (ci=1; ci<NCELLS; ci++){
 		// use Box-Muller to generate polydisperse sample
 		r1 = drand48();
@@ -248,6 +256,8 @@ int main(int argc, char const *argv[]){
 			ip1.at(gi) 	= gindex(ci,vip1,szList);
 		}
 	}
+
+	return 0;
 
 	// fundamental MD time units
 	double dtMD, dt0, dt;
