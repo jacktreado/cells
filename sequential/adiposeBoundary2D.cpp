@@ -1465,12 +1465,10 @@ int main(int argc, char const *argv[]){
 	double zta = 0.0;
 	vector<bool> gij(NVVCTCS,0);
 
-	// initialize directors (PI/4 spread, drift towards +x direction)
+	// initialize directors to the right
 	double Drtmp = Dr;
 	vector<double> DrList(tN,Dr);
 	vector<double> psi(tN,0.0);
-	for (ci=0; ci<tN; ci++)
-		psi.at(ci) = 0.25*PI*drand48() - 0.125*PI;
 
 	// reset for active dynamocs
 	dt = dt0;
