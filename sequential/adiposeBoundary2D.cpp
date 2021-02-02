@@ -2208,6 +2208,10 @@ void printPos(ofstream& posout, vector<double>& vpos, vector<double>& vvel, vect
 			dy -= Ly*round(dy/Ly);
 			yi += dy;
 
+			// get vertex velocities
+			vxi = vvel.at(NDIM*gi);
+			vyi = vvel.at(NDIM*gi + 1);
+
 			// Print indexing information
 			posout << setw(w) << left << "VINFO";
 			posout << setw(w) << left << ci;
