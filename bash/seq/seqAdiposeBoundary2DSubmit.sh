@@ -6,7 +6,15 @@ srcdir=$cellsdir/src
 maindir=$cellsdir/sequential
 
 # directory for all output for cell simulations
-outputdir=/gpfs/loomis/project/fas/ohern/jdt45/cells
+# * * *
+# NEED TO CHANGE ONCE GRACE MAINTENANCE IS COMPLETED ON 02/04/21
+# REVERT BACK TO: outputdir=/gpfs/loomis/project/fas/ohern/jdt45/cells
+# * * *
+outputdir=~/project/cells
+# * * *
+# NEED TO CHANGE ONCE GRACE MAINTENANCE IS COMPLETED ON 02/04/21: 
+# REVERT BACK TO: outputdir=/gpfs/loomis/project/fas/ohern/jdt45/cells
+# * * *
 
 # directory for simulations specific to sims
 simtypedir=$outputdir/adiposeBoundary2D
