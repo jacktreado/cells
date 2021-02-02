@@ -62,7 +62,7 @@ const double ka 			= 1.0;			// area spring (should be = 1)
 const double kl 			= 0.5;			// contractility
 const double eint 			= 0.5;			// interaction energy scale
 const double del 			= 1.0;			// radius of vertices in units of l0
-const double aCalA0 		= 1.01;			// adipocyte deformability
+const double aCalA0 		= 1.001;		// adipocyte deformability
 
 // tumor invasion variables
 const double Ds 			= 0.05;			// spread of velocity coupling along tumor cell boundary
