@@ -32,21 +32,22 @@ using namespace std;
 const double PI 			= 4*atan(1);
 const int w 				= 10;
 const int wnum 				= 25;
-const int pnum 				= 14;
+const int pnum 				= 8;
 
 // simulation constants
 const double timeStepMag 	= 0.01;
-const double sizeRatio 		= 10.0;
-const double phi0 			= 0.4;
-const double phiT 			= 0.95;
-const double dphi0 			= 1e-2;
+const double polyd 			= 0.1;
+const int nvmin 			= 12;
+const double phi0 			= 0.6;
+const double phiT 			= 0.9;
+const double dphi 			= 0.01;
 
 // FIRE constants for initial minimizations (SP + DP)
 const double alpha0      	= 0.2;
 const double finc        	= 1.1;
 const double fdec        	= 0.5;
 const double falpha      	= 0.99;
-const double Ftol 			= 1e-10;
+const double Ftol 			= 1e-6;
 
 const int NSKIP 			= 1e3;
 const int NMIN        		= 10;
@@ -58,19 +59,15 @@ const int NACTIVESKIP 		= 2e3;
 
 // DP force constants
 const double ka 			= 1.0;			// area spring (should be = 1)
-const double kl 			= 1.0;			// contractility
-const double eint 			= 1.0;			// interaction energy scale
+const double kl 			= 0.5;			// contractility
+const double eint 			= 0.5;			// interaction energy scale
 const double del 			= 1.0;			// radius of vertices in units of l0
+const double aCalA0 		= 1.01;			// adipocyte deformability
 
-// numbers of cells of each type
-const int aN 				= 16; 			// number of adipocytes
-const int tN 				= 100;			// number of tumor cells
-
-const double aCalA0Mag 		= 1.01;			// adipocyte deformability
-
-// active tumor cell
-const double Ds 			= 0.1;			// spread of velocity coupling along tumor cell boundary
-
+// tumor invasion variables
+const double Ds 			= 0.05;			// spread of velocity coupling along tumor cell boundary
+const double pinbreak 		= 0.5; 			// fraction of rho0 that breaks a WAT pin spring
+const double kpin 			= 0.1;			// pinning spring stiffness
 
 // FUNCTION PROTOTYPES
 int gindex(int ci, int vi, vector<int>& szList);
@@ -80,43 +77,58 @@ double area(vector<double>& dpos, int ci, vector<double>& L, vector<int>& nv, ve
 double perimeter(vector<double>& dpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList);
 
 // print to file
-void printPos(ofstream& posout, vector<double>& vpos, vector<double>& a0, vector<double>& l0, vector<double>& L, vector<int>& nv, vector<int>& szList, double phi, int NCELLS); 
+void printPos(ofstream& posout, vector<double>& vpos, vector<double>& vvel, vector<double>& a0, vector<double>& l0, vector<double>& L, vector<int>& nv, vector<int>& szList, double phi, int NCELLS, int tN); 
 
 
 // MAIN
 int main(int argc, char const *argv[]){
 	// variables for indexing loops
-	int i, ci, cj, vi, vj, gi, gj, d;
+	int i, ci, cj, vi, gi, gj, d;
 
 	// parameters to be read in 
-	int NCELLS, NT, NV, NVTOT, cellDOF, vertDOF, seed;
-	double NT_dbl, tCalA0, aCalA0, v0, vmin, Dr, Ftoltmp, phi;
-
-	// set initial force tolerance
-	Ftoltmp = 1e3*Ftol;
+	int aN, tN, NCELLS, NT, NV, NVTOT, cellDOF, vertDOF, seed;
+	double NT_dbl, areaRatio, tCalA0, ascale, v0, vmin, Dr, dDr, phi;
 
 	// read in parameters from command line input
-	string NV_str 				= argv[1];
-	string tumorCalA0_str 		= argv[2];
-	string v0_str 				= argv[3];
-	string Dr_str 				= argv[4];
-	string NT_str 				= argv[5];
-	string seed_str 			= argv[6];
-	string positionFile 		= argv[7];
+	// test: ./tumor.o 16 4 24 1.1 0.01 0.1 1.0 1e3 1 pos.test
+	string aN_str 				= argv[1];
+	string areaRatio_str 		= argv[2];
+	string NV_str 				= argv[3];
+	string tumorCalA0_str 		= argv[4];
+	string ascale_str 			= argv[5];
+	string v0_str 				= argv[6];
+	string Dr_str 				= argv[7];
+	string dDr_str 				= argv[8];
+	string NT_str 				= argv[9];
+	string seed_str 			= argv[10];
+	string positionFile 		= argv[11];
 
+	stringstream aNss(aN_str);
+	stringstream areaRatioss(areaRatio_str);
 	stringstream NVss(NV_str);
 	stringstream tCalA0ss(tumorCalA0_str);
+	stringstream ascaless(ascale_str);
 	stringstream v0ss(v0_str);
 	stringstream Drss(Dr_str);
+	stringstream dDrss(dDr_str);
 	stringstream NTss(NT_str);
 	stringstream seedss(seed_str);
 
+	aNss >> aN;
+	areaRatioss >> areaRatio;
 	NVss >> NV;
 	tCalA0ss >> tCalA0;
+	ascaless >> ascale;
 	v0ss >> v0;
 	Drss >> Dr;
+	dDrss >> dDr;
 	NTss >> NT_dbl;
 	seedss >> seed;
+
+
+
+	// seed random number generator
+	srand48(seed);
 
 	// cast input NT_dbl to integer
 	NT = (int)NT_dbl;
@@ -132,17 +144,66 @@ int main(int argc, char const *argv[]){
 		return 1;
 	}
 
+	// determine number of tumor cells by area ratio
+	tN = round(aN * areaRatio);
+	if (tN < 1){
+		cout << "	** ERROR: tN = " << tN << ", which is less than 1. Ending." << endl;
+		return 1;
+	}
+
 	// total number of cells
 	NCELLS = tN + aN;
 
 	// total number of vertices
-	NVTOT = NCELLS*NV;
-
+	
 	// szList and nv (keep track of global vertex indices)
+	int nvtmp, NVtumor, NVadipose;
+	double r1, r2, grv;
 	vector<int> szList(NCELLS,0);
-	vector<int> nv(NCELLS,NV);
-	for (ci=1; ci<NCELLS; ci++)
+	vector<int> nv(NCELLS,0);
+	nv.at(0) = NV;
+	NVtumor = NV;
+	NVadipose = 0;
+	NVTOT = NV;
+
+	// draw random number of vertices for each particle, add to NVTOT
+	int imin, imax, rmin, rmax;
+	rmin = NV;
+	imin = 0;
+	rmax = NV;
+	imax = 0;
+	for (ci=1; ci<NCELLS; ci++){
+		// use Box-Muller to generate polydisperse sample
+		r1 = drand48();
+		r2 = drand48();
+		grv = sqrt(-2.0*log(r1))*cos(2.0*PI*r2);
+		nvtmp = floor(polyd*NV*grv + NV);
+		if (nvtmp < nvmin)
+			nvtmp = nvmin;
+
+		if (nvtmp < rmin){
+			rmin = nvtmp;
+			imin = ci;
+		}
+		else if(nvtmp > rmax){
+			rmax = nvtmp;
+			imax = ci;
+		}
+
+		// store size of cell ci
+		nv.at(ci) = nvtmp;
 		szList.at(ci) = szList.at(ci-1) + nv.at(ci-1);
+
+		// add to total NV count
+		NVTOT += nvtmp;
+
+		// add to cell-specific count
+		if (ci < tN)
+			NVtumor += nvtmp;
+	}
+
+	// number of adipose vertices
+	NVadipose = NVTOT - NVtumor;
 
 	// degree of freedom counts
 	cellDOF = NDIM*NCELLS;
@@ -165,10 +226,6 @@ int main(int argc, char const *argv[]){
 		}
 	}
 
-	// shape parameters
-	tCalA0 *= NV*tan(PI/NV)/PI;
-	aCalA0 = aCalA0Mag*NV*tan(PI/NV)/PI;
-
 	// fundamental MD time units
 	double dtMD, dt0, dt;
 
@@ -186,8 +243,14 @@ int main(int argc, char const *argv[]){
 	cout << "		# tcells 	= " << tN << "						" << endl;
 	cout << "		# acells 	= " << aN << "						" << endl << endl;
 
-	cout << "       NV (both) 	= " << NV << "						" << endl;
-	cout << "		NVTOT 		= " << NVTOT << "					" << endl << endl;
+	cout << "		NCELLS 		= " << NCELLS << "					" << endl;
+	cout << "		NV (mean)	= " << NV << "						" << endl;
+	cout << "		NVTOT 		= " << NVTOT << "					" << endl;
+	cout << "		NVtumor 	= " << NVtumor << "					" << endl;
+	cout << "		NVadipose 	= " << NVadipose << "					" << endl;
+	cout << "		max NV 		= " << rmax << " at ci 	= " << imax << endl;
+	cout << "		min NV 		= " << rmin << " at ci 	= " << imin << endl;
+	cout << endl;
 
 	cout << "		tumor calA0 = " << tCalA0 << "					" << endl;
 	cout << "		adi. calA0 	= " << aCalA0 << "					" << endl << endl;
@@ -203,22 +266,18 @@ int main(int argc, char const *argv[]){
 	
 	cout << "=======================================================" << endl << endl;
 
-	// seed random number generator
-	srand48(seed);
-
 
 
 	/* * * * * * * * * * * * * * * * * * 
 
-				INITIALIZE
+			INITIALIZE
 
-					PARTICLES
+				PARTICLES
 
 	 * * * * * * * * * * * * * * * * * */
 
 	// initialization variables
-	int nvtmp;
-	double a0tmp, lenscale, calA0tmp, areaSum = 0.0;
+	double a0tmp, l0max, lenscale, calA0tmp, areaSum = 0.0;
 
 	// initialize vectors for storing coordinates, shape information
 	vector<double> vrad(NVTOT,1.0);
@@ -232,133 +291,64 @@ int main(int argc, char const *argv[]){
 
 	// initialize effective disk radius (for minimization), and l0 parameter
 	areaSum = 0.0;
+	l0max = 0.0;
 	for (ci=0; ci<NCELLS; ci++){
-		// set initial area
-		if (ci < tN){
-			lenscale = 1.0/sizeRatio;
-			a0tmp = lenscale*lenscale;
-			calA0tmp = tCalA0;
-			nvtmp = NV;
-		}
+		// number of vertices
+		nvtmp 			= nv.at(ci);
+
+		// set initial areas
+		lenscale = (double)nvtmp/NV;
+		if (ci < tN)
+			calA0tmp = tCalA0*(nvtmp*tan(PI/nvtmp)/PI);
 		else{
-			lenscale = 1.0;
-			a0tmp = 1.0;
-			calA0tmp = aCalA0;
-			nvtmp = NV;
+			lenscale *= sqrt(areaRatio);
+			calA0tmp = aCalA0*(nvtmp*tan(PI/nvtmp)/PI);
 		}
 
 		// store preferred area
+		a0tmp 			= lenscale*lenscale;
 		a0.at(ci) 		= a0tmp;
 
 		// set disk radius
 		drad.at(ci) 	= 1.05*sqrt((2.0*a0tmp)/(nvtmp*sin(2.0*PI/nvtmp)));
 
 		// set l0, vector radius
-		l0.at(ci) 	= 2.0*lenscale*sqrt(PI*calA0tmp)/nvtmp;
-		gi 			= szList.at(ci);
+		l0.at(ci) 		= 2.0*lenscale*sqrt(PI*calA0tmp)/nvtmp;
+		gi 				= szList.at(ci);
 		for (vi=0; vi<nvtmp; vi++)
 			vrad.at(gi+vi)	= 0.5*l0.at(ci)*del;
 
-		// add to sum of particle areas (including contribution from vertices)
-		areaSum 		+= a0tmp + 0.25*PI*pow(l0.at(ci)*del,2.0)*(0.5*nvtmp - 1);
-		cout << "drad = " << drad.at(ci) << ", disk area = " << PI*pow(drad.at(ci),2.0) << ", l0 = " << l0.at(ci) << ", a0 = " << a0tmp << endl;
+		// check if l0max for linked list
+		if (l0.at(ci) > l0max)
+			l0max = l0.at(ci);
+
+		// add to sum of tumor cell areas (including contribution from vertices)
+		if (ci < tN)
+			areaSum += a0tmp + 0.25*PI*pow(l0.at(ci)*del,2.0)*(0.5*nvtmp - 1);
+
+		// output info
+		cout << "\t ** ci = " << ci << ";  nv = " << nvtmp << ";  drad = " << drad.at(ci) << ";  disk area = " << PI*pow(drad.at(ci),2.0) << ", l0 = " << l0.at(ci) << ", a0 = " << a0tmp << endl;
 	}
 
 	// determine box lengths from particle sizes and input packing fraction
 	vector<double> L(NDIM,0.0);
-	L.at(1) = sqrt((aN*1.0)/phi0);
-	L.at(0) = 3.0*L.at(1);
+	L.at(1) = sqrt(areaSum/phi0);
+	L.at(0) = 2.0*L[1];
 
 	// initial packing fraction
-	phi = areaSum/(L[0]*L[1]);
+	phi = areaSum/(L[1]*L[1]);
 
-	// initialize tumor cells in right 2/3 of box box
+	// initialize tumor cell centers in left side of the box
 	for (ci=0; ci<tN; ci++){
-		dpos.at(NDIM*ci) 		= (0.9*L[0] - 1.1*L[1])*drand48() + 1.1*L[1];
+		dpos.at(NDIM*ci) 		= (L[1] - 2.0*drad[ci])*drand48() + drad[ci];
 		dpos.at(NDIM*ci + 1) 	= L[1]*drand48();
 	}
 
-	// initialize WAT cell centers in left 1/3 of box
+	// initialize WAT cell centers to the right
 	for (ci=tN; ci<NCELLS; ci++){
-		dpos.at(NDIM*ci) 		= L[1]*drand48();
+		dpos.at(NDIM*ci) 		= (L[0] - L[1] - 2.0*drad[ci])*drand48() + L[1] + drad[ci];
 		dpos.at(NDIM*ci + 1) 	= L[1]*drand48();
 	}
-
-
-	/* * * * * * * * * * * * * * * * * * 
-
-			INITIALIZE
-
-				BOX-LINKED-LIST
-
-	 * * * * * * * * * * * * * * * * * */
-
-
-	// Cell-linked-list variables
-
-	// box lengths in each direction
-	vector<int> sb(NDIM,0);
-	vector<double> lb(NDIM,0.0);
-	int NBX = 1;
-	for (d=0; d<NDIM; d++){
-		// determine number of cells along given dimension by rmax
-		sb[d] = round(L[d]/(2.5*l0.at(NCELLS-1)));
-
-		// just in case, if < 3, change to 3 so box neighbor checking will work
-		if (sb[d] < 3)
-			sb[d] = 3;
-
-		// determine box length by number of cells
-		lb[d] = L[d]/sb[d];
-
-		// count total number of cells
-		NBX *= sb[d];
-	}
-
-	// // print location of each cell
-	// for (i=0; i<NBX; i++)
-	// 	cout << "** box i = " << i << ", x = " << (i % sb[0])*lb[0] << ", y = " << (i/sb[0])*lb[1] << endl;
-
-	// cout << "lx = " << lb[0] << ", ly = " << lb[1] << endl;
-	// cout << "Lx = " << L[0] << ", Ly = " << L[1] << endl;
-	// cout << "sx = " << sb[0] << ", sy = " << sb[1] << endl;
-
-	// return 0;
-
-	// neighboring boxes for each box (4 neighbors / box)
-	int nntmp;
-	int scx = sb[0];
-	vector< vector<int> > nn;
-	nn.resize(NBX);
-
-	// loop over cells, save forward neighbors for each box
-	for (i=0; i<NBX; i++){
-		// reshape entry
-		nn[i].resize(NNN);
-		
-		// neighbors
-		nn[i][0] 			= (i + 1) % NBX; 			// right neighbor (i+1)
-		nn[i][1] 			= (i + scx) % NBX;			// top neighbor (j+1)
-		nntmp 				= (i + NBX - scx) % NBX;	// bottom neighbor (j-1)
-		nn[i][2] 			= (nn[i][1] + 1) % NBX;		// top-right neighbor (i+1, j+1)
-		nn[i][3] 			= nntmp + 1;				// bottom-right neighbor (i+1, j-1)
-
-		// right-hand bc (periodic)
-		if ((i+1) % scx == 0){
-			nn[i][0] = i - scx + 1;
-			nn[i][2] = nn[i][1]  - scx + 1;
-			nn[i][3] = nntmp - scx + 1;
-		}
-	} 
-
-	// linked-list variables
-	vector<int> head(NBX,0);
-	vector<int> last(NBX,0);
-	vector<int> list(NVTOT+1,0);
-
-
-
-
 
 
 	/* * * * * * * * * * * * * * * * * * 
@@ -436,10 +426,18 @@ int main(int argc, char const *argv[]){
 			}
 
 			// x boundary forces
-			if (xi < drad[ci])
-				dF[NDIM*ci] += eint*(1.0 - (xi/drad[ci]))/drad[ci];
-			else if (xi > L[0] - drad[ci])
-				dF[NDIM*ci] -= eint*(1.0 - ((L[0] - xi)/drad[ci]))/drad[ci];
+			if (ci < tN) {
+				if (xi < drad[ci])
+					dF[NDIM*ci] += eint*(1.0 - (xi/drad[ci]))/drad[ci];
+				else if (xi > L[1] - drad[ci])
+					dF[NDIM*ci] -= eint*(1.0 - ((L[1] - xi)/drad[ci]))/drad[ci];
+			}
+			else {
+				if (xi < L[1] + drad[ci])
+					dF[NDIM*ci] += eint*(1.0 - ((xi - L[1])/drad[ci]))/drad[ci];
+				else if (xi > L[0] - drad[ci])
+					dF[NDIM*ci] -= eint*(1.0 - ((L[0] - xi)/drad[ci]))/drad[ci];
+			}
 		}
 
 
@@ -596,11 +594,90 @@ int main(int argc, char const *argv[]){
 
 
 
+
+
+
+	/* * * * * * * * * * * * * * * * * * 
+
+			INITIALIZE
+
+				BOX-LINKED-LIST
+
+	 * * * * * * * * * * * * * * * * * */
+
+
+	// Cell-linked-list variables
+
+	// box lengths in each direction
+	vector<int> sb(NDIM,0);
+	vector<double> lb(NDIM,0.0);
+	int NBX = 1;
+	for (d=0; d<NDIM; d++){
+		// determine number of cells along given dimension by rmax
+		sb[d] = round(L[d]/(1.5*l0max));
+
+		// just in case, if < 3, change to 3 so box neighbor checking will work
+		if (sb[d] < 3)
+			sb[d] = 3;
+
+		// determine box length by number of cells
+		lb[d] = L[d]/sb[d];
+
+		// count total number of cells
+		NBX *= sb[d];
+	}
+
+	// neighboring boxes for each box (4 neighbors / box)
+	int nntmp;
+	int scx = sb[0];
+	vector< vector<int> > nn;
+	nn.resize(NBX);
+
+	// loop over cells, save forward neighbors for each box
+	for (i=0; i<NBX; i++){
+		// reshape entry
+		nn[i].resize(NNN);
+		
+		// neighbors
+		nn[i][0] 			= (i + 1) % NBX; 			// right neighbor (i+1)
+		nn[i][1] 			= (i + scx) % NBX;			// top neighbor (j+1)
+		nntmp 				= (i + NBX - scx) % NBX;	// bottom neighbor (j-1)
+		nn[i][2] 			= (nn[i][1] + 1) % NBX;		// top-right neighbor (i+1, j+1)
+		nn[i][3] 			= nntmp + 1;				// bottom-right neighbor (i+1, j-1)
+
+		// right-hand bc (no periodicity in x direction)
+		if ((i+1) % scx == 0){
+			nn[i][0] = -1;
+			nn[i][2] = -1;
+			nn[i][3] = -1;
+		}
+	} 
+
+	// linked-list variables
+	vector<int> head(NBX,0);
+	vector<int> last(NBX,0);
+	vector<int> list(NVTOT+1,0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	/* * * * * * * * * * * * * * * * * * 
 
 		COMPRESS TO TARGET
 
 			PACKING FRACTION
+
+				IN SEPARATE CHAMBERS
 
 	 * * * * * * * * * * * * * * * * * */
 
@@ -612,39 +689,44 @@ int main(int argc, char const *argv[]){
 
 	// linked list variables
 	int boxid, bi, bj, pi, pj, sbtmp;
-	int d0, dend;
-	double U = 0.0;
 
 	// shape force variables
 	double rho0, fa, fl, l0tmp, atmp, ri, li, lim1, cx, cy;
 	double da, dli, dlim1;
-	double lim2x, lim2y, lim1x, lim1y, lix, liy, lip1x, lip1y;
-	double rim2x, rim2y, rim1x, rim1y, rix, riy, rip1x, rip1y, rip2x, rip2y;
+	double lim1x, lim1y, lix, liy;
+	double rim1x, rim1y, rix, riy, rip1x, rip1y;
 
-	// take equal sized steps in dphi
+	// packing fractions for different cell types
+	double tumorPhi, adiposePhi, phiMin;
+	tumorPhi = 0.0;
+	adiposePhi = 0.0;
+	for (ci=0; ci<tN; ci++)
+		tumorPhi += area(vpos,ci,L,nv,szList) + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1.0);
+	for (ci=tN+1; ci<NCELLS; ci++)
+		adiposePhi += area(vpos,ci,L,nv,szList) + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1.0);
+	tumorPhi /= L[1]*L[1];
+	adiposePhi /= L[1]*L[1];
+
+	if (tumorPhi < adiposePhi)
+		phiMin = tumorPhi;
+	else
+		phiMin = adiposePhi;
+
+	// size scaling variables
 	int k, kmax, xind, yind;
-	double dphi, pcheck, scaleFactor;
-
-	// initial packing fraction
-	phi = 0.0;
-	for (ci=0; ci<NCELLS; ci++)
-		phi += area(vpos,ci,L,nv,szList) + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1.0);
-	phi /= L[0]*L[1];
+	double pcheck, scaleFactor;
 
 	// determine number of steps
-	kmax = ((phiT - phi)/dphi0);
-	dphi = (phiT - phi)/kmax;
-
-
+	k = 0;
+	kmax = 1e4;
 
 	// compress to jamming, relax U and F using FIRE
 	cout << endl << endl << endl;
 	cout << "	** Compressing to target packing fraction phiT = " << phiT << endl;
-	for (k=0; k<kmax+1; k++){
-		
-		// update tolerance when close to target
-		if (phi > 0.9*phiT)
-			Ftoltmp = Ftol;
+	while (phiMin < phiT && k < kmax){
+
+		// increment counter
+		k++;
 
 		// RESET FIRE VARIABLES
 		P  			= 0;	
@@ -652,7 +734,7 @@ int main(int argc, char const *argv[]){
 		vnorm 		= 0;
 		alpha   	= alpha0;
 
-		dtmax   	= 10*dt0;
+		dtmax   	= 10.0*dt0;
 		dtmin   	= 1e-6*dt0;
 		dt 			= dt0;
 
@@ -661,15 +743,19 @@ int main(int argc, char const *argv[]){
 		npPMin      = 0;
 
 		fireit    	= 0;
-		fcheck  	= 10*Ftol;
+		fcheck  	= 10.0*Ftol;
 
 		// set length constant (variable due to particle growth)
-		rho0 = sqrt(a0.at(NCELLS-1));
+		rho0 = sqrt(a0.at(0));
+
+		// reset forces and velocities
+		fill(vF.begin(), vF.end(), 0.0);
+		fill(vFold.begin(), vFold.end(), 0.0);
+		fill(vvel.begin(), vvel.end(), 0.0);
 
 		// RELAX FORCES USING FIRE
-		while ((fcheck > Ftoltmp || npPMin < NMIN) && fireit < itmax){
+		while ((fcheck > Ftol || npPMin < NMIN) && fireit < itmax){
 			// VV POSITION UPDATE
-			cout << "pos update " << endl;
 			for (i=0; i<vertDOF; i++){
 				// update position
 				vpos[i] += dt*vvel[i] + 0.5*dt*dt*vF[i];
@@ -686,19 +772,12 @@ int main(int argc, char const *argv[]){
 				vF[i] = 0.0;
 			}
 
-			// reset linked list 
-			cout << "linked list reset " << endl;
-			for (gi=0; gi<NVTOT+1; gi++)
-				list[gi] = 0;
-
-			// reset linked list head
-			for (i=0; i<NBX; i++){
-				head[i] = 0;
-				last[i] = 0;
-			}
+			// reset linked list variables
+			fill(list.begin(), list.end(), 0);
+			fill(head.begin(), head.end(), 0);
+			fill(last.begin(), last.end(), 0);
 
 			// sort vertices into linked list
-			cout << "linked list sort " << endl;
 			for (gi=0; gi<NVTOT; gi++){
 				// 1. get cell id of current particle position
 				boxid = 0;
@@ -709,13 +788,6 @@ int main(int argc, char const *argv[]){
 
 					// increment dimensional factor
 					sbtmp *= sb[d];
-				}
-
-				if (boxid >= NBX){
-					cout << "** boxid = " << boxid << " >= NBX = " << NBX << ". At gi = " << gi << ", fireit = " << fireit << endl;
-					cout << "** vx = " << vpos[NDIM*gi] << ", vy = " << vpos[NDIM*gi + 1] << endl;
-					cout << "** Lx = " << L[0] << ", Ly = " << L[1] << endl;
-					return 0;
 				}
 
 				// 2. add to head list or link within list
@@ -733,7 +805,6 @@ int main(int argc, char const *argv[]){
 			// FORCE UPDATE
 
 			// interaction forces (USE BOX LINKED LIST)
-			cout << "int force update " << endl;
 			pcheck = 0.0;
 			for (bi=0; bi<NBX; bi++){
 
@@ -793,7 +864,11 @@ int main(int argc, char const *argv[]){
 
 					// test overlaps with forward neighboring cells
 					for (bj=0; bj<NNN; bj++){
-						// get first particle in neighboring cell
+						// if on boundary, don't check
+						if (nn[bi][bj] == -1)
+							continue;
+
+						// get first particle in neighboring cell 
 						pj = head[nn[bi][bj]];
 
 						// loop down neighbors of pi in same cell
@@ -851,7 +926,6 @@ int main(int argc, char const *argv[]){
 
 
 			// shape forces (loop over global vertex labels)
-			cout << "shape force update " << endl;
 			ci = 0;
 			for (gi=0; gi<NVTOT; gi++){
 
@@ -868,7 +942,7 @@ int main(int argc, char const *argv[]){
 						da = (atmp/a0tmp) - 1.0;
 
 						// shape force parameters (kl and kl are unitless energy ratios)
-						fa = ka*da*(rho0/a0tmp);		// derivation from the fact that rho0^2 does not necessarily cancel a0tmp
+						fa = ka*da*(rho0/a0tmp);
 						fl = kl*(rho0/l0tmp);
 
 
@@ -879,7 +953,6 @@ int main(int argc, char const *argv[]){
 						cy = yi;
 						for (vi=1; vi<nvtmp; vi++){
 							dx = vpos[NDIM*(gi+vi)] - xi;
-							dx -= L[0]*round(dx/L[0]);
 
 							dy = vpos[NDIM*(gi+vi) + 1] - yi;
 							dy -= L[1]*round(dy/L[1]);
@@ -899,28 +972,32 @@ int main(int argc, char const *argv[]){
 
 						// get (prior) adjacent vertices
 						rim1x = vpos[NDIM*im1[gi]] - cx;
-						rim1x -= L[0]*round(rim1x/L[0]);
 
 						rim1y = vpos[NDIM*im1[gi] + 1] - cy;
 						rim1y -= L[1]*round(rim1y/L[1]);
 
-						rim2x = vpos[NDIM*im1[im1[gi]]] - cx;
-						rim2x -= L[0]*round(rim2x/L[0]);
-
-						rim2y = vpos[NDIM*im1[im1[gi]] + 1] - cy;
-						rim2y -= L[1]*round(rim2y/L[1]);
-
 						// boundary forces
 						for (vi=0; vi<nvtmp; vi++){
-							// x-position using global indexing
+							// positions using global indexing
 							xi = vpos[NDIM*(gi+vi)];
-							ri = vrad[gi + vi];
+							ri = vrad[gi+vi];
 
 							// if near a wall, add to force
-							if (xi < ri)
-								vF[NDIM*(gi+vi)] += eint*(1.0 - (xi/ri))/ri;
-							else if (xi > L[0] - ri)
-								vF[NDIM*(gi+vi)] -= eint*(1.0 - ((L[0] - xi)/ri))/ri;
+
+							// tumors
+							if (ci < tN){
+								if (xi < ri)
+									vF[NDIM*(gi+vi)] += eint*(1.0 - (xi/ri))/ri;
+								else if (xi > L[1] - ri)
+									vF[NDIM*(gi+vi)] -= eint*(1.0 - ((L[1] - xi)/ri))/ri;
+							}
+							// adipocytes
+							else{
+								if (xi < L[1] + ri)
+									vF[NDIM*(gi+vi)] += eint*(1.0 - ((xi - L[1])/ri))/ri;
+								else if (xi > L[0] - ri)
+									vF[NDIM*(gi+vi)] -= eint*(1.0 - ((L[0] - xi)/ri))/ri;
+							}
 						}
 
 						// increment cell index
@@ -930,16 +1007,14 @@ int main(int argc, char const *argv[]){
 
 
 				// get next adjacent vertices
-				rip1x = vpos.at(NDIM*ip1[gi]) - cx;
-				rip1x -= L[0]*round(rip1x/L[0]);
+				rip1x = vpos[NDIM*ip1[gi]] - cx;
 
-				rip1y = vpos.at(NDIM*ip1[gi] + 1) - cy;
+				rip1y = vpos[NDIM*ip1[gi] + 1] - cy;
 				rip1y -= L[1]*round(rip1y/L[1]);
 
 
 
 				// -- Area force
-
 				vF[NDIM*gi] 		+= 0.5*fa*(rim1y - rip1y);
 				vF[NDIM*gi + 1] 	+= 0.5*fa*(rip1x - rim1x);
 
@@ -966,11 +1041,9 @@ int main(int argc, char const *argv[]){
 				vF[NDIM*gi + 1] 	+= fl*(dli*(liy/li) - dlim1*(lim1y/lim1));
 
 				// update old coordinates
-				rim2x = rim1x;
 				rim1x = rix;
 				rix = rip1x;
 
-				rim2y = rim1y;
 				rim1y = riy;
 				riy = rip1y;
 			}
@@ -1001,14 +1074,10 @@ int main(int argc, char const *argv[]){
 			fcheck = fnorm/(NDIM*NCELLS);
 
 			// update npPMin
-			if (fcheck < Ftoltmp)
+			if (fcheck < Ftol)
 				npPMin++;
 			else
 				npPMin = 0;
-
-			// print vertex positions
-			cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl << endl;
-			printPos(posout, vpos, a0, l0, L, nv, szList, phi0, NCELLS);
 
 			// print to console
 			if (fireit % NSKIP == 0){
@@ -1112,9 +1181,6 @@ int main(int argc, char const *argv[]){
 			cout << "	** P 		= " << P << endl;
 			cout << "	** Pdir 	= " << P/(fnorm*vnorm) << endl;
 			cout << "	** alpha 	= " << alpha << endl << endl;
-
-			cout << "	** current phi = " << phi0 << endl;
-			cout << "	** k = " << k << "/" << kmax << endl << endl;
 		}
 
 		// output to console
@@ -1126,18 +1192,48 @@ int main(int argc, char const *argv[]){
 		cout << "===============================================" << endl;
 		cout << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&" << endl;
 		cout << endl;
-		cout << "	* k 			= " << k << endl;
-		cout << "	* dr 			= " << scaleFactor << endl;
-		cout << "	* phi 			= " << phi << endl;
-		cout << "	* fcheck 		= " << fcheck << endl;
-		cout << "	* pcheck 		= " << pcheck << endl;
-		cout << "	* U 		 	= " << U << endl;
+		cout << "	* k 				= " << k << endl;
+		cout << "	* dr 				= " << scaleFactor << endl;
+		cout << "	* tumorPhi 			= " << tumorPhi << endl;
+		cout << "	* adiposePhi 		= " << adiposePhi << endl;
+		cout << "	* phiMin			= " << phiMin << endl;
+		cout << "	* fcheck 			= " << fcheck << endl;
+		cout << "	* pcheck 			= " << pcheck << endl;
 		cout << endl;
 
 
 		// grow or shrink particles by scale factor
-		phi = 0.0;
+		tumorPhi = 0.0;
+		adiposePhi = 0.0;
 		for (ci=0; ci<NCELLS; ci++){
+			if (ci < tN)
+				tumorPhi += area(vpos,ci,L,nv,szList) + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1);
+			else
+				adiposePhi += area(vpos,ci,L,nv,szList) + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1);
+		}
+		tumorPhi /= L[1]*L[1];
+		adiposePhi /= L[1]*L[1];
+
+		if (tumorPhi < adiposePhi)
+			phiMin = tumorPhi;
+		else
+			phiMin = adiposePhi;
+
+		for (ci=0; ci<NCELLS; ci++){
+			// check whether or not to scale particles
+			if (ci < tN){
+				if (tumorPhi > phiT)
+					continue;
+				else
+					scaleFactor = sqrt((tumorPhi + dphi)/tumorPhi);
+			}
+			else {
+				if (adiposePhi > phiT)
+					continue;
+				else
+					scaleFactor = sqrt((adiposePhi + dphi)/adiposePhi);
+			}
+
 			// scale preferred lengths
 			l0[ci] *= scaleFactor;
 			a0[ci] *= scaleFactor*scaleFactor;
@@ -1152,7 +1248,6 @@ int main(int argc, char const *argv[]){
 			cy = yi;
 			for (vi=1; vi<nv.at(ci); vi++){
 				dx = vpos.at(NDIM*(gi+vi)) - xi;
-				dx -= L[0]*round(dx/L[0]);
 
 				dy = vpos.at(NDIM*(gi+vi) + 1) - yi;
 				dy -= L[1]*round(dy/L[1]);
@@ -1172,32 +1267,720 @@ int main(int argc, char const *argv[]){
 				yind = xind + 1;
 
 				// closest relative position
-				dx = vpos[xind] - cx;
-				dx -= L[0]*round(dx/L[0]);
+				dx = vpos.at(xind) - cx;
 
-				dy = vpos[yind] - cy;
+				dy = vpos.at(yind) - cy;
 				dy -= L[1]*round(dy/L[1]);
 
 				// update vertex positions
-				vpos[xind] 		+= (scaleFactor - 1.0)*dx;
-				vpos[yind] 		+= (scaleFactor - 1.0)*dy;
+				vpos.at(xind)		+= (scaleFactor - 1.0)*dx;
+				vpos.at(yind) 		+= (scaleFactor - 1.0)*dy;
 
 				// scale vertex radii
-				vrad[gi+vi] *= scaleFactor;
+				vrad.at(gi+vi) 		*= scaleFactor;
 			}
-
-			// update packing fraction
-			phi += a0[ci] + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1);
 		}
-		phi /= L[0]*L[1];
-		scaleFactor = sqrt((phi + dphi)/phi);
+	}
+	if (k == kmax){
+		cout << "	** ERROR: In adipose/tumor compression step, k reached kmax without getting to phiT. Ending." << endl;
+		return 1;
 	}
 
-	// print vertex positions
-	cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl << endl;
-	printPos(posout, vpos, a0, l0, L, nv, szList, phi0, NCELLS);
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	/* * * * * * * * * * * * * * * * * * 
+
+			RESET AND RESIZE
+
+				BOX-LINKED-LIST
+
+	 * * * * * * * * * * * * * * * * * */
+
+
+	// re-determine l0max
+	l0max = 0.0;
+	for (ci=0; ci<NCELLS; ci++){
+		if (l0[ci] > l0max)
+			l0max = l0[ci];
+	}
+
+	// recount cell box dimensions, total number of cells needed
+	NBX = 1;
+	for (d=0; d<NDIM; d++){
+		// determine number of cells along given dimension by rmax
+		sb[d] = round(L[d]/(1.25*l0max));
+
+		// just in case, if < 3, change to 3 so box neighbor checking will work
+		if (sb[d] < 3)
+			sb[d] = 3;
+
+		// determine box length by number of cells
+		lb[d] = L[d]/sb[d];
+
+		// recount total number of cells
+		NBX *= sb[d];
+	}
+
+	// neighboring boxes for each box (4 neighbors / box)
+	scx = sb[0];
+	nn.clear();
+	nn.resize(NBX);
+
+	// loop over cells, save forward neighbors for each box
+	for (i=0; i<NBX; i++){
+		// reshape entry
+		nn[i].resize(NNN);
+		
+		// neighbors
+		nn[i][0] 			= (i + 1) % NBX; 			// right neighbor (i+1)
+		nn[i][1] 			= (i + scx) % NBX;			// top neighbor (j+1)
+		nntmp 				= (i + NBX - scx) % NBX;	// bottom neighbor (j-1)
+		nn[i][2] 			= (nn[i][1] + 1) % NBX;		// top-right neighbor (i+1, j+1)
+		nn[i][3] 			= nntmp + 1;				// bottom-right neighbor (i+1, j-1)
+
+		// right-hand bc (no periodicity in x direction)
+		if ((i+1) % scx == 0){
+			nn[i][0] = -1;
+			nn[i][2] = -1;
+			nn[i][3] = -1;
+		}
+	} 
+
+	// resize linked-list variables
+	head.resize(NBX);
+	last.resize(NBX);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	/* * * * * * * * * * * * * * * * * * 
+
+		OVERDAMPED DYNAMICS
+
+			WITH ACTIVE TUMOR CELL
+
+	 * * * * * * * * * * * * * * * * * */
+
+	// DYNAMICS VARIABLES
+	int tt, tcells; 
+	double ux, uy, rnorm, psitmp, dpsi, v0tmp, psiMean, psiStd;
+
+	// attractive shell for tumor vertices
+	double shellij, cutij;
+
+	// WAT pin locations
+	int pinCellInd = 0;
+	double dpin, dpinx, dpiny = 0.0;
+	vector<double> watpins(NDIM*aN,0.0);
+	vector<int> pinattached(aN,1);
+	for (ci=tN; ci<NCELLS; ci++){
+		// first global index for ci
+		gi = szList.at(ci);
+
+		// compute cell center of mass
+		xi = vpos[NDIM*gi];
+		yi = vpos[NDIM*gi + 1];
+		cx = xi; 
+		cy = yi;
+		for (vi=1; vi<nv.at(ci); vi++){
+			dx = vpos.at(NDIM*(gi+vi)) - xi;
+
+			dy = vpos.at(NDIM*(gi+vi) + 1) - yi;
+			dy -= L[1]*round(dy/L[1]);
+
+			xi += dx;
+			yi += dy;
+
+			cx += xi;
+			cy += yi;
+		}
+		cx /= nv.at(ci);
+		cy /= nv.at(ci);
+
+		// save pin locations
+		watpins.at(NDIM*(ci-tN)) = cx;
+		watpins.at(NDIM*(ci-tN) + 1) = cy;
+	}
+
+	// initialize vertex-vertex contact network
+	int NVVCTCS = 0.5*NVTOT*(NVTOT-1);
+	int zta;
+	vector<bool> gij(NVVCTCS,0);
+
+	// initialize directors (PI/4 spread, drift towards +x direction)
+	double Drtmp = Dr;
+	vector<double> DrList(tN,Dr);
+	vector<double> psi(tN,0.0);
+	for (ci=0; ci<tN; ci++)
+		psi.at(ci) = 0.25*PI*drand48() - 0.125*PI;
+
+	// reset for active dynamocs
+	dt = dt0;
+
+	// draw draw 
+	cout << endl;
+	cout << "--  BEGINNING ACTIVE TUMOR CELL DYNAMICS" << endl;
+	cout << "--  Looping over time for NT = " << NT << " time steps with dt = " << dt << endl;
+	for(tt=0; tt<NT; tt++){
+
+		// pbcs and reset forces
+		for (i=0; i<vertDOF; i++){
+			// recenter in box (only if y)
+			if (i % NDIM == 1){
+				if (vpos[i] > L[1])
+					vpos[i] -= L[1];
+				else if (vpos[i] < 0)
+					vpos[i] += L[1];
+			}
+
+			// reset forces
+			vF[i] = 0.0;
+		}
+
+		// reset linked list variables
+		fill(list.begin(), list.end(), 0);
+		fill(head.begin(), head.end(), 0);
+		fill(last.begin(), last.end(), 0);
+
+		// sort vertices into linked list
+		for (gi=0; gi<NVTOT; gi++){
+			// 1. get cell id of current particle position
+			boxid = 0;
+			sbtmp = 1;
+			for (d=0; d<NDIM; d++){
+				// add d index to 1d list
+				boxid += floor(vpos[NDIM*gi + d]/lb[d])*sbtmp;
+
+				// increment dimensional factor
+				sbtmp *= sb[d];
+			}
+
+			// 2. add to head list or link within list
+			// NOTE: particle ids are labelled starting from 1, setting to 0 means end of linked list
+			if (head[boxid] == 0){
+				head[boxid] = gi + 1;
+				last[boxid] = gi + 1;
+			}
+			else{
+				list[last[boxid]] = gi + 1;
+				last[boxid] = gi + 1;
+			}
+		}
+
+		// FORCE UPDATE
+
+		// interaction forces (USE BOX LINKED LIST)
+		pcheck = 0.0;
+		for (bi=0; bi<NBX; bi++){
+
+			// get start of list of particles
+			pi = head[bi];
+
+			// loop over linked list
+			while (pi > 0){
+				// real particle index
+				gi = pi - 1;
+
+				// next particle in list
+				pj = list[pi];
+
+				// loop down neighbors of pi in same cell
+				while (pj > 0){
+					// real index of pj
+					gj = pj - 1;
+
+					if (gj == ip1[gi] || gj == im1[gi]){
+						pj = list[pj];
+						continue;
+					}
+
+					// contact distance
+					sij = vrad[gi] + vrad[gj];
+
+					// attraction distances
+					shellij = (1.0 + ascale)*sij;
+					cutij = (1.0 + 0.5*ascale)*sij;
+
+					// particle distance
+					dx = vpos[NDIM*gj] - vpos[NDIM*gi];
+					if (dx < shellij){
+						dy = vpos[NDIM*gj + 1] - vpos[NDIM*gi + 1];
+						dy -= L[1]*round(dy/L[1]);
+						if (dy < shellij){
+							rij = sqrt(dx*dx + dy*dy);
+							// if two tumor cells, check for attraction
+							if (rij < shellij && rij > cutij && gi < NVtumor && gj < NVtumor){
+								// force scale
+								ftmp 				= eint*((rij/sij) - 1.0 - ascale)/sij;
+								fx 					= ftmp*(dx/rij);
+								fy 					= ftmp*(dy/rij);
+
+								// add to forces
+								vF[NDIM*gi] 		-= fx;
+								vF[NDIM*gi + 1] 	-= fy;
+
+								vF[NDIM*gj] 		+= fx;
+								vF[NDIM*gj + 1] 	+= fy;
+
+								// add to virial expression for pressure
+								pcheck += dx*fx + dy*fy;
+
+								// add to contact network
+								if (gj > gi)
+									gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 1;
+								else
+									gij[NVTOT*gj + gi - (gj+1)*(gj+2)/2] = 1;
+							}
+							else if (rij < cutij && rij > sij && gi < NVtumor && gj < NVtumor){
+								// force scale
+								ftmp 				= eint*(1 - (rij/sij))/sij;
+								fx 					= ftmp*(dx/rij);
+								fy 					= ftmp*(dy/rij);
+
+								// add to forces
+								vF[NDIM*gi] 		-= fx;
+								vF[NDIM*gi + 1] 	-= fy;
+
+								vF[NDIM*gj] 		+= fx;
+								vF[NDIM*gj + 1] 	+= fy;
+
+								// add to virial expression for pressure
+								pcheck += dx*fx + dy*fy;
+
+								// add to contact network
+								if (gj > gi)
+									gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 1;
+								else
+									gij[NVTOT*gj + gi - (gj+1)*(gj+2)/2] = 1;
+							}
+							// otherwise, check for two overlapping purely-repulsive vertices
+							else if (rij < sij){
+								// force scale
+								ftmp 				= eint*(1 - (rij/sij))/sij;
+								fx 					= ftmp*(dx/rij);
+								fy 					= ftmp*(dy/rij);
+
+								// add to forces
+								vF[NDIM*gi] 		-= fx;
+								vF[NDIM*gi + 1] 	-= fy;
+
+								vF[NDIM*gj] 		+= fx;
+								vF[NDIM*gj + 1] 	+= fy;
+
+								// add to virial expression for pressure
+								pcheck += dx*fx + dy*fy;
+
+								// add to contact network
+								if (gj > gi)
+									gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 1;
+								else
+									gij[NVTOT*gj + gi - (gj+1)*(gj+2)/2] = 1;
+							}
+						}
+					}
+
+					// update pj
+					pj = list[pj];
+				}
+
+				// test overlaps with forward neighboring cells
+				for (bj=0; bj<NNN; bj++){
+					// get first particle in neighboring cell
+					pj = head[nn[bi][bj]];
+
+					// loop down neighbors of pi in same cell
+					while (pj > 0){
+						// real index of pj
+						gj = pj - 1;
+
+						if (gj == ip1[gi] || gj == im1[gi]){
+							pj = list[pj];
+							continue;
+						}
+
+						// contact distance
+						sij = vrad[gi] + vrad[gj];
+
+						// attraction distances
+						shellij = (1.0 + ascale)*sij;
+						cutij = (1.0 + 0.5*ascale)*sij;
+
+						// particle distance
+						dx = vpos[NDIM*gj] - vpos[NDIM*gi];
+						if (dx < shellij){
+							dy = vpos[NDIM*gj + 1] - vpos[NDIM*gi + 1];
+							dy -= L[1]*round(dy/L[1]);
+							if (dy < shellij){
+								rij = sqrt(dx*dx + dy*dy);
+								// if two tumor cells, check for attraction
+								if (rij < shellij && rij > cutij && gi < NVtumor && gj < NVtumor){
+									// force scale
+									ftmp 				= eint*((rij/sij) - 1.0 - ascale)/sij;
+									fx 					= ftmp*(dx/rij);
+									fy 					= ftmp*(dy/rij);
+
+									// add to forces
+									vF[NDIM*gi] 		-= fx;
+									vF[NDIM*gi + 1] 	-= fy;
+
+									vF[NDIM*gj] 		+= fx;
+									vF[NDIM*gj + 1] 	+= fy;
+
+									// add to virial expression for pressure
+									pcheck += dx*fx + dy*fy;
+
+									// add to contact network
+									if (gj > gi)
+										gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 1;
+									else
+										gij[NVTOT*gj + gi - (gj+1)*(gj+2)/2] = 1;
+								}
+								else if (rij < cutij && rij > sij && gi < NVtumor && gj < NVtumor){
+									// force scale
+									ftmp 				= eint*(1 - (rij/sij))/sij;
+									fx 					= ftmp*(dx/rij);
+									fy 					= ftmp*(dy/rij);
+
+									// add to forces
+									vF[NDIM*gi] 		-= fx;
+									vF[NDIM*gi + 1] 	-= fy;
+
+									vF[NDIM*gj] 		+= fx;
+									vF[NDIM*gj + 1] 	+= fy;
+
+									// add to virial expression for pressure
+									pcheck += dx*fx + dy*fy;
+
+									// add to contact network
+									if (gj > gi)
+										gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 1;
+									else
+										gij[NVTOT*gj + gi - (gj+1)*(gj+2)/2] = 1;
+								}
+								// otherwise, check for two overlapping purely-repulsive vertices
+								else if (rij < sij){
+									// force scale
+									ftmp 				= eint*(1 - (rij/sij))/sij;
+									fx 					= ftmp*(dx/rij);
+									fy 					= ftmp*(dy/rij);
+
+									// add to forces
+									vF[NDIM*gi] 		-= fx;
+									vF[NDIM*gi + 1] 	-= fy;
+
+									vF[NDIM*gj] 		+= fx;
+									vF[NDIM*gj + 1] 	+= fy;
+
+									// add to virial expression for pressure
+									pcheck += dx*fx + dy*fy;
+
+									// add to contact network
+									if (gj > gi)
+										gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 1;
+									else
+										gij[NVTOT*gj + gi - (gj+1)*(gj+2)/2] = 1;
+								}
+							}
+						}
+
+						// update pj
+						pj = list[pj];
+					}
+				}
+
+				// update pi index to be next
+				pi = list[pi];
+			}
+		}
+
+		// normalize pressure by box area and number of particles
+		pcheck /= NCELLS*L[0]*L[1];
+
+		// shape forces (loop over global vertex labels)
+		ci = 0;
+		psiMean = 0.0;
+		psiStd = 0.0;
+		for (gi=0; gi<NVTOT; gi++){
+
+			// -- Area force (and get cell index ci)
+			if (ci < NCELLS){
+				if (gi == szList[ci]){
+					// compute shape parameter
+					nvtmp = nv[ci];
+					a0tmp = a0[ci];
+					l0tmp = l0[ci];
+
+					/// compute area deviation
+					atmp = area(vpos,ci,L,nv,szList);
+					da = (atmp/a0tmp) - 1.0;
+
+					// shape force parameters (kl and kl are unitless energy ratios)
+					fa = ka*da*(rho0/a0tmp);
+					fl = kl*(rho0/l0tmp);
+
+					// compute cell center of mass
+					xi = vpos[NDIM*gi];
+					yi = vpos[NDIM*gi + 1];
+					cx = xi; 
+					cy = yi;
+					for (vi=1; vi<nvtmp; vi++){
+						dx = vpos[NDIM*(gi+vi)] - xi;
+
+						dy = vpos[NDIM*(gi+vi) + 1] - yi;
+						dy -= L[1]*round(dy/L[1]);
+
+						xi += dx;
+						yi += dy;
+
+						cx += xi;
+						cy += yi;
+					}
+					cx /= nvtmp;
+					cy /= nvtmp;
+
+					// get coordinates relative to center of mass
+					rix = vpos[NDIM*gi] - cx;
+					riy = vpos[NDIM*gi + 1] - cy;
+
+					// get (prior) adjacent vertices
+					rim1x = vpos[NDIM*im1[gi]] - cx;
+
+					rim1y = vpos[NDIM*im1[gi] + 1] - cy;
+					rim1y -= L[1]*round(rim1y/L[1]);
+
+					// if adipocyte, get distance to pin
+					if (ci >= tN){
+						// get pin indices
+						pinCellInd = ci - tN;
+
+						// get distance to pin if attached
+						if (pinattached[pinCellInd] == 1){
+							dpinx = watpins[NDIM*pinCellInd] - cx;
+							dpiny = watpins[NDIM*pinCellInd + 1] - cy;
+							dpiny -= L[1]*round(dpiny/L[1]);
+							dpin = sqrt(pow(dpinx,2.0) + pow(dpiny,2.0));
+						}
+					}
+					// otherwise, update director
+					else{
+						// generate random variable
+						r1 = drand48();
+						r2 = drand48();
+						grv = sqrt(-2.0*log(r1))*cos(2.0*PI*r2);
+
+						// update director
+						psi[ci] += sqrt(dt*2.0*DrList[ci])*grv;
+
+						// add to mean and std dev of directors
+						psiMean += psi[ci];
+						psiStd += psi[ci]*psi[ci];
+					}
+
+					// boundary forces
+					for (vi=0; vi<nvtmp; vi++){
+						// positions using global indexing
+						xind = NDIM*(gi+vi);
+						yind = xind + 1;
+
+						xi = vpos[xind];
+						ri = vrad[gi+vi];
+
+						// if near a wall, add to force
+						if (xi < ri)
+							vF[xind] += eint*(1.0 - (xi/ri))/ri;
+						else if (xi > L[0] - ri)
+							vF[xind] -= eint*(1.0 - ((L[0] - xi)/ri))/ri;
+
+						// if an adipocyte and pin is intact, compute force due to pinning spring
+						if (ci >= tN && pinattached[pinCellInd] == 1){
+							if (dpin < pinbreak*sqrt(a0tmp)){
+								vF[xind] 	+= (kpin/nvtmp)*dpinx;
+								vF[yind] 	+= (kpin/nvtmp)*dpiny;
+							}
+							else
+								pinattached[pinCellInd] = 0;
+						}
+					}
+
+					// increment cell index
+					ci++;
+				}
+			}
+
+
+			// get next adjacent vertices
+			rip1x = vpos[NDIM*ip1[gi]] - cx;
+
+			rip1y = vpos[NDIM*ip1[gi] + 1] - cy;
+			rip1y -= L[1]*round(rip1y/L[1]);
+
+
+			// -- Area force
+			vF[NDIM*gi] 		+= 0.5*fa*(rim1y - rip1y);
+			vF[NDIM*gi + 1] 	+= 0.5*fa*(rip1x - rim1x);
+
+
+			// -- Perimeter force
+
+			// segment vector elements
+			lim1x 	= rix - rim1x;
+			lim1y 	= riy - rim1y;
+
+			lix 	= rip1x - rix;
+			liy 	= rip1y - riy;
+
+			// segment lengths
+			lim1 	= sqrt(lim1x*lim1x + lim1y*lim1y);
+			li 		= sqrt(lix*lix + liy*liy);
+
+			// segment deviations
+			dlim1  	= (lim1/l0tmp) - 1.0;
+			dli 	= (li/l0tmp) - 1.0;
+
+			// add to forces
+			vF[NDIM*gi] 		+= fl*(dli*(lix/li) - dlim1*(lim1x/lim1));
+			vF[NDIM*gi + 1] 	+= fl*(dli*(liy/li) - dlim1*(lim1y/lim1));
+
+			// active force (only if tumor cell vertices)
+			if (gi < NVtumor){
+				// get angular distance from psi
+				psitmp = atan2(riy,rix);
+				dpsi = psitmp - psi[ci-1];
+				dpsi -= 2.0*PI*round(dpsi/(2.0*PI));
+
+				// get velocity scale
+				v0tmp = vmin + (v0-vmin)*exp(-pow(dpsi,2.0)/(2.0*Ds*Ds));
+
+				// get unit vectors
+				rnorm = sqrt(rix*rix + riy*riy);
+				ux = rix/rnorm;
+				uy = riy/rnorm;
+
+				// add to forces
+				vF[NDIM*gi] += v0tmp*ux;
+				vF[NDIM*gi + 1] += v0tmp*uy;
+			}
+
+			// update old coordinates
+			rim1x = rix;
+			rix = rip1x;
+
+			rim1y = riy;
+			riy = rip1y;
+		}
+
+		// compute psi stats for output
+		psiMean /= tN;
+		psiStd /= tN;
+		psiStd -= psiMean*psiMean;
+		psiStd = sqrt(psiStd);
+
+		// BROWNIAN MOTION VIA EULER UPDATE
+		for (i=0; i<vertDOF; i++)
+			vpos[i] += dt*vF[i];
+
+		// update Dr based on contact with adipocytes
+		gi = 0;
+		for (ci=0; ci<tN; ci++){
+			// compute number of tumor-adipocyte contacts
+			zta = 0;
+			for (vi=0; vi<nv[ci]; vi++){
+				for (gj=NVtumor; gj<NVTOT; gj++){
+					if (gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2])
+						zta++;
+				}
+				gi++;
+			}
+
+			// scale Dr based on tumor-adipocyte contacts
+			Drtmp = Dr*(1 - (zta/nv[ci])*dDr);
+			if (Drtmp > 0)
+				DrList[ci] = Drtmp;
+			else
+				DrList[ci] = 0.0;
+		}
+
+		// print message console, print position to file
+		if (tt % NACTIVESKIP == 0){
+			cout << endl << endl;
+			cout << "===========================================" << endl;
+			cout << "			active tumor cells 				" << endl;
+			cout << "===========================================" << endl;
+			cout << endl;
+			cout << "	** tt 			= " << tt << endl;
+			cout << "	** p 			= " << pcheck << endl;
+			cout << "	** psiMean 		= " << psiMean << endl;
+			cout << "	** psiStd 		= " << psiStd << endl;
+
+			// compute instantaneous packing fraction
+			phi = 0.0;
+			for (ci=0; ci<NCELLS; ci++)
+				phi += area(vpos,ci,L,nv,szList) + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1);
+			phi /= L[0]*L[1];
+
+			// print vertex positions to check placement
+			cout << "\t** PRINTING POSITIONS TO FILE... " << endl;
+			printPos(posout, vpos, vF, a0, l0, L, nv, szList, phi, NCELLS, tN);
+		}
+	}
 
 
 
@@ -1283,14 +2066,13 @@ double area(vector<double>& vpos, int ci, vector<double>& L, vector<int>& nv, ve
 	yi = vpos[NDIM*gi + 1];
 
 	// loop over vertices of cell ci, get area by shoe-string method
-	for (vi=0; vi<nv.at(ci); vi++){
+	for (vi=0; vi<nv[ci]; vi++){
 		// next vertex
-		vip1 = (vi + 1) % nv.at(ci);
+		vip1 = (vi + 1) % nv[ci];
 		gip1 = gindex(ci,vip1,szList);
 
 		// get positions (check minimum images)
 		dx 		= vpos[NDIM*gip1] - xi;
-		dx 		-= L[0]*round(dx/L[0]);
 		xip1 	= xi + dx;
 
 		dy 		= vpos[NDIM*gip1 + 1] - yi;
@@ -1322,14 +2104,13 @@ double perimeter(vector<double>& vpos, int ci, vector<double>& L, vector<int>& n
 	yi = vpos[NDIM*gi + 1];
 
 	// loop over vertices of cell ci, get perimeter
-	for (vi=0; vi<nv.at(ci); vi++){
+	for (vi=0; vi<nv[ci]; vi++){
 		// next vertex
-		vip1 = (vi + 1) % nv.at(ci);
+		vip1 = (vi + 1) % nv[ci];
 		gip1 = gindex(ci,vip1,szList);
 
 		// get positions (check minimum images)
 		dx 		= vpos[NDIM*gip1] - xi;
-		dx 		-= L[0]*round(dx/L[0]);
 		xip1 	= xi + dx;
 
 		dy 		= vpos[NDIM*gip1 + 1] - yi;
@@ -1362,10 +2143,10 @@ double perimeter(vector<double>& vpos, int ci, vector<double>& L, vector<int>& n
 
 
 // print cell positions
-void printPos(ofstream& posout, vector<double>& vpos, vector<double>& a0, vector<double>& l0, vector<double>& L, vector<int>& nv, vector<int>& szList, double phi, int NCELLS){
+void printPos(ofstream& posout, vector<double>& vpos, vector<double>& vvel, vector<double>& a0, vector<double>& l0, vector<double>& L, vector<int>& nv, vector<int>& szList, double phi, int NCELLS, int tN){
 	// local variables
-	int ci, cj, vi, gi, ctmp;
-	double xi, yi, dx, dy, Lx, Ly;
+	int ci, vi, gi;
+	double xi, yi, vxi, vyi, dx, dy, Lx, Ly;
 
 	// save box sizes
 	Lx = L.at(0);
@@ -1373,7 +2154,7 @@ void printPos(ofstream& posout, vector<double>& vpos, vector<double>& a0, vector
 
 	// print information starting information
 	posout << setw(w) << left << "NEWFR" << " " << endl;
-	posout << setw(w) << left << "NUMCL" << setw(w) << right << NCELLS << endl;
+	posout << setw(w) << left << "NUMCL" << setw(w) << right << NCELLS << setw(w) << right << tN << endl;
 	posout << setw(w) << left << "PACKF" << setw(wnum) << setprecision(pnum) << right << phi << endl;
 
 	// print box sizes
@@ -1397,6 +2178,10 @@ void printPos(ofstream& posout, vector<double>& vpos, vector<double>& a0, vector
 		xi = vpos.at(NDIM*gi);
 		yi = vpos.at(NDIM*gi + 1);
 
+		// get vertex velocities
+		vxi = vvel.at(NDIM*gi);
+		vyi = vvel.at(NDIM*gi + 1);
+
 		// place back in box center
 		xi = fmod(xi,Lx);
 		yi = fmod(yi,Ly);
@@ -1408,6 +2193,8 @@ void printPos(ofstream& posout, vector<double>& vpos, vector<double>& a0, vector
 		// output initial vertex information
 		posout << setw(wnum) << setprecision(pnum) << right << xi;
 		posout << setw(wnum) << setprecision(pnum) << right << yi;
+		posout << setw(wnum) << setprecision(pnum) << right << vxi;
+		posout << setw(wnum) << setprecision(pnum) << right << vyi;
 		posout << endl;
 
 		// vertex information for next vertices
@@ -1417,7 +2204,6 @@ void printPos(ofstream& posout, vector<double>& vpos, vector<double>& a0, vector
 
 			// get next vertex positions (use MIC)
 			dx = vpos.at(NDIM*gi) - xi;
-			dx -= Lx*round(dx/Lx);
 			xi += dx;
 
 			dy = vpos.at(NDIM*gi + 1) - yi;

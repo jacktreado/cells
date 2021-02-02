@@ -1286,6 +1286,9 @@ int main(int argc, char const *argv[]){
 		cout << "	* Ncc 			= " << Ncc << endl;
 		cout << endl;
 
+		cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl << endl;
+		printPos(posout, vpos, vrad, a0, calA0, L, cij, nv, szList, phi, NCELLS);
+
 		// grow or shrink particles by scale factor
 		phi = 0.0;
 		for (ci=0; ci<NCELLS; ci++){
@@ -1348,7 +1351,7 @@ int main(int argc, char const *argv[]){
 		return 1;
 	}
 
-
+	return 0;
 	// print initial dense state
 	cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl << endl;
 	printPos(posout, vpos, vrad, a0, calA0, L, cij, nv, szList, phi, NCELLS);
