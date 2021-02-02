@@ -1462,7 +1462,7 @@ int main(int argc, char const *argv[]){
 
 	// initialize vertex-vertex contact network
 	int NVVCTCS = 0.5*NVTOT*(NVTOT-1);
-	int zta;
+	double zta = 0.0;
 	vector<bool> gij(NVVCTCS,0);
 
 	// initialize directors (PI/4 spread, drift towards +x direction)
@@ -1945,7 +1945,7 @@ int main(int argc, char const *argv[]){
 			for (vi=0; vi<nv[ci]; vi++){
 				for (gj=NVtumor; gj<NVTOT; gj++){
 					if (gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2])
-						zta++;
+						zta += 1.0;
 				}
 				gi++;
 			}
