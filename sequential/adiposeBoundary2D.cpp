@@ -55,7 +55,7 @@ const int NNEGMAX     		= 1000;
 const int NDELAY      		= 50;
 const int itmax       		= 5e7;
 
-const int NACTIVESKIP 		= 2e3;
+const int NACTIVESKIP 		= 5e3;
 
 // DP force constants
 const double ka 			= 1.0;			// area spring (should be = 1)
@@ -2216,6 +2216,8 @@ void printPos(ofstream& posout, vector<double>& vpos, vector<double>& vvel, vect
 			// output vertex information
 			posout << setw(wnum) << setprecision(pnum) << right << xi;
 			posout << setw(wnum) << setprecision(pnum) << right << yi;
+			posout << setw(wnum) << setprecision(pnum) << right << vxi;
+			posout << setw(wnum) << setprecision(pnum) << right << vyi;
 			posout << endl;
 		}
 	}
