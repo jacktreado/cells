@@ -55,7 +55,7 @@ const int NNEGMAX     		= 1000;
 const int NDELAY      		= 50;
 const int itmax       		= 5e7;
 
-const int NACTIVESKIP 		= 5e3;
+const int NACTIVESKIP 		= 1e4;
 
 // DP force constants
 const double ka 			= 1.0;			// area spring (should be = 1)
