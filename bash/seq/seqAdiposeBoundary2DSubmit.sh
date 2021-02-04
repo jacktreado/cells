@@ -41,9 +41,9 @@ startSeed="${10}"
 
 # other variables
 areaRatio=15
-NV=16
+NV=32
 NT=1e6
-NASKIP=2e3
+NASKIP=5e3
 numSeedsPerRun=1
 
 let numSeeds=$numSeedsPerRun*$numRuns
