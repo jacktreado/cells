@@ -58,14 +58,15 @@ const int itmax       		= 5e7;
 // DP force constants
 const double ka 			= 1.0;			// area spring (should be = 1)
 const double kl 			= 0.5;			// contractility
+const double kb 			= 1e-3;			// bending modulus
 const double eint 			= 0.5;			// interaction energy scale
 const double del 			= 1.0;			// radius of vertices in units of l0
 const double aCalA0 		= 1.001;		// adipocyte deformability
 
 // tumor invasion variables
 const double Ds 			= 0.05;			// spread of velocity coupling along tumor cell boundary
-const double pinbreak 		= 0.5; 			// fraction of rho0 that breaks a WAT pin spring
-const double kpin 			= 0;			// pinning spring stiffness
+const double pinbreak 		= 2.0; 			// fraction of rho0 that breaks a WAT pin spring
+const double kpin 			= 1.0;			// pinning spring stiffness
 
 // FUNCTION PROTOTYPES
 int gindex(int ci, int vi, vector<int>& szList);
@@ -693,10 +694,10 @@ int main(int argc, char const *argv[]){
 	int boxid, bi, bj, pi, pj, sbtmp;
 
 	// shape force variables
-	double rho0, fa, fl, l0tmp, atmp, ri, li, lim1, cx, cy;
+	double rho0, fa, fl, fb, l0tmp, atmp, ri, li, lim1, cx, cy;
 	double da, dli, dlim1;
-	double lim1x, lim1y, lix, liy;
-	double rim1x, rim1y, rix, riy, rip1x, rip1y;
+	double lim2x, lim2y, lim1x, lim1y, lix, liy, lip1x, lip1y;
+	double rim2x, rim2y, rim1x, rim1y, rix, riy, rip1x, rip1y, rip2x, rip2y;
 
 	// packing fractions for different cell types
 	double tumorPhi, adiposePhi, phiMin;
@@ -946,7 +947,7 @@ int main(int argc, char const *argv[]){
 						// shape force parameters (kl and kl are unitless energy ratios)
 						fa = ka*da*(rho0/a0tmp);
 						fl = kl*(rho0/l0tmp);
-
+						fb = kb*(rho0/(l0tmp*l0tmp));
 
 						// compute cell center of mass
 						xi = vpos[NDIM*gi];
@@ -977,6 +978,11 @@ int main(int argc, char const *argv[]){
 
 						rim1y = vpos[NDIM*im1[gi] + 1] - cy;
 						rim1y -= L[1]*round(rim1y/L[1]);
+
+						rim2x = vpos[NDIM*im1[im1[gi]]] - cx;
+
+						rim2y = vpos[NDIM*im1[im1[gi]] + 1] - cy;
+						rim2y -= L[1]*round(rim2y/L[1]);
 
 						// boundary forces
 						for (vi=0; vi<nvtmp; vi++){
@@ -1042,10 +1048,31 @@ int main(int argc, char const *argv[]){
 				vF[NDIM*gi] 		+= fl*(dli*(lix/li) - dlim1*(lim1x/lim1));
 				vF[NDIM*gi + 1] 	+= fl*(dli*(liy/li) - dlim1*(lim1y/lim1));
 
+				// -- Bending force
+				if ((ci-1) >= tN){
+					// segment vectors for ip2
+					rip2x = vpos[NDIM*ip1[ip1[gi]]] - cx;
+
+					rip2y = vpos[NDIM*ip1[ip1[gi]] + 1] - cy;
+					rip2y -= L[1]*round(rip2y/L[1]);
+
+					lip1x = rip2x - rip1x;
+					lip1y = rip2y - rip1y;
+
+					lim2x = rim1x - rim2x;
+					lim2y = rim1y - rim2y;
+
+					// add to force
+					vF[NDIM*gi] 		+= fb*(3.0*(lix - lim1x) + lim2x - lip1x);
+					vF[NDIM*gi + 1] 	+= fb*(3.0*(liy - lim1y) + lim2y - lip1y);
+				}
+
 				// update old coordinates
+				rim2x = rim1x;
 				rim1x = rix;
 				rix = rip1x;
 
+				rim2y = rim1y;
 				rim1y = riy;
 				riy = rip1y;
 			}
@@ -1775,6 +1802,7 @@ int main(int argc, char const *argv[]){
 					// shape force parameters (kl and kl are unitless energy ratios)
 					fa = ka*da*(rho0/a0tmp);
 					fl = kl*(rho0/l0tmp);
+					fb = kb*(rho0/(l0tmp*l0tmp));
 
 					// compute cell center of mass
 					xi = vpos[NDIM*gi];
@@ -1805,6 +1833,11 @@ int main(int argc, char const *argv[]){
 
 					rim1y = vpos[NDIM*im1[gi] + 1] - cy;
 					rim1y -= L[1]*round(rim1y/L[1]);
+
+					rim2x = vpos[NDIM*im1[im1[gi]]] - cx;
+
+					rim2y = vpos[NDIM*im1[im1[gi]] + 1] - cy;
+					rim2y -= L[1]*round(rim2y/L[1]);
 
 					// if adipocyte, get distance to pin
 					if (ci >= tN){
@@ -1873,6 +1906,7 @@ int main(int argc, char const *argv[]){
 			rip1y -= L[1]*round(rip1y/L[1]);
 
 
+
 			// -- Area force
 			vF[NDIM*gi] 		+= 0.5*fa*(rim1y - rip1y);
 			vF[NDIM*gi + 1] 	+= 0.5*fa*(rip1x - rim1x);
@@ -1899,8 +1933,26 @@ int main(int argc, char const *argv[]){
 			vF[NDIM*gi] 		+= fl*(dli*(lix/li) - dlim1*(lim1x/lim1));
 			vF[NDIM*gi + 1] 	+= fl*(dli*(liy/li) - dlim1*(lim1y/lim1));
 
+			// bending force for adipocytes
+			if (gi >= NVtumor){
+				// segment vectors for ip2
+				rip2x = vpos[NDIM*ip1[ip1[gi]]] - cx;
+
+				rip2y = vpos[NDIM*ip1[ip1[gi]] + 1] - cy;
+				rip2y -= L[1]*round(rip2y/L[1]);
+
+				lip1x = rip2x - rip1x;
+				lip1y = rip2y - rip1y;
+
+				lim2x = rim1x - rim2x;
+				lim2y = rim1y - rim2y;
+
+				// add to force
+				vF[NDIM*gi] 		+= fb*(3.0*(lix - lim1x) + lim2x - lip1x);
+				vF[NDIM*gi + 1] 	+= fb*(3.0*(liy - lim1y) + lim2y - lip1y);
+			}
 			// active force (only if tumor cell vertices)
-			if (gi < NVtumor){
+			else {
 				// get angular distance from psi
 				psitmp = atan2(riy,rix);
 				dpsi = psitmp - psi[ci-1];
@@ -1920,9 +1972,11 @@ int main(int argc, char const *argv[]){
 			}
 
 			// update old coordinates
+			rim2x = rim1x;
 			rim1x = rix;
 			rix = rip1x;
 
+			rim2y = rim1y;
 			rim1y = riy;
 			riy = rip1y;
 		}
@@ -1956,9 +2010,6 @@ int main(int argc, char const *argv[]){
 				DrList[ci] = Drtmp;
 			else
 				DrList[ci] = 0.0;
-
-			// relax psi back to 0 
-			psi[ci] -= dt*Dr*(zta/nv[ci])*psi[ci];
 		}
 
 		// print message console, print position to file

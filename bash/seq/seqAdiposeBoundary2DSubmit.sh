@@ -173,13 +173,8 @@ sbatch -t $time $slurmf
 # 6.    dDr
 # 7.    partition
 # 8.    time
-# 9.   number of runs (number of array entries, i.e. arraynum)
+# 9.    number of runs (number of array entries, i.e. arraynum)
 # 10.   start seed (end seed determined by number of runs)
-
-
-
-
-
 
 
 
