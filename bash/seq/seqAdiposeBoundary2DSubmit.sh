@@ -41,8 +41,9 @@ startSeed="${10}"
 
 # other variables
 areaRatio=15
-NV=32
-NT=5e6
+NV=16
+NT=1e6
+NASKIP=2e3
 numSeedsPerRun=1
 
 let numSeeds=$numSeedsPerRun*$numRuns
@@ -59,7 +60,15 @@ mkdir -p $simdatadir
 # compile into binary using packing.h
 binf=bin/"$runstr".o
 mainf=$maindir/adiposeBoundary2D.cpp
-echo Running $numSeeds adipose boundary invasion sims of $aN adipocytes at area ratio $areaRatio, tumor cells with shape param = $tcalA0, v0 = $v0, Dr = $Dr, runs for $NT time steps
+echo Running $numSeeds adipose boundary invasion sims of $aN adipocytes 
+echo - - - Area ratio                   $areaRatio
+echo - - - tumor cells shape param      $tcalA0
+echo - - - ascale                       $ascale
+echo - - - v0                           $v0
+echo - - - Dr                           $Dr, runs for $NT time steps
+echo - - - dDr                          $dDr
+echo - - - NT                           $NT
+echo - - - NASKIP                       $NASKIP
 
 # run compiler
 rm -f $binf
@@ -105,7 +114,7 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         posf=$simdatadir/$filestr.pos
 
         # append to runString
-        runString="$runString ; ./$binf $aN $areaRatio $NV $tcalA0 $ascale $v0 $Dr $dDr $NT $seed $posf"
+        runString="$runString ; ./$binf $aN $areaRatio $NV $tcalA0 $ascale $v0 $Dr $dDr $NT $NASKIP $seed $posf"
     done
 
     # finish off run string
@@ -164,8 +173,8 @@ sbatch -t $time $slurmf
 # 6.    dDr
 # 7.    partition
 # 8.    time
-# 10.   number of runs (number of array entries, i.e. arraynum)
-# 11.   start seed (end seed determined by number of runs)
+# 9.   number of runs (number of array entries, i.e. arraynum)
+# 10.   start seed (end seed determined by number of runs)
 
 
 

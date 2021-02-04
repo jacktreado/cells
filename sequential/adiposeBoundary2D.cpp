@@ -55,8 +55,6 @@ const int NNEGMAX     		= 1000;
 const int NDELAY      		= 50;
 const int itmax       		= 5e7;
 
-const int NACTIVESKIP 		= 1e4;
-
 // DP force constants
 const double ka 			= 1.0;			// area spring (should be = 1)
 const double kl 			= 0.5;			// contractility
@@ -67,7 +65,7 @@ const double aCalA0 		= 1.001;		// adipocyte deformability
 // tumor invasion variables
 const double Ds 			= 0.05;			// spread of velocity coupling along tumor cell boundary
 const double pinbreak 		= 0.5; 			// fraction of rho0 that breaks a WAT pin spring
-const double kpin 			= 0.1;			// pinning spring stiffness
+const double kpin 			= 0;			// pinning spring stiffness
 
 // FUNCTION PROTOTYPES
 int gindex(int ci, int vi, vector<int>& szList);
@@ -86,11 +84,11 @@ int main(int argc, char const *argv[]){
 	int i, ci, cj, vi, gi, gj, d;
 
 	// parameters to be read in 
-	int aN, tN, NCELLS, NT, NV, NVTOT, cellDOF, vertDOF, seed;
-	double NT_dbl, areaRatio, tCalA0, ascale, v0, vmin, Dr, dDr, phi;
+	int aN, tN, NCELLS, NT, NACTIVESKIP, NV, NVTOT, cellDOF, vertDOF, seed;
+	double NT_dbl, NACTIVESKIP_dbl, areaRatio, tCalA0, ascale, v0, vmin, Dr, dDr, phi;
 
 	// read in parameters from command line input
-	// test: ./tumor.o 16 4 24 1.1 0.01 0.1 1.0 1e3 1 pos.test
+	// test: ./tumor.o 8 2 24 1.2 0.01 0.05 0.05 0.5 1e5 5e2 1 pos.test
 	string aN_str 				= argv[1];
 	string areaRatio_str 		= argv[2];
 	string NV_str 				= argv[3];
@@ -100,8 +98,9 @@ int main(int argc, char const *argv[]){
 	string Dr_str 				= argv[7];
 	string dDr_str 				= argv[8];
 	string NT_str 				= argv[9];
-	string seed_str 			= argv[10];
-	string positionFile 		= argv[11];
+	string NACTIVESKIP_str 		= argv[10];
+	string seed_str 			= argv[11];
+	string positionFile 		= argv[12];
 
 	stringstream aNss(aN_str);
 	stringstream areaRatioss(areaRatio_str);
@@ -112,6 +111,7 @@ int main(int argc, char const *argv[]){
 	stringstream Drss(Dr_str);
 	stringstream dDrss(dDr_str);
 	stringstream NTss(NT_str);
+	stringstream NAss(NACTIVESKIP_str);
 	stringstream seedss(seed_str);
 
 	aNss >> aN;
@@ -123,6 +123,7 @@ int main(int argc, char const *argv[]){
 	Drss >> Dr;
 	dDrss >> dDr;
 	NTss >> NT_dbl;
+	NAss >> NACTIVESKIP_dbl;
 	seedss >> seed;
 
 
@@ -130,8 +131,9 @@ int main(int argc, char const *argv[]){
 	// seed random number generator
 	srand48(seed);
 
-	// cast input NT_dbl to integer
-	NT = (int)NT_dbl;
+	// cast input time scales to integer
+	NT 				= (int)NT_dbl;
+	NACTIVESKIP 	= (int)NACTIVESKIP_dbl;
 
 	// minimum velocity
 	vmin = 1e-2*v0;
@@ -1954,6 +1956,9 @@ int main(int argc, char const *argv[]){
 				DrList[ci] = Drtmp;
 			else
 				DrList[ci] = 0.0;
+
+			// relax psi back to 0 
+			psi[ci] -= dt*Dr*(zta/nv[ci])*psi[ci];
 		}
 
 		// print message console, print position to file
