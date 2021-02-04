@@ -44,6 +44,7 @@ int main(int argc, char const *argv[])
 	double r1, r2, grv, Lmin;
 
 	// inputs from command line
+	// ./hopper.o 200 1e5 0.2 0.01 20.0 2.0 1 pos.test
 	string NCELLS_str 			= argv[1];
 	string NT_str 				= argv[2];
 	string sizeDisp_str 		= argv[3];
@@ -79,7 +80,7 @@ int main(int argc, char const *argv[])
 	NT = (int)round(NT_dbl);
 
 	// seed random number generator
-	srand48(341234018*seed);
+	srand48(seed);
 
 	// determine L from hopper geometry parameters
 	L = 0.5*(w0 - w)/tan(th);
@@ -95,7 +96,13 @@ int main(int argc, char const *argv[])
 		grv = sqrt(-2.0*log(r1))*cos(2*PI*r2);
 
 		// get radius
-		radii.at(ci) = grv*sizeDispersion + meanRadius;
+		if (ci < round(0.5*NCELLS))
+			radii.at(ci) = 0.5;
+		else
+			radii.at(ci) = 0.5*sizeDispersion;
+
+		// print
+		cout << "ci = " << ci << ";  grv = " << grv << ";  r = " << radii.at(ci) << endl;
 	}
 
 	// determine scale of reservoir size to make sure that phi \approx 2 given width
