@@ -47,7 +47,7 @@ const double alpha0      	= 0.2;
 const double finc        	= 1.1;
 const double fdec        	= 0.5;
 const double falpha      	= 0.99;
-const double Ftol 			= 1e-6;
+const double Ftol 			= 1e-8;
 
 const int NSKIP 			= 1e3;
 const int NMIN        		= 10;
