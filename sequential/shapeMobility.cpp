@@ -1,42 +1,17 @@
-/* 
+/*
 
-	MAIN FILE FOR 2D MESOPHYLL TISSUE
+	shapeMobility.cpp 
 
-	NCELLS polydisperse disperse DPb particles
-
-	Features:
-		-- contact dependent adhesion
-		-- crosslinking with binding kinetics
-		-- perimeter aging
-		-- quasistatic decompression
-
-	ADDED 
-
-	01/13/21
-		-- RIGIDIFICATION: cells all have preferred curvature that lags
-			behind instantaneous curvature, will rigidify shape
-			as decompression progresses
-
-	01/14/21
-		-- LOCALIZED CONTRACTILITY: each perimeter spring will have an l0
-			localized to it, rather than an l0 for each cell
-		-- CONTACT-DEPENDENT AGING: The perimeter will age twice as fast
-			on contacts that are engaged vs void contacts
-		-- SHAPE LIMIT: There is an upper limit to cell preferred shape
+	Code to analyze shape distribution 
+	as a function of deformability
+	and driving
 
 
-
-	NOTE 01/24/21
-		-- Look into effect of contactScale and voidScale, deformation vs void size scaling??
-		-- Should these be variable inputs?
-
-	Jack Treado
-	11/03/2020, in the time of covid
-
-
-	Note: get back onto cluster, take out early printing during compression
+	NOTE: DEbug excessive overlaps 
+	between cells, activity? Or vertex energy?
 
 */
+
 
 // preprocessor directives
 #include <cstdlib>
@@ -63,17 +38,15 @@ const int pnum 				= 14;
 // simulation constants
 const int nvmin 			= 12;
 const double timeStepMag 	= 0.01;
-const double phiInit 		= 0.2;
+const double phiInit 		= 0.5;
 const double dphiGrow 		= 0.01;
-const double dphiShrink 	= 0.001;
-const double dphiPrint 		= 0.01;
 
 // FIRE constants for initial minimizations (SP + DP)
 const double alpha0      	= 0.2;
 const double finc        	= 1.1;
 const double fdec        	= 0.5;
 const double falpha      	= 0.99;
-const double Ftol 			= 1e-12;
+const double Ftol 			= 1e-8;
 
 const int NSKIP 			= 1e4;
 const int NMIN        		= 10;
@@ -85,14 +58,8 @@ const int itmax       		= 1e7;
 const double ka 			= 1.0;			// area spring (should be = 1)
 const double eint 			= 1.0;			// baseline interaction energy 
 const double del 			= 1.0;			// radius of vertices in units of l0
-
-// displacement magnitude for MC bonds
-const double bondDisp 		= 1.0;
-
-// shape aging constants
-const double contactScale 	= 2.0;			// rate of growth rel. to lambdal of contact vertices
-const double voidScale 		= 1.0;			// rate of growth rel. to lambdal of void-facing vertices
-const double calA0Thresh 	= 2.0;			// max preferred shape parameter allowable
+const double calA0Input 	= 1.1;			// shape parameter
+const double Ds 			= 0.2;			// spread of velocity coupling along tumor cell boundary
 
 // FUNCTION PROTOTYPES
 
@@ -104,22 +71,6 @@ void cindices(int& ci, int& vi, int gi, int NCELLS, vector<int>& szList);
 double area(vector<double>& dpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList);
 double perimeter(vector<double>& dpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList);
 
-// system potential energy without spring network (for Metropolis choice)
-double potentialEnergyNoNetwork(vector<double>& vpos, 
-	vector<double>& vrad, 
-	vector<double>& a0, 
-	vector<double>& l0, 
-	vector<double>& delta0,
-	vector<double>& s0,
-	vector<double>& L, 
-	vector<int>& nv, 
-	vector<int>& szList, 
-	vector<int> im1, 
-	vector<int> ip1, 
-	double kl, 
-	double kb, 
-	int NCELLS);
-
 // remove rattlers from contact network, return rattler number
 int removeRattlers(vector<int>& cij);
 
@@ -130,63 +81,70 @@ void printPos(ofstream& posout, vector<double>& vpos, vector<double>& vrad, vect
 
 // MAIN
 int main(int argc, char const *argv[]){
+
 	// variables for indexing loops
 	int i, ci, cj, vi, vj, gi, gj, d;
 
 	// parameters to be read in 
-	int NCELLS, NV, NVTOT, cellDOF, vertDOF, seed;
-	double polyd, calA0Input, phi, phiMax, phiMin, kl, kb, espring, lambdaL, lambdaB, betaEff;
-
-	// set spring energy
-	espring = eint;
+	int NT, NPOSPRINT, NSHAPEPRINT, NCELLS, NV, NVTOT, cellDOF, vertDOF, seed;
+	double vmin, polyd, phi, phiMax, kl, kb, v0, Dr, NT_dbl, NPOSPRINT_dbl, NSHAPEPRINT_dbl;
 
 	// read in parameters from command line input
-	// test: g++ -O3 sequential/mesoRigidify2D.cpp -o meso.cpp
-	// test: ./meso.o 16 32 1.01 0.1 1.05 0.4 1.0 0.01 0.01 0.01 1.0 1 pos.test
+	// test: g++ -O3 sequential/shapeMobility.cpp -o shape.o
+	// test: ./shape.o 16 16 0.1 0.9 1.0 1e-3 0.05 0.1 1e3 10 100 1 pos.test shape.test
 	string NCELLS_str 			= argv[1];
 	string NV_str 				= argv[2];
-	string calA0_str 			= argv[3];
-	string polyd_str 			= argv[4];
-	string phiMax_str  			= argv[5];
-	string phiMin_str 			= argv[6];
-	string kl_str 				= argv[7];
-	string kb_str 				= argv[8];
-	string lambdaL_str 			= argv[9];
-	string lambdaB_str			= argv[10];
-	string betaEff_str 			= argv[11];
+	string polyd_str 			= argv[3];
+	string phiMax_str  			= argv[4];
+	string kl_str 				= argv[5];
+	string kb_str 				= argv[6];
+	string v0_str 				= argv[7];
+	string Dr_str 				= argv[8];
+	string NT_str 				= argv[9];
+	string NPOSPRINT_str 		= argv[10];
+	string NSHAPEPRINT_str 		= argv[11];
 	string seed_str 			= argv[12];
 	string positionFile 		= argv[13];
+	string shapeFile 			= argv[14];
 
 	stringstream NCELLSss(NCELLS_str);
 	stringstream NVss(NV_str);
-	stringstream calA0ss(calA0_str);
 	stringstream polydss(polyd_str);
 	stringstream phiMaxss(phiMax_str);
-	stringstream phiMinss(phiMin_str);
 	stringstream klss(kl_str);
 	stringstream kbss(kb_str);
-	stringstream lambdaLss(lambdaL_str);
-	stringstream lambdaBss(lambdaB_str);
-	stringstream betaEffss(betaEff_str);
+	stringstream v0ss(v0_str);
+	stringstream Drss(Dr_str);
+	stringstream NTss(NT_str);
+	stringstream NPOSPRINTss(NPOSPRINT_str);
+	stringstream NSHAPEPRINTss(NSHAPEPRINT_str);
 	stringstream seedss(seed_str);
 
 	NCELLSss >> NCELLS;
 	NVss >> NV;
-	calA0ss >> calA0Input;
 	polydss >> polyd;
 	phiMaxss >> phiMax;
-	phiMinss >> phiMin;
 	klss >> kl;
 	kbss >> kb;
-	lambdaLss >> lambdaL;
-	lambdaBss >> lambdaB;
-	betaEffss >> betaEff;
+	v0ss >> v0;
+	Drss >> Dr;
+	NTss >> NT_dbl;
+	NPOSPRINTss >> NPOSPRINT_dbl;
+	NSHAPEPRINTss >> NSHAPEPRINT_dbl;
 	seedss >> seed;
 
 	// seed random number generator
 	srand48(seed);
 
-	// open xyz file
+	// number of steps
+	NT = (int)NT_dbl;
+	NPOSPRINT = NPOSPRINT_dbl;
+	NSHAPEPRINT = NSHAPEPRINT_dbl;
+
+	// min v
+	vmin = 1e-2*v0;
+
+	// open files
 	ofstream posout;
 	posout.open(positionFile.c_str());
 	if (!posout.is_open()){
@@ -194,9 +152,17 @@ int main(int argc, char const *argv[]){
 		return 1;
 	}
 
+	ofstream shapeout;
+	shapeout.open(shapeFile.c_str());
+	if (!shapeout.is_open()){
+		cout << "	** ERROR: shape file " << shapeFile << " could not be opened, ending." << endl;
+		return 1;
+	}
+
+
+
 	// total number of vertices
 	
-
 	// szList and nv (keep track of global vertex indices)
 	int nvtmp;
 	double r1, r2, grv;
@@ -282,12 +248,11 @@ int main(int argc, char const *argv[]){
 
 	cout << "		phiInit 	= " << phiInit << " 				" << endl;
 	cout << "		phiMax 		= " << phiMax << " 					" << endl;
-	cout << "		phiMin 		= " << phiMin << "					" << endl;
 	cout << "		kl 			= " << kl << "						" << endl;
 	cout << "		kb 			= " << kb << "						" << endl;
-	cout << "		lambdaL 	= " << lambdaL << " 				" << endl;
-	cout << "		lambdaB 	= " << lambdaB << " 				" << endl;
-	cout << "		betaEff 	= " << betaEff << " 				" << endl;
+	cout << "		v0 			= " << v0 << " 						" << endl;
+	cout << "		Dr 			= " << Dr << " 						" << endl;
+	cout << "		NT 			= " << NT << " 						" << endl;
 	cout << "		seed 		= " << seed << "					" << endl << endl;
 
 	cout << "		pos file 	= " << positionFile << "			" << endl << endl;;
@@ -295,7 +260,11 @@ int main(int argc, char const *argv[]){
 	cout << "=======================================================" << endl << endl;
 
 
-
+	// print out output info to shape files
+	shapeout << NCELLS << endl;
+	shapeout << NT << endl;
+	shapeout << NSHAPEPRINT << endl;
+	shapeout << dt << endl;
 
 
 
@@ -374,15 +343,9 @@ int main(int argc, char const *argv[]){
 		dpos.at(NDIM*ci + 1) = L[1]*drand48();
 	}
 
-
 	// initialize cc contact network
 	int NCTCS = 0.5*NCELLS*(NCELLS-1);
 	vector<int> cij(NCTCS,0);
-
-
-	// initialize vertex-vertex spring network
-	int NVVCTCS = 0.5*NVTOT*(NVTOT-1);
-	vector<bool> gij(NVVCTCS,0);
 
 
 	/* * * * * * * * * * * * * * * * * * 
@@ -708,9 +671,6 @@ int main(int argc, char const *argv[]){
 	vector<double> vF(vertDOF,0.0);
 	vector<double> vFold(vertDOF,0.0);
 
-	// RIGIDIFY SIM: initialize preferred curvatures (unit of length)
-	vector<double> s0(NVTOT,0.0);
-
 	// jamming check variables
 	int k, kmax, xind, yind;
 	double pcheck;
@@ -828,7 +788,6 @@ int main(int argc, char const *argv[]){
 
 			// reset contact networks
 			fill(cij.begin(), cij.end(), 0);
-			fill(gij.begin(), gij.end(), false);
 
 			// FORCE UPDATE
 
@@ -897,11 +856,6 @@ int main(int argc, char const *argv[]){
 											cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
 										else
 											cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++;
-										
-										if (gi > gj)
-											gij.at(NVTOT*gj + gi - (gj+1)*(gj+2)/2) = 1;
-										else
-											gij.at(NVTOT*gi + gj - (gi+1)*(gi+2)/2) = 1; 
 									}
 
 								}
@@ -967,11 +921,6 @@ int main(int argc, char const *argv[]){
 												cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
 											else
 												cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++;
-
-											if (gi > gj)
-												gij.at(NVTOT*gj + gi - (gj+1)*(gj+2)/2) = 1;
-											else
-												gij.at(NVTOT*gi + gj - (gi+1)*(gi+2)/2) = 1; 
 										}
 									}
 								}
@@ -1289,9 +1238,6 @@ int main(int argc, char const *argv[]){
 		cout << "	* Ncc 			= " << Ncc << endl;
 		cout << endl;
 
-		cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl << endl;
-		printPos(posout, vpos, vrad, a0, calA0, L, cij, nv, szList, phi, NCELLS);
-
 		// grow or shrink particles by scale factor
 		phi = 0.0;
 		for (ci=0; ci<NCELLS; ci++){
@@ -1354,9 +1300,15 @@ int main(int argc, char const *argv[]){
 		return 1;
 	}
 
-	// print initial dense state
-	cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl << endl;
-	printPos(posout, vpos, vrad, a0, calA0, L, cij, nv, szList, phi, NCELLS);
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1369,165 +1321,263 @@ int main(int argc, char const *argv[]){
 
 	/* * * * * * * * * * * * * * * * * * 
 
-			DECOMPRESS TO
+			RESET AND RESIZE
 
-				FORM CELL GEL
+				BOX-LINKED-LIST
 
 	 * * * * * * * * * * * * * * * * * */
 
-	// aging parameters
-	double sip1, sip1x, sip1y, si, six, siy, sim1, sim1x, sim1y;
-	double s0tmp, d0tmp, p0tmp, meanSegLength, meanPrefCurv;
-	int Nb, NbRmv;
 
-	// vector of perimeter segment length
-	vector<double> linst(NVTOT,0.0);
-	vector<int> contactVert(NVTOT,0);
-	vector<double> delta0(NVTOT,1.0);
-
-	// vector of instantaneous curvatures
-	vector<double> sinst(NVTOT,0.0);
-
-	// new scale factor
-	scaleFactor = sqrt((phi - dphiShrink)/phi);
-
-	// set Ftoltmp to Ftol
-	Ftoltmp = Ftol;
-
-	// # of interparticle contacts for each cell
-	int ctmp;
-	bool gtmp;
-	double zij;
-	vector<int> z(NCELLS,0);
-	for (ci=0; ci<NCELLS; ci++){
-		for (cj=0; cj<NCELLS; cj++){
-			if (ci != cj){
-				if (ci > cj)
-					ctmp = cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2];
-				else
-					ctmp = cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2];
-			}
-			else
-				ctmp = 0;
-
-			// add to vector of per-cell vv contacts
-			z.at(ci) += ctmp;
-		}
+	// re-determine l0max
+	double l0max = 0.0;
+	for (gi=0; gi<NVTOT; gi++){
+		if (vrad[gi] > l0max)
+			l0max = 2.0*vrad[gi];
 	}
 
-	// MC variables
-	double rdraw, dU, dUtot, poff;
-	vector<double> altpos(vertDOF,0.0);
+	// recount cell box dimensions, total number of cells needed
+	NBX = 1;
+	for (d=0; d<NDIM; d++){
+		// determine number of cells along given dimension by rmax
+		sb[d] = round(L[d]/(2.0*l0max));
 
-	// loop until phi is below phiMin
-	double lastPrintPhi = phi;
-	k = 0;
-	while (phi > phiMin && k < kmax){
-		// update iterator
-		k++;
+		// just in case, if < 3, change to 3 so box neighbor checking will work
+		if (sb[d] < 3)
+			sb[d] = 3;
 
-		// RESET FIRE VARIABLES
-		P  			= 0;	
-		fnorm 		= 0;
-		vnorm 		= 0;
-		alpha   	= alpha0;
+		// determine box length by number of cells
+		lb[d] = L[d]/sb[d];
 
-		dtmax   	= 10*dt0;
-		dtmin   	= 2e-2*dt0;
-		dt 			= dt0;
+		// recount total number of cells
+		NBX *= sb[d];
+	}
 
-		npPos      	= 0;
-		npNeg      	= 0;
-		npPMin      = 0;
+	// neighboring boxes for each box (4 neighbors / box)
+	scx = sb[0];
+	nn.clear();
+	nn.resize(NBX);
 
-		fireit    	= 0;
-		fcheck  	= 10*Ftoltmp;
+	// loop over cells, save forward neighbors for each box
+	for (i=0; i<NBX; i++){
+		// reshape entry
+		nn.at(i).resize(NNN);
+		
+		// neighbors
+		nn[i][0] 			= (i + 1) % NBX; 			// right neighbor (i+1)
+		nn[i][1] 			= (i + scx) % NBX;			// top neighbor (j+1)
+		nntmp 				= (i + NBX - scx) % NBX;	// bottom neighbor (j-1)
+		nn[i][2] 			= (nn[i][1] + 1) % NBX;		// top-right neighbor (i+1, j+1)
+		nn[i][3] 			= nntmp + 1;				// bottom-right neighbor (i+1, j-1)
 
-		// reset forces
-		fill(vF.begin(), vF.end(), 0.0);
-		fill(vFold.begin(), vFold.end(), 0.0);
-		fill(vvel.begin(), vvel.end(), 0.0);
+		// right-hand bc (periodic)
+		if ((i+1) % scx == 0){
+			nn[i][0] = i - scx + 1;
+			nn[i][2] = nn[i][1]  - scx + 1;
+			nn[i][3] = nntmp - scx + 1;
+		}
+	} 
 
-		// set length constant (variable due to particle growth)
-		rho0 = sqrt(a0.at(0));
+	// resize linked-list variables
+	head.resize(NBX);
+	last.resize(NBX);
 
-		// RELAX FORCES USING FIRE
-		while ((fcheck > Ftoltmp || npPMin < NMIN) && fireit < itmax){
-			// VV POSITION UPDATE
-			for (i=0; i<vertDOF; i++){
-				// update position
-				vpos[i] += dt*vvel[i] + 0.5*dt*dt*vF[i];
 
-				// recenter in box
-				if (vpos[i] > L[i % NDIM])
-					vpos[i] -= L[i % NDIM];
-				else if (vpos[i] < 0)
-					vpos[i] += L[i % NDIM];
 
-				// reset forces
-				vF[i] = 0;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	/* * * * * * * * * * * * * * * * * * 
+
+		OVERDAMPED DYNAMICS
+
+			WITH ACTIVE TUMOR CELL
+
+	 * * * * * * * * * * * * * * * * * */
+
+	// DYNAMICS VARIABLES
+	int tt, tcells; 
+	double ux, uy, rnorm, psitmp, dpsi, v0tmp, psiMean, psiStd, calAtmp;
+
+	// skip variables
+	int NPOSSKIP, NSHAPESKIP;
+	NPOSSKIP = NT/NPOSPRINT;
+	NSHAPESKIP = NT/NSHAPEPRINT;
+
+	// initialize directors to the right
+	vector<double> psi(NCELLS,0.0);
+	for (ci=0; ci<NCELLS; ci++)
+		psi.at(ci) = 2.0*PI*drand48();
+
+	// reset for active dynamocs
+	dt = dt0;
+
+	// loop over time
+	cout << endl;
+	cout << "--  BEGINNING ACTIVE CELL DYNAMICS" << endl;
+	cout << "--  Looping over time for NT = " << NT << " time steps with dt = " << dt << endl;
+	for(tt=0; tt<NT; tt++){
+
+		// pbcs and reset forces
+		for (i=0; i<vertDOF; i++){
+			// recenter in box
+			if (vpos[i] > L[i % NDIM])
+				vpos[i] -= L[i % NDIM];
+			else if (vpos[i] < 0)
+				vpos[i] += L[i % NDIM];
+
+			// reset forces
+			vF[i] = 0;
+		}
+
+		// reset linked list variables
+		fill(list.begin(), list.end(), 0);
+		fill(head.begin(), head.end(), 0);
+		fill(last.begin(), last.end(), 0);
+
+		// sort vertices into linked list
+		for (gi=0; gi<NVTOT; gi++){
+			// 1. get cell id of current particle position
+			boxid = 0;
+			sbtmp = 1;
+			for (d=0; d<NDIM; d++){
+				// add d index to 1d list
+				boxid += floor(vpos[NDIM*gi + d]/lb[d])*sbtmp;
+
+				// increment dimensional factor
+				sbtmp *= sb[d];
 			}
 
-			// reset linked list variables
-			fill(list.begin(), list.end(), 0);
-			fill(head.begin(), head.end(), 0);
-			fill(last.begin(), last.end(), 0);
-
-			// sort vertices into linked list
-			for (gi=0; gi<NVTOT; gi++){
-				// 1. get cell id of current particle position
-				boxid = 0;
-				sbtmp = 1;
-				for (d=0; d<NDIM; d++){
-					// add d index to 1d list
-					boxid += floor(vpos[NDIM*gi + d]/lb[d])*sbtmp;
-
-					// increment dimensional factor
-					sbtmp *= sb[d];
-				}
-
-				// 2. add to head list or link within list
-				// NOTE: particle ids are labelled starting from 1, setting to 0 means end of linked list
-				if (head[boxid] == 0){
-					head[boxid] = gi + 1;
-					last[boxid] = gi + 1;
-				}
-				else{
-					list[last[boxid]] = gi + 1;
-					last[boxid] = gi + 1;
-				}
+			// 2. add to head list or link within list
+			// NOTE: particle ids are labelled starting from 1, setting to 0 means end of linked list
+			if (head[boxid] == 0){
+				head[boxid] = gi + 1;
+				last[boxid] = gi + 1;
 			}
+			else{
+				list[last[boxid]] = gi + 1;
+				last[boxid] = gi + 1;
+			}
+		}
 
+		// FORCE UPDATE
 
+		// reset contact network
+		fill(cij.begin(), cij.end(), 0);
 
+		// interaction forces (USE BOX LINKED LIST)
+		pcheck = 0.0;
+		for (bi=0; bi<NBX; bi++){
 
-			// FORCE UPDATE
+			// get start of list of particles
+			pi = head[bi];
 
-			// reset contact network
-			fill(cij.begin(), cij.end(), 0);
+			// loop over linked list
+			while (pi > 0){
+				// real particle index
+				gi = pi - 1;
 
-			// REPULSIVE interaction forces (USE BOX LINKED LIST)
-			U = 0.0;
-			pcheck = 0.0;
-			for (bi=0; bi<NBX; bi++){
+				// cell index of i
+				cindices(ci, vi, gi, NCELLS, szList);
 
-				// get start of list of particles
-				pi = head[bi];
+				// next particle in list
+				pj = list[pi];
 
-				// loop over linked list
-				while (pi > 0){
-					// real particle index
-					gi = pi - 1;
+				// loop down neighbors of pi in same cell
+				while (pj > 0){
+					// real index of pj
+					gj = pj - 1;
 
-					// next particle in list
-					pj = list[pi];
+					// cell index of j
+					cindices(cj, vj, gj, NCELLS, szList);
+
+					if (ci == cj){
+						pj = list[pj];
+						continue;
+					}
+
+					// contact distance
+					sij = vrad[gi] + vrad[gj];
+
+					// particle distance
+					dx = vpos[NDIM*gj] - vpos[NDIM*gi];
+					dx -= L[0]*round(dx/L[0]);
+					if (dx < sij){
+						dy = vpos[NDIM*gj + 1] - vpos[NDIM*gi + 1];
+						dy -= L[1]*round(dy/L[1]);
+						if (dy < sij){
+							rij = sqrt(dx*dx + dy*dy);
+							if (rij < sij){
+								// force scale
+								ftmp 				= eint*(1 - (rij/sij))/sij;
+								fx 					= ftmp*(dx/rij);
+								fy 					= ftmp*(dy/rij);
+
+								// add to forces
+								vF[NDIM*gi] 		-= fx;
+								vF[NDIM*gi + 1] 	-= fy;
+
+								vF[NDIM*gj] 		+= fx;
+								vF[NDIM*gj + 1] 	+= fy;
+
+								// add to virial expression for pressure
+								pcheck += dx*fx + dy*fy;
+
+								// add to contacts
+								if (ci != cj){
+									if (ci > cj)
+										cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
+									else
+										cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++;
+								}
+							}
+						}
+					}
+
+					// update pj
+					pj = list[pj];
+				}
+
+				// test overlaps with forward neighboring cells
+				for (bj=0; bj<NNN; bj++){
+					// get first particle in neighboring cell
+					pj = head[nn[bi][bj]];
 
 					// loop down neighbors of pi in same cell
 					while (pj > 0){
 						// real index of pj
 						gj = pj - 1;
 
-						if (gj == ip1[gi] || gj == im1[gi]){
+						// cell index of j
+						cindices(cj, vj, gj, NCELLS, szList);
+
+						if (ci == cj){
 							pj = list[pj];
 							continue;
 						}
@@ -1543,9 +1593,10 @@ int main(int argc, char const *argv[]){
 							dy -= L[1]*round(dy/L[1]);
 							if (dy < sij){
 								rij = sqrt(dx*dx + dy*dy);
+								// check for two overlapping purely-repulsive vertices
 								if (rij < sij){
 									// force scale
-									ftmp 				= eint*(1 - (rij/sij))*(rho0/sij);
+									ftmp 				= eint*(1 - (rij/sij))/sij;
 									fx 					= ftmp*(dx/rij);
 									fy 					= ftmp*(dy/rij);
 
@@ -1556,20 +1607,15 @@ int main(int argc, char const *argv[]){
 									vF[NDIM*gj] 		+= fx;
 									vF[NDIM*gj + 1] 	+= fy;
 
-									// increae potential energy
-									U += 0.5*eint*pow((1 - (rij/sij)),2.0);
-
 									// add to virial expression for pressure
 									pcheck += dx*fx + dy*fy;
 
-									// add to contacts
-									cindices(ci, vi, gi, NCELLS, szList);
-									cindices(cj, vj, gj, NCELLS, szList);
-
-									if (ci > cj)
-										cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
-									else
-										cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++; 
+									if (ci != cj){
+										if (ci > cj)
+											cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
+										else
+											cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++;
+									}
 								}
 							}
 						}
@@ -1577,714 +1623,240 @@ int main(int argc, char const *argv[]){
 						// update pj
 						pj = list[pj];
 					}
-
-					// test overlaps with forward neighboring cells
-					for (bj=0; bj<NNN; bj++){
-						// get first particle in neighboring cell
-						pj = head[nn[bi][bj]];
-
-						// loop down neighbors of pi in same cell
-						while (pj > 0){
-							// real index of pj
-							gj = pj - 1;
-
-							if (gj == ip1[gi] || gj == im1[gi]){
-								pj = list[pj];
-								continue;
-							}
-
-							// contact distance
-							sij = vrad[gi] + vrad[gj];
-
-							// particle distance
-							dx = vpos[NDIM*gj] - vpos[NDIM*gi];
-							dx -= L[0]*round(dx/L[0]);
-							if (dx < sij){
-								dy = vpos[NDIM*gj + 1] - vpos[NDIM*gi + 1];
-								dy -= L[1]*round(dy/L[1]);
-								if (dy < sij){
-									rij = sqrt(dx*dx + dy*dy);
-									if (rij < sij){
-										// force scale
-										ftmp 				= eint*(1 - (rij/sij))*(rho0/sij);
-										fx 					= ftmp*(dx/rij);
-										fy 					= ftmp*(dy/rij);
-
-										// add to forces
-										vF[NDIM*gi] 		-= fx;
-										vF[NDIM*gi + 1] 	-= fy;
-
-										vF[NDIM*gj] 		+= fx;
-										vF[NDIM*gj + 1] 	+= fy;
-
-										// increae potential energy
-										U += 0.5*eint*pow((1 - (rij/sij)),2.0);
-
-										// add to virial expression for pressure
-										pcheck += dx*fx + dy*fy;
-
-										// add to contacts
-										cindices(ci, vi, gi, NCELLS, szList);
-										cindices(cj, vj, gj, NCELLS, szList);
-
-										if (ci > cj)
-											cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
-										else
-											cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++; 
-									}
-								}
-							}
-
-							// update pj
-							pj = list[pj];
-						}
-					}
-
-					// update pi index to be next
-					pi = list[pi];
 				}
+
+				// update pi index to be next
+				pi = list[pi];
 			}
+		}
 
+		// normalize pressure by box area and number of particles
+		pcheck /= NCELLS*L[0]*L[1];
 
-			// SPRING NETWORK FORCES
-			fill(contactVert.begin(), contactVert.end(), 0);
-			for (gi=0; gi<NVTOT; gi++){
-					
-				// loop over other vertices and check connections					
-				for (gj=gi+1; gj<NVTOT; gj++){
+		// shape forces (loop over global vertex labels)
+		ci = 0;
+		psiMean = 0.0;
+		psiStd = 0.0;
+		for (gi=0; gi<NVTOT; gi++){
 
-					// connections
-					gtmp = gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2];
+			// -- Area force (and get cell index ci)
+			if (ci < NCELLS){
+				if (gi == szList[ci]){
+					// compute shape parameter
+					nvtmp = nv[ci];
+					a0tmp = a0[ci];
+					l0tmp = l0[ci];
 
-					// if connected, compute spring force based on z_\mu\nu
-					if (gtmp){
+					/// compute area deviation
+					atmp = area(vpos,ci,L,nv,szList);
+					da = (atmp/a0tmp) - 1.0;
 
-						// label gi and gj as vertices in contact
-						contactVert[gi] = 1;
-						contactVert[gj] = 1;
+					// shape force parameters (kl and kl are unitless energy ratios)
+					fa = ka*da*(rho0/a0tmp);
+					fl = kl*(rho0/l0tmp);
+					fb = kb*(rho0/(l0tmp*l0tmp));
 
-						// contact distance
-						sij = vrad[gi] + vrad[gj];
-
-						// get vertex-vertex distances
-						dx = vpos[NDIM*gj] - vpos[NDIM*gi];
+					// compute cell center of mass
+					xi = vpos[NDIM*gi];
+					yi = vpos[NDIM*gi + 1];
+					cx = xi; 
+					cy = yi;
+					for (vi=1; vi<nvtmp; vi++){
+						dx = vpos[NDIM*(gi+vi)] - xi;
 						dx -= L[0]*round(dx/L[0]);
 
-						dy = vpos[NDIM*gj + 1] - vpos[NDIM*gi + 1];
+						dy = vpos[NDIM*(gi+vi) + 1] - yi;
 						dy -= L[1]*round(dy/L[1]);
 
-						// true distance
-						rij = sqrt(dx*dx + dy*dy);
+						xi += dx;
+						yi += dy;
 
-						// only compute forces if spring is extended
-						if (rij > sij){
-							// get cell indices for vertex gi
-							cindices(ci, vi, gi, NCELLS, szList);
-
-							// get cell indices for vertex gj
-							cindices(cj, vj, gj, NCELLS, szList);
-
-							// get zij
-							zij = 0.5*(z[ci] + z[cj]) + 1.0;
-
-							// force scale
-							ftmp 				= (espring/zij)*(1 - (rij/sij))*(rho0/sij);
-							fx 					= ftmp*(dx/rij);
-							fy 					= ftmp*(dy/rij);
-
-							// add to forces
-							vF[NDIM*gi] 		-= fx;
-							vF[NDIM*gi + 1] 	-= fy;
-
-							vF[NDIM*gj] 		+= fx;
-							vF[NDIM*gj + 1] 	+= fy;
-
-							// increae potential energy
-							U += 0.5*(espring/zij)*pow((1 - (rij/sij)),2.0);
-
-							// add to virial expression for pressure
-							pcheck += dx*fx + dy*fy;
-						}
+						cx += xi;
+						cy += yi;
 					}
-				}
-			}
+					cx /= nvtmp;
+					cy /= nvtmp;
 
-			// normalize pressure by box area (make dimensionless with extra factor of rho)
-			pcheck *= (rho0/(2.0*L[0]*L[1]));
+					// get coordinates relative to center of mass
+					rix = vpos[NDIM*gi] - cx;
+					riy = vpos[NDIM*gi + 1] - cy;
 
+					// get (prior) adjacent vertice
+					rim1x = vpos[NDIM*im1[gi]] - cx;
+					rim1x -= L[0]*round(rim1x/L[0]);
 
-			// shape forces (loop over global vertex labels)
-			ci = 0;
-			for (gi=0; gi<NVTOT; gi++){
+					rim1y = vpos[NDIM*im1[gi] + 1] - cy;
+					rim1y -= L[1]*round(rim1y/L[1]);
 
-				// -- Area force (and get cell index ci)
-				if (ci < NCELLS){
-					if (gi == szList[ci]){
-						// compute shape parameter
-						nvtmp = nv[ci];
-						a0tmp = a0[ci];
-						l0tmp = l0[ci];
+					rim2x = vpos[NDIM*im1[im1[gi]]] - cx;
+					rim2x -= L[0]*round(rim2x/L[0]);
 
-						// compute area deviation
-						atmp = area(vpos,ci,L,nv,szList);
-						da = (atmp/a0tmp) - 1.0;
+					rim2y = vpos[NDIM*im1[im1[gi]] + 1] - cy;
+					rim2y -= L[1]*round(rim2y/L[1]);
 
-						// update potential energy
-						U += 0.5*ka*da*da;
+					// generate random variable
+					r1 = drand48();
+					r2 = drand48();
+					grv = sqrt(-2.0*log(r1))*cos(2.0*PI*r2);
 
-						// shape force parameters (kl and kl are unitless energy ratios)
-						fa = ka*da*(rho0/a0tmp);		// derivation from the fact that rho0^2 does not necessarily cancel a0tmp
-						fl = kl*(rho0/l0tmp);
-						fb = kb*(rho0/(l0tmp*l0tmp));
-						
-						// compute cell center of mass
-						xi = vpos[NDIM*gi];
-						yi = vpos[NDIM*gi + 1];
-						cx = xi; 
-						cy = yi;
-						for (vi=1; vi<nvtmp; vi++){
-							dx = vpos.at(NDIM*(gi+vi)) - xi;
-							dx -= L[0]*round(dx/L[0]);
+					// update director
+					psi[ci] += sqrt(dt*2.0*Dr)*grv;
 
-							dy = vpos.at(NDIM*(gi+vi) + 1) - yi;
-							dy -= L[1]*round(dy/L[1]);
+					// add to mean and std dev of directors
+					psiMean += psi[ci];
+					psiStd += psi[ci]*psi[ci];
 
-							xi += dx;
-							yi += dy;
-
-							cx += xi;
-							cy += yi;
-						}
-						cx /= nvtmp;
-						cy /= nvtmp;
-
-						// get coordinates relative to center of mass
-						rix = vpos[NDIM*gi] - cx;
-						riy = vpos[NDIM*gi + 1] - cy;
-
-						// get (prior) adjacent vertices
-						rim1x = vpos[NDIM*im1[gi]] - cx;
-						rim1x -= L[0]*round(rim1x/L[0]);
-
-						rim1y = vpos[NDIM*im1[gi] + 1] - cy;
-						rim1y -= L[1]*round(rim1y/L[1]);
-
-						rim2x = vpos[NDIM*im1[im1[gi]]] - cx;
-						rim2x -= L[0]*round(rim2x/L[0]);
-
-						rim2y = vpos[NDIM*im1[im1[gi]] + 1] - cy;
-						rim2y -= L[1]*round(rim2y/L[1]);
-
-						// increment cell index
-						ci++;
-					}
-				}
-
-
-				// get next adjacent vertices
-				rip1x = vpos.at(NDIM*ip1[gi]) - cx;
-				rip1x -= L[0]*round(rip1x/L[0]);
-
-				rip1y = vpos.at(NDIM*ip1[gi] + 1) - cy;
-				rip1y -= L[1]*round(rip1y/L[1]);
-
-
-
-				// -- Area force
-				vF[NDIM*gi] 		+= 0.5*fa*(rim1y - rip1y);
-				vF[NDIM*gi + 1] 	+= 0.5*fa*(rip1x - rim1x);
-
-
-				// -- Perimeter force
-
-				// segment vector elements
-				lim1x 		= rix - rim1x;
-				lim1y 		= riy - rim1y;
-
-				lix 		= rip1x - rix;
-				liy 		= rip1y - riy;
-
-				// segment lengths
-				lim1 		= sqrt(lim1x*lim1x + lim1y*lim1y);
-				li 			= sqrt(lix*lix + liy*liy);
-
-				// update instantaneous segment length
-				linst[gi] 	= li;
-
-				// segment deviations
-				dlim1  		= (lim1/l0tmp) - delta0[im1[gi]];
-				dli 		= (li/l0tmp) - delta0[gi];
-
-				// add to forces
-				vF[NDIM*gi] 		+= fl*(dli*(lix/li) - dlim1*(lim1x/lim1));
-				vF[NDIM*gi + 1] 	+= fl*(dli*(liy/li) - dlim1*(lim1y/lim1));
-
-				// update potential energy
-				U += 0.5*kl*dli*dli;
-
-
-				// -- Bending force
-
-				// update instantaneous curvature
-				six 		= lix - lim1x;
-				siy 		= liy - lim1y;
-				si 			= sqrt(six*six + siy*siy);
-				sinst[gi] 	= si;
-
-				// segment vectors for ip2
-				rip2x = vpos[NDIM*ip1[ip1[gi]]] - cx;
-				rip2x -= L[0]*round(rip2x/L[0]);
-
-				rip2y = vpos[NDIM*ip1[ip1[gi]] + 1] - cy;
-				rip2y -= L[1]*round(rip2y/L[1]);
-
-				lip1x = rip2x - rip1x;
-				lip1y = rip2y - rip1y;
-
-				lim2x = rim1x - rim2x;
-				lim2y = rim1y - rim2y;
-
-				// compute instantaneous curvatures
-				sim1x = lim1x - lim2x;
-				sim1y = lim1y - lim2y;
-				sim1 = sqrt(sim1x*sim1x + sim1y*sim1y);
-
-				sip1x = lip1x - lix;
-				sip1y = lip1y - liy;
-				sip1 = sqrt(sip1x*sip1x + sip1y*sip1y);
-
-				// add to force
-				vF[NDIM*gi] 		+= fb*((sim1x/sim1)*(s0[im1[gi]] - sim1) - 2.0*(six/si)*(s0[gi] - si) + (sip1x/sip1)*(s0[ip1[gi]] - sip1));
-				vF[NDIM*gi + 1] 	+= fb*((sim1y/sim1)*(s0[im1[gi]] - sim1) - 2.0*(siy/si)*(s0[gi] - si) + (sip1y/sip1)*(s0[ip1[gi]] - sip1));
-
-				// add to potential energy
-				U += 0.5*(kb/(l0tmp*l0tmp))*pow(si - s0[gi],2.0);
-
-				// update old coordinates
-				rim2x = rim1x;
-				rim1x = rix;
-				rix = rip1x;
-
-				rim2y = rim1y;
-				rim1y = riy;
-				riy = rip1y;
-			}
-
-
-			// VV VELOCITY UPDATE
-			for (i=0; i<vertDOF; i++){
-				vvel[i] += 0.5*(vF[i] + vFold[i])*dt;
-				vFold[i] = vF[i];
-			}
-
-
-			// FIRE UPDATE
-			// compute fnorm, vnorm and P
-			fnorm = 0.0;
-			vnorm = 0.0;
-			P = 0.0;
-			for (i=0; i<vertDOF; i++){
-				fnorm 	+= vF[i]*vF[i];
-				vnorm 	+= vvel[i]*vvel[i];
-				P 		+= vvel[i]*vF[i];
-			}
-			fnorm = sqrt(fnorm);
-			vnorm = sqrt(vnorm);
-
-			// update fcheck based on fnorm (= force per degree of freedom)
-			fcheck = fnorm/sqrt(NDIM*NVTOT);
-
-			// update npPMin
-			if (fcheck < Ftoltmp)
-				npPMin++;
-			else
-				npPMin = 0;
-
-			// print to console
-			if (fireit % NSKIP == 0){
-				cout << endl << endl;
-				cout << "===========================================" << endl;
-				cout << " 	F I R E 						" << endl;
-				cout << "		M I N I M I Z A T I O N 	" << endl;
-				cout << "===========================================" << endl;
-				cout << endl;
-				cout << "	** fireit 	= " << fireit << endl;
-				cout << "	** fcheck 	= " << fcheck << endl;
-				cout << "	** pcheck 	= " << pcheck << endl;
-				cout << "	** total U 	= " << U << endl;
-
-				cout << "	** vnorm 	= " << vnorm << endl;
-				cout << "	** dt 		= " << dt << endl;
-				cout << "	** P 		= " << P << endl;
-				cout << "	** Pdir 	= " << P/(fnorm*vnorm) << endl;
-				cout << "	** alpha 	= " << alpha << endl;
-			}
-
-			// Step 1. adjust simulation based on net motion of degrees of freedom
-			if (P > 0){
-				// increase positive counter
-				npPos++;
-
-				// reset negative counter
-				npNeg = 0;
-
-				// alter simulation if enough positive steps have been taken
-				if (npPos > NDELAY){
-					// change time step
-					if (dt*finc < dtmax)
-						dt *= finc;
-
-					// decrease alpha
-					alpha *= falpha;
-				}
-			}
-			else{
-				// reset positive counter
-				npPos = 0;
-
-				// increase negative counter
-				npNeg++;
-
-				// check if simulation is stuck
-				if (npNeg > NNEGMAX){
-					cout << "	** ERROR: During initial FIRE minimization, P < 0 for too long, so ending." << endl;
-					return 1;
-				}
-
-				// decrease time step if past initial delay
-				if (fireit > NDELAY){
-					// decrease time step 
-					if (dt*fdec > dtmin)
-						dt *= fdec;
-
-					// reset alpha
-					alpha = alpha0;
-				}
-
-				// take half step backwards, reset velocities
-				for (i=0; i<vertDOF; i++){
-					// take half step backwards
-					vpos[i] -= 0.5*dt*vvel[i] + 0.25*dt*dt*vF[i];
-
-					// reset vertex velocities
-					vvel[i] = 0.0;
+					// increment cell index
+					ci++;
 				}
 			}
 
 
-			// update velocities (s.d. vs inertial dynamics) only if forces are acting
-			if (fnorm > 0){
-				for (i=0; i<vertDOF; i++)
-					vvel[i] = (1 - alpha)*vvel[i] + alpha*(vnorm/fnorm)*vF[i];
-			}
+			// get next adjacent vertices
+			rip1x = vpos[NDIM*ip1[gi]] - cx;
+			rip1x -= L[0]*round(rip1x/L[0]);
 
-			// update iterator
-			fireit++;
+			rip1y = vpos[NDIM*ip1[gi] + 1] - cy;
+			rip1y -= L[1]*round(rip1y/L[1]);
+
+
+
+			// -- Area force
+			vF[NDIM*gi] 		+= 0.5*fa*(rim1y - rip1y);
+			vF[NDIM*gi + 1] 	+= 0.5*fa*(rip1x - rim1x);
+
+
+			// -- Perimeter force
+
+			// segment vector elements
+			lim1x 	= rix - rim1x;
+			lim1y 	= riy - rim1y;
+
+			lix 	= rip1x - rix;
+			liy 	= rip1y - riy;
+
+			// segment lengths
+			lim1 	= sqrt(lim1x*lim1x + lim1y*lim1y);
+			li 		= sqrt(lix*lix + liy*liy);
+
+			// segment deviations
+			dlim1  	= (lim1/l0tmp) - 1.0;
+			dli 	= (li/l0tmp) - 1.0;
+
+			// add to forces
+			vF[NDIM*gi] 		+= fl*(dli*(lix/li) - dlim1*(lim1x/lim1));
+			vF[NDIM*gi + 1] 	+= fl*(dli*(liy/li) - dlim1*(lim1y/lim1));
+
+			// segment vectors for ip2
+			rip2x = vpos[NDIM*ip1[ip1[gi]]] - cx;
+			rip2x -= L[0]*round(rip2x/L[0]);
+
+			rip2y = vpos[NDIM*ip1[ip1[gi]] + 1] - cy;
+			rip2y -= L[1]*round(rip2y/L[1]);
+
+			lip1x = rip2x - rip1x;
+			lip1y = rip2y - rip1y;
+
+			lim2x = rim1x - rim2x;
+			lim2y = rim1y - rim2y;
+
+			// add to force
+			vF[NDIM*gi] 		+= fb*(3.0*(lix - lim1x) + lim2x - lip1x);
+			vF[NDIM*gi + 1] 	+= fb*(3.0*(liy - lim1y) + lim2y - lip1y);
+
+			// active force (only if tumor cell vertices)
+			// get angular distance from psi
+			psitmp = atan2(riy,rix);
+			dpsi = psitmp - psi[ci-1];
+			dpsi -= 2.0*PI*round(dpsi/(2.0*PI));
+
+			// get velocity scale
+			v0tmp = vmin + (v0-vmin)*exp(-pow(dpsi,2.0)/(2.0*Ds*Ds));
+
+			// get unit vectors
+			rnorm = sqrt(rix*rix + riy*riy);
+			ux = rix/rnorm;
+			uy = riy/rnorm;
+
+			// add to forces
+			vF[NDIM*gi] += v0tmp*ux;
+			vF[NDIM*gi + 1] += v0tmp*uy;
+			// vF[NDIM*gi] += (v0/nvtmp)*cos(psi[ci-1]);
+			// vF[NDIM*gi + 1] += (v0/nvtmp)*sin(psi[ci-1]);
+
+			// update old coordinates
+			rim2x = rim1x;
+			rim1x = rix;
+			rix = rip1x;
+
+			rim2y = rim1y;
+			rim1y = riy;
+			riy = rip1y;
 		}
-		// check if FIRE converged
-		if (fireit == itmax){
-			cout << "	** FIRE minimization did not converge, fireit = " << fireit << ", itmax = " << itmax << "; ending." << endl;
-			return 1;
-		}
-		else{
-			cout << endl;
-			cout << "===========================================" << endl;
-			cout << " 	F I R E 						" << endl;
-			cout << "		M I N I M I Z A T I O N 	" << endl;
-			cout << "	C O N V E R G E D! 				" << endl;
-			cout << "	** at k = " << k << " 			" << endl;
-			cout << "===========================================" << endl;
-			cout << endl;
-			cout << "	** fireit 	= " << fireit << endl;
-			cout << "	** fcheck 	= " << fcheck << endl;
-			cout << "	** pcheck 	= " << pcheck << endl;
-			cout << "	** U 		= " << U << endl;
 
-			cout << "	** vnorm 	= " << vnorm << endl;
-			cout << "	** dt 		= " << dt << endl;
-			cout << "	** P 		= " << P << endl;
-			cout << "	** Pdir 	= " << P/(fnorm*vnorm) << endl;
-			cout << "	** alpha 	= " << alpha << endl;
+		// compute psi stats for output
+		psiMean /= NCELLS;
+		psiStd /= NCELLS;
+		psiStd -= psiMean*psiMean;
+		psiStd = sqrt(psiStd);
+
+		// BROWNIAN MOTION VIA EULER UPDATE
+		for (i=0; i<vertDOF; i++)
+			vpos[i] += dt*vF[i];
+
+		// print shape info
+		if (tt % NSHAPESKIP == 0){
+			for (ci=0; ci<NCELLS; ci++){
+				calAtmp = pow(perimeter(vpos,ci,L,nv,szList),2.0)/(4.0*PI*area(vpos,ci,L,nv,szList));
+				shapeout << setw(wnum) << setprecision(6) << right << calAtmp;
+			}
+			shapeout << endl;
+		}
+
+		// print message console, print position to file
+		if (tt % NPOSSKIP == 0){
 			cout << endl << endl;
-		}
+			cout << "=======================================" << endl;
+			cout << "			active cells 				" << endl;
+			cout << "=======================================" << endl;
+			cout << endl;
+			cout << "	** tt 			= " << tt << endl;
+			cout << "	** p 			= " << pcheck << endl;
+			cout << "	** psiMean 		= " << psiMean << endl;
+			cout << "	** psiStd 		= " << psiStd << endl;
 
-		// BOND MC AND CONTACT NETWORK UPDATE
-		Nb 		= 0;
-		NbRmv 	= 0;
-		dUtot 	= 0.0;
-		for (gi=0; gi<NVTOT; gi++){	
-			cindices(ci, vi, gi, NCELLS, szList);				
-			for (gj=gi+1; gj<NVTOT; gj++){
-				// get cell index of gj
-				cindices(cj, vj, gj, NCELLS, szList);
-				if (ci != cj){
-					// contact distance
-					sij = vrad[gi] + vrad[gj];
+			// compute instantaneous packing fraction
+			phi = 0.0;
+			for (ci=0; ci<NCELLS; ci++)
+				phi += area(vpos,ci,L,nv,szList) + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1);
+			phi /= L[0]*L[1];
 
-					// get vertex-vertex distances
-					dx = vpos[NDIM*gj] - vpos[NDIM*gi];
-					dx -= L[0]*round(dx/L[0]);
-
-					dy = vpos[NDIM*gj + 1] - vpos[NDIM*gi + 1];
-					dy -= L[1]*round(dy/L[1]);
-
-					// true distance
-					rij = sqrt(dx*dx + dy*dy);
-
-					// mean contact number
-					zij = 0.5*(z[ci] + z[cj]) + 1.0;
-
-					// get current contact status
-					gtmp = gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2];
-
-					// reconnect bond if vertices come into contact
-					if (rij <= sij && !gtmp){
-						// update number of bonds
-						Nb++;
-
-						// add connection
-						gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 1;
-
-						// add bond to global contact network
-						if (ci > cj)
-							cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
-						else
-							cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++; 
-					}
-					// if extended and bond exists, detach if distance exceeds threshold
-					else if (rij > sij && gtmp){
-						// construct proposed configuration with displaced vertices
-						altpos = vpos;
-
-						// displace vertices in alternative configuration
-						altpos[NDIM*gi] 		-= (bondDisp*sij)*(dx/rij);
-						altpos[NDIM*gi + 1] 	-= (bondDisp*sij)*(dy/rij);
-
-						altpos[NDIM*gj] 		+= (bondDisp*sij)*(dx/rij);
-						altpos[NDIM*gj + 1] 	+= (bondDisp*sij)*(dy/rij);
-
-						// compute change in potential energy
-						dU = potentialEnergyNoNetwork(altpos, vrad, a0, l0, delta0, s0, L, nv, szList, im1, ip1, kl, kb, NCELLS);
-						dU -= U;
-
-						// add in change to potential energy based on bond displacement 
-						// 	-- note in prefactor, sij cancels out based on def of bondDisp vs delta in notes
-						dU += ((2.0*bondDisp*espring)/zij)*(((bondDisp*sij + rij)/sij) - 1.0);
-
-						// add to total possible change in U
-						dUtot += dU;
-
-						// remove if bond detaching decreases energy
-						if (dU < 0){
-							gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 0;
-							NbRmv++;
-						}
-						// else, remove conditionally
-						else{
-							poff = exp(-betaEff*dU);
-							rdraw = drand48();
-
-							// detach
-							if (poff > rdraw){
-								gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 0;
-								NbRmv++;
-							}
-							// else, keep and add bond to global contact network
-							else{
-								if (ci > cj)
-									cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
-								else
-									cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++; 
-							}
-						}
-					}
-				}
-			}
-		}
-
-		// update number of contacts
-		Nvv = 0;
-		Ncc = 0;
-		for (i=0; i<NCTCS; i++){
-			Nvv += cij[i];
-			if (cij[i] > 0)
-				Ncc++;
-		}
-
-		for (ci=0; ci<NCELLS; ci++){
-			z[ci] = 0;
-			for (cj=0; cj<NCELLS; cj++){
-				if (ci != cj){
-					if (ci > cj)
-						ctmp = cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2];
-					else
-						ctmp = cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2];
-				}
-				else
-					ctmp = 0;
-
-				// add to vector of per-cell vv contacts
-				if (ctmp > 0)
-					z[ci]++;
-			}
-		}
-
-
-		// SHAPE AGING
-		fill(calA0.begin(), calA0.end(), 0.0);
-		meanPrefCurv = 0.0;
-		meanSegLength = 0.0;
-		gi = 0;
-		for (ci=0; ci<NCELLS; ci++){
-
-			// loop over vertices, age curvature and perimeter rest values
-			p0tmp = 0.0;
-			for (vi=0; vi<nv[ci]; vi++){
-				// update s0 (preferred curvature)
-				s0tmp = s0[gi];
-				s0[gi] += lambdaB*(sinst[gi] - s0tmp);
-
-				// update mean preferred curvature
-				meanPrefCurv += s0[gi];
-
-				// perimeter tmp variables
-				l0tmp = l0[ci];
-				d0tmp = delta0[gi];
-
-				// only grow if calA0 below threshold
-				if (calA0[ci] < calA0Thresh && l0tmp*d0tmp < linst[gi]){
-					// update delta0 (preferred segment length) based on if between contact verts
-					// otherwise, treat as void contact
-					if (contactVert[gi] == 1 && contactVert[ip1[gi]] == 1)					
-						delta0[gi] += contactScale*lambdaL*((linst[gi]/l0tmp) - d0tmp);
-					else
-						delta0[gi] += voidScale*lambdaL*((linst[gi]/l0tmp) - d0tmp);
-				}
-
-				// update total preferred perimeter
-				p0tmp += delta0[gi]*l0tmp;
-
-				// update mean preferred segment length
-				meanSegLength += delta0[gi]*l0tmp;
-
-				// update global vertex index
-				gi++;
-			}
-
-			// update preferred shape parameter calA0
-			calA0[ci] = pow(p0tmp,2.0)/(4.0*PI*a0[ci]);
-		}
-		meanPrefCurv /= NVTOT;
-		meanSegLength /= NVTOT;
-
-
-		// output to console
-		cout << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&" << endl;
-		cout << "===============================================" << endl << endl;
-		cout << " 	Q U A S I S T A T I C  				" << endl;
-		cout << " 	  	I S O T R O P I C 				" << endl;
-		cout << "			G E L A T I O N 			" << endl << endl;
-		cout << "===============================================" << endl;
-		cout << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&" << endl;
-		cout << endl;
-		cout << "	* k 			= " << k << endl;
-		cout << "	* dr 			= " << scaleFactor << endl;
-		cout << "	* phi 			= " << phi << endl;
-		cout << "	* fcheck 		= " << fcheck << endl;
-		cout << "	* pcheck 		= " << pcheck << endl;
-		cout << "	* U 		 	= " << U << endl << endl;
-		cout << "	* Contacts:" << endl;
-		cout << "	* Nvv 			= " << Nvv << endl;
-		cout << "	* Ncc 			= " << Ncc << endl << endl;
-		cout << "	* Spring network: " << endl;
-		cout << "	* dUtot 		= " << dUtot << endl;
-		cout << "	* Nb 			= " << Nb << endl;
-		cout << "	* NbCurr 		= " << Nb - NbRmv << endl;
-		cout << "	* NbRmv 		= " << NbRmv << endl << endl;
-		cout << "	* Shape aging: " << endl;
-		cout << "	* meanPrefCurv 	= " << meanPrefCurv << endl;
-		cout << "	* meanSegLength = " << meanSegLength << endl;
-		cout << endl;
-
-		if ((lastPrintPhi - phi) > dphiPrint){
-			// print positions
-			cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl << endl;
+			// print vertex positions to check placement
+			cout << "\t** PRINTING POSITIONS TO FILE... " << endl;
 			printPos(posout, vpos, vrad, a0, calA0, L, cij, nv, szList, phi, NCELLS);
-
-			// update last phi when printed, for next time
-			lastPrintPhi = phi;
 		}
-		
-
-		// grow or shrink particles by scale factor
-		phi = 0.0;
-		for (ci=0; ci<NCELLS; ci++){
-			// scale preferred lengths
-			l0[ci] *= scaleFactor;
-			a0[ci] *= scaleFactor*scaleFactor;
-
-			// first global index for ci
-			gi = szList.at(ci);
-
-			// compute cell center of mass
-			xi = vpos[NDIM*gi];
-			yi = vpos[NDIM*gi + 1];
-			cx = xi; 
-			cy = yi;
-			for (vi=1; vi<nv.at(ci); vi++){
-				dx = vpos.at(NDIM*(gi+vi)) - xi;
-				dx -= L[0]*round(dx/L[0]);
-
-				dy = vpos.at(NDIM*(gi+vi) + 1) - yi;
-				dy -= L[1]*round(dy/L[1]);
-
-				xi += dx;
-				yi += dy;
-
-				cx += xi;
-				cy += yi;
-			}
-			cx /= nv.at(ci);
-			cy /= nv.at(ci);
-
-			for (vi=0; vi<nv.at(ci); vi++){
-				// x and y inds
-				xind = NDIM*(gi+vi);
-				yind = xind + 1;
-
-				// closest relative position
-				dx = vpos[xind] - cx;
-				dx -= L[0]*round(dx/L[0]);
-
-				dy = vpos[yind] - cy;
-				dy -= L[1]*round(dy/L[1]);
-
-				// update vertex positions
-				vpos[xind] 		+= (scaleFactor - 1.0)*dx;
-				vpos[yind] 		+= (scaleFactor - 1.0)*dy;
-
-				// scale vertex radii
-				vrad[gi+vi] *= scaleFactor;
-			}
-
-			// update packing fraction
-			phi += a0[ci] + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1);
-		}
-		phi /= L[0]*L[1];
-		scaleFactor = sqrt((phi - dphiShrink)/phi);
 	}
 
-	// print final time
-	cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl << endl;
-	printPos(posout, vpos, vrad, a0, calA0, L, cij, nv, szList, phi, NCELLS);
 
-	// close open objects
+
+	// close files
 	posout.close();
+	shapeout.close();
 
-	// end simulation
-	cout << "\n\n\nFINISHED MAIN FOR mesophyll2D.cpp, ENDING." << endl << endl << endl;
+	// end
 	return 0;
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2306,8 +1878,6 @@ int main(int argc, char const *argv[]){
 
 	area 				: returns area of cell ci
 	perimeter 			: returns perimeter of cell ci
-
-	potentialEnergy 	: returns total potential energy of entire system given any configuration
 
 	removeRattlers		: remove all rattlers from a contact network
 
@@ -2434,170 +2004,6 @@ double perimeter(vector<double>& vpos, int ci, vector<double>& L, vector<int>& n
 	// return perimeter
 	return perimVal;
 }
-
-
-
-
-// TOTAL SYSTEM POTENTIAL ENERGY WITHOUT SPRING NETWORK
-double potentialEnergyNoNetwork(vector<double>& vpos, 
-	vector<double>& vrad, 
-	vector<double>& a0, 
-	vector<double>& l0, 
-	vector<double>& delta0,
-	vector<double>& s0,
-	vector<double>& L, 
-	vector<int>& nv, 
-	vector<int>& szList, 
-	vector<int> im1, 
-	vector<int> ip1, 
-	double kl, 
-	double kb, 
-	int NCELLS){
-
-	// local variables
-	int ci, vi, gi, gj, nvtmp;
-	double atmp, a0tmp, l0tmp;
-	double dx, dy, rij, ri, rj, sij;
-	double xi, yi, cx, cy, da, dli;
-	double rix, riy, rim1x, rim1y, rip1x, rip1y, lim1x, lim1y, lix, liy, li, six, siy, si;
-	double U = 0.0;
-
-	// compute variables from input
-	int NVTOT = 0;
-	for (ci=0; ci<NCELLS; ci++)
-		NVTOT += nv[ci];
-
-	// add up potential energy contributions
-	ci = 0;
-	for (gi=0; gi<NVTOT; gi++){
-		// radius of i
-		ri = vrad[gi];
-
-		// interactions with other repulsive vertices
-		for (gj=gi+1; gj<NVTOT; gj++){
-			// only if not adjacent
-			if (gj != im1[gi] && gj != ip1[gi]){
-				// radius of j
-				rj = vrad[gj];
-
-				// contact distance
-				sij = ri + rj;
-
-				// vertex-vertex distance
-				dx = vpos[NDIM*gj] - vpos[NDIM*gi];
-				dx -= L[0]*round(dx/L[0]);
-				if (dx < sij){
-					dy = vpos[NDIM*gj + 1] - vpos[NDIM*gi + 1];
-					dy -= L[1]*round(dy/L[1]);
-					if (dy < sij){
-						rij = sqrt(dx*dx + dy*dy);
-
-						// if overlaps, add to potential
-						if (rij < sij)
-							U += 0.5*eint*pow((1 - (rij/sij)),2.0);
-					}
-				}
-			}
-		}
-
-		// shape potential energy
-		if (ci < NCELLS){
-			if (gi == szList[ci]){
-				// compute shape parameter
-				nvtmp = nv[ci];
-				l0tmp = l0[ci];
-				a0tmp = a0[ci];
-
-				// compute area deviation
-				atmp = area(vpos,ci,L,nv,szList);
-				da = (atmp/a0tmp) - 1.0;
-
-				// add area energy
-				U += 0.5*ka*da*da;
-				
-				// compute cell center of mass
-				xi = vpos[NDIM*gi];
-				yi = vpos[NDIM*gi + 1];
-				cx = xi; 
-				cy = yi;
-				for (vi=1; vi<nvtmp; vi++){
-					dx = vpos.at(NDIM*(gi+vi)) - xi;
-					dx -= L[0]*round(dx/L[0]);
-
-					dy = vpos.at(NDIM*(gi+vi) + 1) - yi;
-					dy -= L[1]*round(dy/L[1]);
-
-					xi += dx;
-					yi += dy;
-
-					cx += xi;
-					cy += yi;
-				}
-				cx /= nvtmp;
-				cy /= nvtmp;
-
-				// get coordinates relative to center of mass
-				rix = vpos[NDIM*gi] - cx;
-				riy = vpos[NDIM*gi + 1] - cy;
-
-				// get (prior) adjacent vertices
-				rim1x = vpos[NDIM*im1[gi]] - cx;
-				rim1x -= L[0]*round(rim1x/L[0]);
-
-				rim1y = vpos[NDIM*im1[gi] + 1] - cy;
-				rim1y -= L[1]*round(rim1y/L[1]);
-
-				// increment cell index
-				ci++;
-			}
-
-			// get next adjacent vertices
-			rip1x = vpos.at(NDIM*ip1[gi]) - cx;
-			rip1x -= L[0]*round(rip1x/L[0]);
-
-			rip1y = vpos.at(NDIM*ip1[gi] + 1) - cy;
-			rip1y -= L[1]*round(rip1y/L[1]);
-
-			// -- Perimeter force
-
-			// segments
-			lim1x 		= rix - rim1x;
-			lim1y 		= riy - rim1y;
-
-			lix 		= rip1x - rix;
-			liy 		= rip1y - riy;
-
-			// segment length (just li for energy)
-			li 			= sqrt(lix*lix + liy*liy);
-			dli 		= (li/l0tmp) - delta0[gi];
-
-			// add to potential energy
-			U += 0.5*kl*dli*dli;
-
-			// -- Bending force
-
-			// get instantaneous curvature
-			six 		= lix - lim1x;
-			siy 		= liy - lim1y;
-			si 			= sqrt(six*six + siy*siy);
-
-			// add to potential energy
-			U += 0.5*(kb/(l0tmp*l0tmp))*pow(si - s0[gi],2.0);
-
-			// update old coordinates for next vertex
-			rim1x = rix;
-			rix = rip1x;
-
-			rim1y = riy;
-			riy = rip1y;
-		}
-	}
-
-	// return potential energy
-	return U;
-}
-
-
 
 
 // RECURSIVELY REMOVE RATTLERS FROM CONTACT NETWORK
@@ -2775,5 +2181,18 @@ void printPos(ofstream& posout, vector<double>& vpos, vector<double>& vrad, vect
 	// print end frame
 	posout << setw(w) << left << "ENDFR" << " " << endl;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
