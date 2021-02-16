@@ -27,10 +27,11 @@ v0=$4
 Dr=$5
 NT=$6
 NSHAPEPRINT=$7
-time=$8
-numSeedsPerRun="${9}"
-numRuns="${10}"
-startSeed="${11}"
+partition=$8
+time=$9
+numSeedsPerRun="${10}"
+numRuns="${11}"
+startSeed="${12}"
 
 # other variables
 polyd=0.1
