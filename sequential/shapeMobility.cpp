@@ -6,9 +6,8 @@
 	as a function of deformability
 	and driving
 
-
-	NOTE: DEbug excessive overlaps 
-	between cells, activity? Or vertex energy?
+	Jack Treado
+	02/14/21, in the time of covid
 
 */
 
