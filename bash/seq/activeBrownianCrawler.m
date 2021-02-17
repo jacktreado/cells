@@ -52,10 +52,11 @@ psi = 0.0;
 randList = randn(NT,1);
 
 % quantities to save
-frameList = zeros(NFRAMES,1);
-cList = zeros(NFRAMES,2);
-fList = zeros(NFRAMES,2);
-UList = zeros(NFRAMES,3);
+frameList   = zeros(NFRAMES,1);
+cList       = zeros(NFRAMES,2);
+fList       = zeros(NFRAMES,2);
+UList       = zeros(NFRAMES,3);
+calAList    = zeros(NFRAMES,1);
 
 for tt = 1:NT
     
@@ -185,6 +186,8 @@ for tt = 1:NT
         UList(ff,2) = Ul;
         UList(ff,3) = Ub;
         
+        calAList(ff) = (sum(l)^2)/(4.0*pi*a);
+        
         % update frame index
         ff = ff + 1;
     end
@@ -200,4 +203,4 @@ end
 %% Save
 
 save(savestr,'NV','calA0','Kl','Kb','v0','Dr','NT','dt','NFRAMES','seed',...
-    'frameList','cList','fList','UList');
+    'frameList','cList','fList','UList','calAList');
