@@ -29,7 +29,7 @@ numRuns="${11}"
 startSeed="${12}"
 
 # other variables
-kl=1.0
+kl=10.0
 numSeedsPerRun=1
 
 let numSeeds=$numSeedsPerRun*$numRuns
