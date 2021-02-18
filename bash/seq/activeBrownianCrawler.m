@@ -6,7 +6,7 @@ rng(seed);
 
 % auxiliary parameters
 vmin = 1e-2*v0;
-Ds = 0.2;
+Ds = 0.4;
 b = 1.0;
 
 % initial coordinates of deformable polygon
