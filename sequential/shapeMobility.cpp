@@ -57,7 +57,7 @@ const int itmax       		= 1e7;
 const double ka 			= 1.0;			// area spring (should be = 1)
 const double eint 			= 1.0;			// baseline interaction energy 
 const double del 			= 1.0;			// radius of vertices in units of l0
-const double calA0Input 	= 1.1;			// shape parameter
+const double calA0Input 	= 1.01;			// shape parameter
 const double Ds 			= 0.2;			// spread of velocity coupling along tumor cell boundary
 
 // FUNCTION PROTOTYPES
