@@ -17,26 +17,26 @@ mkdir -p out
 # inputs
 NV=$1
 calA0=$2
-kb=$3
-v0=$4
-Dr=$5
-NT=$6
-dt=$7
-NFRAMES=$8
-partition=$9
-time="${10}"
-numRuns="${11}"
-startSeed="${12}"
+kl=$3
+kb=$4
+v0=$5
+Dr=$6
+NT=$7
+dt=$8
+NFRAMES=$9
+partition=$10
+time="${11}"
+numRuns="${12}"
+startSeed="${13}"
 
 # other variables
-kl=10.0
 numSeedsPerRun=1
 
 let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=abc_NV"$NV"_ca"$calA0"_kb"$kb"_v0"$v0"_Dr"$Dr"
+basestr=abc_NV"$NV"_ca"$calA0"_kl"$kl"_kb"$kb"_v0"$v0"_Dr"$Dr"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation
@@ -49,6 +49,7 @@ mainf=$maindir/shapeMobility.cpp
 echo Running $numSeeds sims of ABC particles 
 echo - - - NV                           $NV
 echo - - - calA0 						$calA0
+echo - - - kl 							$kl
 echo - - - kb                           $kb
 echo - - - v0                           $v0
 echo - - - Dr                           $Dr
