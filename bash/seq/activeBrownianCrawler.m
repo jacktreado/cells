@@ -7,6 +7,7 @@ rng(seed);
 % auxiliary parameters
 vmin = 1e-2*v0;
 Ds = 0.1;
+b = 1.0;
 
 % initial coordinates of deformable polygon
 x = zeros(NV,1);
@@ -22,8 +23,8 @@ l0 = 2.0*sqrt(pi*calA0*a0)/NV;
 
 % vertex positions
 for vv = 1:NV
-    x(vv) = r0*cos(2.0*pi*vv/NV) + 0.01*l0*randn;
-    y(vv) = r0*sin(2.0*pi*vv/NV) + 0.01*l0*randn;
+    x(vv) = r0*cos(2.0*pi*vv/NV);
+    y(vv) = r0*sin(2.0*pi*vv/NV);
 end
 
 % indexing
@@ -45,6 +46,13 @@ timeVals = (0:(NT-1))*dt;
 
 %% Loop over time
 
+% velocities and forces
+vx = zeros(NV,1);
+vy = zeros(NV,1);
+
+fx = zeros(NV,1);
+fy = zeros(NV,1);
+
 % director
 psi = 0.0;
 
@@ -59,6 +67,15 @@ UList       = zeros(NFRAMES,3);
 calAList    = zeros(NFRAMES,1);
 
 for tt = 1:NT
+    
+    % do first verlet update for vertices (assume unit mass)
+    x = x + dt*vx + 0.5*fx*dt*dt;
+    y = y + dt*vy + 0.5*fy*dt*dt;
+    
+    % update old forces
+    fxold = fx;
+    fyold = fy;
+    
     
     % * * * * * * * * * * * * * * * * * *
     % calculate forces based on positions
@@ -192,9 +209,21 @@ for tt = 1:NT
         ff = ff + 1;
     end
     
-    % Euler update
-    x = x + dt*fx;
-    y = y + dt*fy;
+    % include damping
+    dampingNumX = b*(vx - 0.5*fxold*dt);
+    dampingNumY = b*(vy - 0.5*fyold*dt);
+    dampingDenom = 1.0 - 0.5*b*dt;
+    
+    fx = (fx - dampingNumX)./dampingDenom;
+    fy = (fy - dampingNumY)./dampingDenom;
+    
+    % do second verlet update for vertices
+    vx = vx + dt*0.5*(fx + fxold);
+    vy = vy + dt*0.5*(fy + fyold);
+    
+%     % Euler update
+%     x = x + dt*fx;
+%     y = y + dt*fy;
     
     % update directors
     psi = psi + sqrt(dt*2.0*Dr)*randList(tt);
