@@ -141,16 +141,17 @@ sbatch -t $time $slurmf
 # ====================
 # 1. NV
 # 2. calA0
-# 3. bending energy (kb)
-# 4. v0
-# 5. Dr
-# 6. NT
-# 7. dt
-# 8. NFRAMES
-# 9. partition
-# 10. time
-# 11. number of runs (number of array entries, i.e. arraynum)
-# 12. start seed (end seed determined by number of runs)
+# 3. kl
+# 4. kb
+# 5. v0
+# 6. Dr
+# 7. NT
+# 8. dt
+# 9. NFRAMES
+# 10. partition
+# 11. time
+# 12. number of runs (number of array entries, i.e. arraynum)
+# 13. start seed (end seed determined by number of runs)
 
 
 
