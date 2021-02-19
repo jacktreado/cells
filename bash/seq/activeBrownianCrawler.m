@@ -38,7 +38,8 @@ fl              = Kl*(rho0/l0);             % units: dim. less
 fb              = Kb*(rho0/(l0*l0));        % units: inv length, because of length in force expression
 
 % plot skipping
-pskip = NT/NFRAMES;
+pskip = floor(NT/NFRAMES);
+frameList = pskip:pskip:NT;
 ff = 1;
 
 % time
@@ -53,16 +54,15 @@ vy = zeros(NV,1);
 fx = zeros(NV,1);
 fy = zeros(NV,1);
 
-% director
-psi = 0.0;
-
 % random numbers
-randList = randn(NT,1);
+randList    = randn(NT,1);
+dtpsi       = sqrt(2.0*Dr*dt).*randList;
+psi         = cumsum(dtpsi);
 
 % quantities to save
-frameList   = zeros(NFRAMES,1);
 cList       = zeros(NFRAMES,2);
 fList       = zeros(NFRAMES,2);
+vList       = zeros(NFRAMES,2);
 UList       = zeros(NFRAMES,3);
 calAList    = zeros(NFRAMES,1);
 
@@ -152,7 +152,7 @@ for tt = 1:NT
     
     % get angular position of each vertex relative to director
     psiVi = atan2(ry,rx);
-    dpsi = psiVi - psi;
+    dpsi = psiVi - psi(tt);
     dpsi = dpsi - 2.0*pi*round(dpsi/(2.0*pi));
     
     % get velocity scales for each 
@@ -164,6 +164,18 @@ for tt = 1:NT
     ury = ry./rscales;
     fx = fx + v0tmp.*urx;
     fy = fy + v0tmp.*ury;
+    
+    % include damping
+    dampingNumX = b*(vx - 0.5*fxold*dt);
+    dampingNumY = b*(vy - 0.5*fyold*dt);
+    dampingDenom = 1.0 - 0.5*b*dt;
+    
+    fx = (fx - dampingNumX)./dampingDenom;
+    fy = (fy - dampingNumY)./dampingDenom;
+    
+    % do second verlet update for vertices
+    vx = vx + dt*0.5*(fx + fxold);
+    vy = vy + dt*0.5*(fy + fyold);
     
     % print to console
     if mod(tt,pskip) == 0
@@ -192,9 +204,11 @@ for tt = 1:NT
         fprintf('Ub         = %0.4g\n\n',Ub);
         
         % save quantities for later
-        frameList(ff) = tt;
         cList(ff,1) = cx;
         cList(ff,2) = cy;
+        
+        vList(ff,1) = mean(vx);
+        vList(ff,2) = mean(vy);
         
         fList(ff,1) = Fx;
         fList(ff,2) = Fy;
@@ -209,27 +223,31 @@ for tt = 1:NT
         ff = ff + 1;
     end
     
-    % include damping
-    dampingNumX = b*(vx - 0.5*fxold*dt);
-    dampingNumY = b*(vy - 0.5*fyold*dt);
-    dampingDenom = 1.0 - 0.5*b*dt;
-    
-    fx = (fx - dampingNumX)./dampingDenom;
-    fy = (fy - dampingNumY)./dampingDenom;
-    
-    % do second verlet update for vertices
-    vx = vx + dt*0.5*(fx + fxold);
-    vy = vy + dt*0.5*(fy + fyold);
-    
 %     % Euler update
 %     x = x + dt*fx;
 %     y = y + dt*fy;
-    
-    % update directors
-    psi = psi + sqrt(dt*2.0*Dr)*randList(tt);
 end
+
+%% Also compare to ABP 
+
+% print 
+fprintf(' ** Also generating equivalent ABP data ... \n');
+
+% displacements
+fprintf(' ** Computing velocities from psi ...\n');
+abpVel      = v0.*[cos(psi),sin(psi)];
+
+% center of mass
+fprintf(' ** Computing c.o.m positions ...\n');
+abpPos      = cumsum(dt.*abpVel);
+
+% saving frames for abp
+abpCList    = abpPos(frameList,:);
+abpVList    = abpVel(frameList,:);
 
 %% Save
 
 save(savestr,'NV','calA0','Kl','Kb','v0','Dr','NT','dt','NFRAMES','seed',...
-    'frameList','cList','fList','UList','calAList');
+    'frameList','cList','fList','vList','UList','calAList','abpCList','abpVList');
+
+end
