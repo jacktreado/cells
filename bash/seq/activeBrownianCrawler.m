@@ -196,7 +196,7 @@ for tt = 1:NT
         fprintf('***************************\n\n');
         fprintf('tt         = %d / %d\n',tt,NT);
         fprintf('time       = %0.4g\n',timeVals(tt));
-        fprintf('psi        = %0.4g\n\n',psi);
+        fprintf('psi        = %0.4g\n\n',psi(tt));
         fprintf('Fx         = %0.4g\n',Fx);
         fprintf('Fy         = %0.4g\n',Fy);
         fprintf('Ua         = %0.4g\n',Ua);
