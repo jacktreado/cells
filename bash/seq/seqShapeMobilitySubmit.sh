@@ -22,28 +22,29 @@ mkdir -p out
 # inputs
 NCELLS=$1
 NV=$2
-kb=$3
-v0=$4
-Dr=$5
-NT=$6
-NSHAPEPRINT=$7
-partition=$8
-time=$9
-numSeedsPerRun="${10}"
-numRuns="${11}"
-startSeed="${12}"
+calA0=$3
+kb=$4
+v0=$5
+Dr=$6
+NT=$7
+NSHAPEPRINT=$8
+partition=$9
+time=$10
+numSeedsPerRun="${11}"
+numRuns="${12}"
+startSeed="${13}"
 
 # other variables
 polyd=0.1
-phiMax=0.94
-kl=1.0
-NPOSPRINT=100
+phiMax=0.975
+kl=1e-1
+NPOSPRINT=500
 
 let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=shape_N"$NCELLS"_NV"$NV"_kb"$kb"_v0"$v0"_Dr"$Dr"_NT"$NT"
+basestr=shape_N"$NCELLS"_NV"$NV"_ca"$calA0"_kb"$kb"_v0"$v0"_Dr"$Dr"_NT"$NT"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation
@@ -55,6 +56,7 @@ binf=bin/"$runstr".o
 mainf=$maindir/shapeMobility.cpp
 echo Running $numSeeds active sims of $NCELLS DPM particles 
 echo - - - NV                           $NV
+echo - - - calA0                        $calA0
 echo - - - kb                           $kb
 echo - - - v0                           $v0
 echo - - - Dr                           $Dr
@@ -158,16 +160,17 @@ sbatch -t $time $slurmf
 # ====================
 # 1. NCELLS
 # 2. NV
-# 3. bending energy (kb)
-# 4. v0
-# 5. Dr
-# 6. NT
-# 7. NSHAPEPRINT
-# 8. partition
-# 9. time
-# 10. num seeds per run (for each entry in array)
-# 11. number of runs (number of array entries, i.e. arraynum)
-# 12. start seed (end seed determined by number of runs)
+# 3. calA0
+# 4. bending energy (kb)
+# 5. v0
+# 6. Dr
+# 7. NT
+# 8. NSHAPEPRINT
+# 9. partition
+# 10. time
+# 11. num seeds per run (for each entry in array)
+# 12. number of runs (number of array entries, i.e. arraynum)
+# 13. start seed (end seed determined by number of runs)
 
 
 

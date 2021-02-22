@@ -57,7 +57,6 @@ const int itmax       		= 1e7;
 const double ka 			= 1.0;			// area spring (should be = 1)
 const double eint 			= 1.0;			// baseline interaction energy 
 const double del 			= 1.0;			// radius of vertices in units of l0
-const double calA0Input 	= 1.01;			// shape parameter
 const double Ds 			= 0.2;			// spread of velocity coupling along tumor cell boundary
 
 // FUNCTION PROTOTYPES
@@ -86,30 +85,32 @@ int main(int argc, char const *argv[]){
 
 	// parameters to be read in 
 	int NT, NPOSPRINT, NSHAPEPRINT, NCELLS, NV, NVTOT, cellDOF, vertDOF, seed;
-	double vmin, polyd, phi, phiMax, kl, kb, v0, Dr, NT_dbl, NPOSPRINT_dbl, NSHAPEPRINT_dbl;
+	double calA0Input, vmin, polyd, phi, phiMax, kl, kb, v0, Dr, NT_dbl, NPOSPRINT_dbl, NSHAPEPRINT_dbl;
 
 	// read in parameters from command line input
 	// test: g++ -O3 sequential/shapeMobility.cpp -o shape.o
-	// test: ./shape.o 16 16 0.1 0.9 1.0 1e-3 0.05 0.1 1e3 10 100 1 pos.test shape.test
+	// test: ./shape.o 24 32 0.15 0.975 1.10 1e-1 1e-3 1e-2 1e-1 1e6 200 5000 1 pos.test shape.test
 	string NCELLS_str 			= argv[1];
 	string NV_str 				= argv[2];
 	string polyd_str 			= argv[3];
 	string phiMax_str  			= argv[4];
-	string kl_str 				= argv[5];
-	string kb_str 				= argv[6];
-	string v0_str 				= argv[7];
-	string Dr_str 				= argv[8];
-	string NT_str 				= argv[9];
-	string NPOSPRINT_str 		= argv[10];
-	string NSHAPEPRINT_str 		= argv[11];
-	string seed_str 			= argv[12];
-	string positionFile 		= argv[13];
-	string shapeFile 			= argv[14];
+	string calA0_str 			= argv[5];
+	string kl_str 				= argv[6];
+	string kb_str 				= argv[7];
+	string v0_str 				= argv[8];
+	string Dr_str 				= argv[9];
+	string NT_str 				= argv[10];
+	string NPOSPRINT_str 		= argv[11];
+	string NSHAPEPRINT_str 		= argv[12];
+	string seed_str 			= argv[13];
+	string positionFile 		= argv[14];
+	string shapeFile 			= argv[15];
 
 	stringstream NCELLSss(NCELLS_str);
 	stringstream NVss(NV_str);
 	stringstream polydss(polyd_str);
 	stringstream phiMaxss(phiMax_str);
+	stringstream calA0ss(calA0_str);
 	stringstream klss(kl_str);
 	stringstream kbss(kb_str);
 	stringstream v0ss(v0_str);
@@ -123,6 +124,7 @@ int main(int argc, char const *argv[]){
 	NVss >> NV;
 	polydss >> polyd;
 	phiMaxss >> phiMax;
+	calA0ss >> calA0Input;
 	klss >> kl;
 	kbss >> kb;
 	v0ss >> v0;
@@ -262,7 +264,7 @@ int main(int argc, char const *argv[]){
 	// print out output info to shape files
 	shapeout << NCELLS << endl;
 	shapeout << NT << endl;
-	shapeout << NSHAPEPRINT << endl;
+	shapeout << NSHAPEPRINT+1 << endl;
 	shapeout << dt << endl;
 
 
@@ -1422,12 +1424,24 @@ int main(int argc, char const *argv[]){
 
 	// DYNAMICS VARIABLES
 	int tt, tcells; 
-	double ux, uy, rnorm, psitmp, dpsi, v0tmp, psiMean, psiStd, calAtmp;
+	double psitmp, dpsi, v0tmp, psiMean, psiStd, calAtmp;
 
 	// skip variables
 	int NPOSSKIP, NSHAPESKIP;
-	NPOSSKIP = NT/NPOSPRINT;
-	NSHAPESKIP = NT/NSHAPEPRINT;
+	NPOSSKIP = NT/(2*NPOSPRINT);
+	NSHAPESKIP = NT/(2*NSHAPEPRINT);
+
+	// print intial shape and pos information
+	for (ci=0; ci<NCELLS; ci++){
+		calAtmp = pow(perimeter(vpos,ci,L,nv,szList),2.0)/(4.0*PI*area(vpos,ci,L,nv,szList));
+		shapeout << setw(wnum) << setprecision(6) << right << calAtmp;
+	}
+	shapeout << endl;
+
+	cout << "\t** PRINTING INITIAL, T=0 POSITIONS TO FILE... " << endl;
+	printPos(posout, vpos, vrad, a0, calA0, L, cij, nv, szList, phi, NCELLS);
+
+
 
 	// initialize directors to the right
 	vector<double> psi(NCELLS,0.0);
@@ -1772,14 +1786,9 @@ int main(int argc, char const *argv[]){
 			// get velocity scale
 			v0tmp = vmin + (v0-vmin)*exp(-pow(dpsi,2.0)/(2.0*Ds*Ds));
 
-			// get unit vectors
-			rnorm = sqrt(rix*rix + riy*riy);
-			ux = rix/rnorm;
-			uy = riy/rnorm;
-
 			// add to forces
-			vF[NDIM*gi] += v0tmp*ux;
-			vF[NDIM*gi + 1] += v0tmp*uy;
+			vF[NDIM*gi] += v0tmp*cos(psitmp);
+			vF[NDIM*gi + 1] += v0tmp*sin(psitmp);
 			// vF[NDIM*gi] += (v0/nvtmp)*cos(psi[ci-1]);
 			// vF[NDIM*gi + 1] += (v0/nvtmp)*sin(psi[ci-1]);
 
@@ -1804,7 +1813,7 @@ int main(int argc, char const *argv[]){
 			vpos[i] += dt*vF[i];
 
 		// print shape info
-		if (tt % NSHAPESKIP == 0){
+		if (tt % NSHAPESKIP == 0 && tt > NT/2){
 			for (ci=0; ci<NCELLS; ci++){
 				calAtmp = pow(perimeter(vpos,ci,L,nv,szList),2.0)/(4.0*PI*area(vpos,ci,L,nv,szList));
 				shapeout << setw(wnum) << setprecision(6) << right << calAtmp;
@@ -1831,8 +1840,10 @@ int main(int argc, char const *argv[]){
 			phi /= L[0]*L[1];
 
 			// print vertex positions to check placement
-			cout << "\t** PRINTING POSITIONS TO FILE... " << endl;
-			printPos(posout, vpos, vrad, a0, calA0, L, cij, nv, szList, phi, NCELLS);
+			if (tt > NT/2){
+				cout << "\t** PRINTING POSITIONS TO FILE... " << endl;
+				printPos(posout, vpos, vrad, a0, calA0, L, cij, nv, szList, phi, NCELLS);
+			}
 		}
 	}
 
