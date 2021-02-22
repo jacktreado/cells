@@ -107,7 +107,7 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         shapef=$simdatadir/$filestr.shape
 
         # append to runString
-        runString="$runString ; ./$binf $NCELLS $NV $polyd $phiMax $kl $kb $v0 $Dr $NT $NPOSPRINT $NSHAPEPRINT $seed $posf $shapef"
+        runString="$runString ; ./$binf $NCELLS $NV $polyd $phiMax $calA0 $kl $kb $v0 $Dr $NT $NPOSPRINT $NSHAPEPRINT $seed $posf $shapef"
     done
 
     # finish off run string
