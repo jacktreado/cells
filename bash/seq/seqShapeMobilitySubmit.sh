@@ -28,17 +28,17 @@ v0=$5
 Dr=$6
 NT=$7
 NSHAPEPRINT=$8
-partition=$9
-time=$10
-numSeedsPerRun="${11}"
-numRuns="${12}"
-startSeed="${13}"
+NPOSPRINT=$9
+partition="${10}"
+time="${11}"
+numSeedsPerRun="${12}"
+numRuns="${13}"
+startSeed="${14}"
 
 # other variables
 polyd=0.1
 phiMax=0.975
 kl=1e-1
-NPOSPRINT=500
 
 let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
@@ -166,11 +166,12 @@ sbatch -t $time $slurmf
 # 6. Dr
 # 7. NT
 # 8. NSHAPEPRINT
-# 9. partition
-# 10. time
-# 11. num seeds per run (for each entry in array)
-# 12. number of runs (number of array entries, i.e. arraynum)
-# 13. start seed (end seed determined by number of runs)
+# 9. NPOSPRINT
+# 10. partition
+# 11. time
+# 12. num seeds per run (for each entry in array)
+# 13. number of runs (number of array entries, i.e. arraynum)
+# 14. start seed (end seed determined by number of runs)
 
 
 

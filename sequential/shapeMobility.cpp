@@ -1813,7 +1813,7 @@ int main(int argc, char const *argv[]){
 			vpos[i] += dt*vF[i];
 
 		// print shape info
-		if (tt % NSHAPESKIP == 0 && tt > NT/2){
+		if (tt % NSHAPESKIP == 0){
 			for (ci=0; ci<NCELLS; ci++){
 				calAtmp = pow(perimeter(vpos,ci,L,nv,szList),2.0)/(4.0*PI*area(vpos,ci,L,nv,szList));
 				shapeout << setw(wnum) << setprecision(6) << right << calAtmp;
@@ -1840,10 +1840,8 @@ int main(int argc, char const *argv[]){
 			phi /= L[0]*L[1];
 
 			// print vertex positions to check placement
-			if (tt > NT/2){
-				cout << "\t** PRINTING POSITIONS TO FILE... " << endl;
-				printPos(posout, vpos, vrad, a0, calA0, L, cij, nv, szList, phi, NCELLS);
-			}
+			cout << "\t** PRINTING POSITIONS TO FILE... " << endl;
+			printPos(posout, vpos, vrad, a0, calA0, L, cij, nv, szList, phi, NCELLS);
 		}
 	}
 
