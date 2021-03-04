@@ -47,12 +47,9 @@ timeVals = (0:(NT-1))*dt;
 
 %% Loop over time
 
-% velocities and forces
-vx = zeros(NV,1);
-vy = zeros(NV,1);
-
-fx = zeros(NV,1);
-fy = zeros(NV,1);
+% forces
+fx0 = zeros(NV,1);
+fy0 = zeros(NV,1);
 
 % random numbers
 randList    = randn(NT,1);
@@ -68,13 +65,13 @@ calAList    = zeros(NFRAMES,1);
 
 for tt = 1:NT
     
-    % do first verlet update for vertices (assume unit mass)
-    x = x + dt*vx + 0.5*fx*dt*dt;
-    y = y + dt*vy + 0.5*fy*dt*dt;
-    
-    % update old forces
-    fxold = fx;
-    fyold = fy;
+%     % do first verlet update for vertices (assume unit mass)
+%     x = x + dt*vx + 0.5*fx*dt*dt;
+%     y = y + dt*vy + 0.5*fy*dt*dt;
+%     
+%     % update old forces
+%     fxold = fx;
+%     fyold = fy;
     
     
     % * * * * * * * * * * * * * * * * * *
@@ -82,8 +79,8 @@ for tt = 1:NT
     % * * * * * * * * * * * * * * * * * *
     
     % reset forces
-    fx = zeros(NV,1);
-    fy = zeros(NV,1);
+    fx = fx0;
+    fy = fy0;
     
     % -- perimeter force
     
@@ -165,17 +162,17 @@ for tt = 1:NT
     fx = fx + v0tmp.*urx;
     fy = fy + v0tmp.*ury;
     
-    % include damping
-    dampingNumX = b*(vx - 0.5*fxold*dt);
-    dampingNumY = b*(vy - 0.5*fyold*dt);
-    dampingDenom = 1.0 - 0.5*b*dt;
-    
-    fx = (fx - dampingNumX)./dampingDenom;
-    fy = (fy - dampingNumY)./dampingDenom;
-    
-    % do second verlet update for vertices
-    vx = vx + dt*0.5*(fx + fxold);
-    vy = vy + dt*0.5*(fy + fyold);
+%     % include damping
+%     dampingNumX = b*(vx - 0.5*fxold*dt);
+%     dampingNumY = b*(vy - 0.5*fyold*dt);
+%     dampingDenom = 1.0 - 0.5*b*dt;
+%     
+%     fx = (fx - dampingNumX)./dampingDenom;
+%     fy = (fy - dampingNumY)./dampingDenom;
+%     
+%     % do second verlet update for vertices
+%     vx = vx + dt*0.5*(fx + fxold);
+%     vy = vy + dt*0.5*(fy + fyold);
     
     % print to console
     if mod(tt,pskip) == 0
@@ -207,8 +204,8 @@ for tt = 1:NT
         cList(ff,1) = cx;
         cList(ff,2) = cy;
         
-        vList(ff,1) = mean(vx);
-        vList(ff,2) = mean(vy);
+        vList(ff,1) = mean(fx);
+        vList(ff,2) = mean(fy);
         
         fList(ff,1) = Fx;
         fList(ff,2) = Fy;
@@ -223,9 +220,9 @@ for tt = 1:NT
         ff = ff + 1;
     end
     
-%     % Euler update
-%     x = x + dt*fx;
-%     y = y + dt*fy;
+    % Euler update
+    x = x + dt*fx;
+    y = y + dt*fy;
 end
 
 %% Also compare to ABP 

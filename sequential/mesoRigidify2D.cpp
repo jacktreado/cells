@@ -26,9 +26,9 @@
 
 
 
-	NOTE 01/24/21
-		-- Look into effect of contactScale and voidScale, deformation vs void size scaling??
-		-- Should these be variable inputs?
+	NOTE 02/26/21
+		-- Add shear modulus computation, save the contact network periodically
+		-- Add quicker \Delta E computation, notes on iPad
 
 	Jack Treado
 	11/03/2020, in the time of covid
@@ -105,20 +105,20 @@ double area(vector<double>& dpos, int ci, vector<double>& L, vector<int>& nv, ve
 double perimeter(vector<double>& dpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList);
 
 // system potential energy without spring network (for Metropolis choice)
-double potentialEnergyNoNetwork(vector<double>& vpos, 
-	vector<double>& vrad, 
-	vector<double>& a0, 
-	vector<double>& l0, 
-	vector<double>& delta0,
-	vector<double>& s0,
-	vector<double>& L, 
-	vector<int>& nv, 
-	vector<int>& szList, 
-	vector<int> im1, 
-	vector<int> ip1, 
-	double kl, 
-	double kb, 
-	int NCELLS);
+// double potentialEnergyNoNetwork(vector<double>& vpos, 
+// 	vector<double>& vrad, 
+// 	vector<double>& a0, 
+// 	vector<double>& l0, 
+// 	vector<double>& delta0,
+// 	vector<double>& s0,
+// 	vector<double>& L, 
+// 	vector<int>& nv, 
+// 	vector<int>& szList, 
+// 	vector<int> im1, 
+// 	vector<int> ip1, 
+// 	double kl, 
+// 	double kb, 
+// 	int NCELLS);
 
 // remove rattlers from contact network, return rattler number
 int removeRattlers(vector<int>& cij);
@@ -2064,8 +2064,11 @@ int main(int argc, char const *argv[]){
 						altpos[NDIM*gj + 1] 	+= (bondDisp*sij)*(dy/rij);
 
 						// compute change in potential energy
-						dU = potentialEnergyNoNetwork(altpos, vrad, a0, l0, delta0, s0, L, nv, szList, im1, ip1, kl, kb, NCELLS);
-						dU -= U;
+						dU = bondRemovalEnergyChange(vpos,a0,l0,delta0,s0,L,nv,szList,im1,ip1,kl,kb,NCELLS,gi,gj);
+
+						// OLD WAY: recomputing every single U
+						// dU = potentialEnergyNoNetwork(altpos, vrad, a0, l0, delta0, s0, L, nv, szList, im1, ip1, kl, kb, NCELLS);
+						// dU -= U;
 
 						// add in change to potential energy based on bond displacement 
 						// 	-- note in prefactor, sij cancels out based on def of bondDisp vs delta in notes

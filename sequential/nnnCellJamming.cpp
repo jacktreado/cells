@@ -43,9 +43,9 @@ const int wnum 				= 25;
 const int pnum 				= 14;
 
 // simulation constants
-const double phiInit 		= 0.5;
+const double phiInit 		= 0.4;
 const double phiJMin 		= 0.6;
-const double timeStepMag 	= 0.0025;
+const double timeStepMag 	= 0.005;
 const double sizeRatio 		= 1.4;
 const double sizeFraction 	= 0.5;
 
@@ -92,15 +92,16 @@ int main(int argc, char const *argv[]){
 
 	// parameters to be read in 
 	int NCELLS, smallNV, largeNV, smallN, largeN, NVTOT, NVSMALL, cellDOF, vertDOF, seed;
-	double Ptol, Ftol, phi0, dphi, T0, kl, kb, calA0, smallCalA0, largeCalA0;
+	double Ptol, Ftol, phi0, dphi, T0, kl, knnn, calA0, smallCalA0, largeCalA0;
 
 	// read in parameters from command line input
+	// test: ./nnn.o 16 24 1.005 0.001 1.0 1.0 1e-8 1e-12 1 pos.test vdos.test
 	string NCELLS_str 		= argv[1];
 	string smallNV_str 		= argv[2];
 	string calA0_str 		= argv[3];
 	string dphi_str 		= argv[4];
 	string kl_str 			= argv[5];
-	string kb_str 			= argv[6];
+	string knnn_str 		= argv[6];
 	string Ptol_str 		= argv[7];
 	string Ftol_str 		= argv[8];
 	string seed_str 		= argv[9];
@@ -112,7 +113,7 @@ int main(int argc, char const *argv[]){
 	stringstream calA0ss(calA0_str);
 	stringstream dphiss(dphi_str);
 	stringstream klss(kl_str);
-	stringstream kbss(kb_str);
+	stringstream knnnss(knnn_str);
 	stringstream Ptolss(Ptol_str);
 	stringstream Ftolss(Ftol_str);
 	stringstream seedss(seed_str);
@@ -122,7 +123,7 @@ int main(int argc, char const *argv[]){
 	calA0ss >> calA0;
 	dphiss >> dphi;
 	klss >> kl;
-	kbss >> kb;
+	knnnss >> knnn;
 	Ptolss >> Ptol;
 	Ftolss >> Ftol;
 	seedss >> seed;
@@ -154,7 +155,7 @@ int main(int argc, char const *argv[]){
 	NVTOT 	= NVSMALL + largeNV*largeN;
 
 	// szList and nv (keep track of global vertex indices)
-	cout << "makin vectors" << endl;
+	cout << "makin NV and szList vectors" << endl;
 	vector<int> szList(NCELLS,0);
 	vector<int> nv(NCELLS,0);
 	nv.at(0) = smallNV;
@@ -222,9 +223,9 @@ int main(int argc, char const *argv[]){
 	cout << "		small calA0 = " << smallCalA0 << "				" << endl;
 	cout << "		large calA0 = " << largeCalA0 << "				" << endl << endl;
 
-	cout << "		phi0 		= " << phiInit << " 					" << endl;
+	cout << "		phi0 		= " << phiInit << " 				" << endl;
 	cout << "		kl 			= " << kl << "						" << endl;
-	cout << "		kb 			= " << kb << "						" << endl;
+	cout << "		knnn 		= " << knnn << "					" << endl;
 	cout << "		seed 		= " << seed << "					" << endl << endl;
 
 	cout << "		pos file 	= " << positionFile << "			" << endl;
@@ -257,6 +258,7 @@ int main(int argc, char const *argv[]){
 
 	vector<double> a0(NCELLS,1.0);
 	vector<double> l0(NCELLS,1.0);
+	vector<double> w0(NCELLS,1.0);
 
 	// initialize effective disk radius (for minimization), and l0 parameter
 	for (ci=0; ci<NCELLS; ci++){
@@ -276,6 +278,9 @@ int main(int argc, char const *argv[]){
 
 		// store preferred area
 		a0.at(ci) 		= a0tmp;
+
+		// store preferred NNN length
+		w0.at(ci) 		= 2.0*sqrt((2.0*a0tmp*sin(2.0*PI/nvtmp))/nvtmp);
 
 		// set disk radius
 		drad.at(ci) 	= 1.1*sqrt((2.0*a0tmp)/(nvtmp*sin(2.0*PI/nvtmp)));
@@ -317,7 +322,7 @@ int main(int argc, char const *argv[]){
 
 
 	// Cell-linked-list variables
-	double boxLengthScale = 4.0;
+	double boxLengthScale = 4.5;
 
 	// box lengths in each direction
 	vector<int> sb(NDIM,0);
@@ -325,7 +330,7 @@ int main(int argc, char const *argv[]){
 	int NBX = 1;
 	for (d=0; d<NDIM; d++){
 		// determine number of cells along given dimension by rmax
-		sb[d] = round(L[d]/(boxLengthScale*l0.at(NCELLS-1)));
+		sb[d] = round(L[d]/(boxLengthScale*vrad.at(NVTOT-1)));
 
 		// just in case, if < 3, change to 3 so box neighbor checking will work
 		if (sb[d] < 3)
@@ -406,7 +411,7 @@ int main(int argc, char const *argv[]){
 	double alpha   	= alpha0;
 
 	double dtmax   	= 10*dt0;
-	double dtmin   	= 1e-8*dt0;
+	double dtmin   	= 1e-4*dt0;
 
 	int npPos      	= 0;
 	int npNeg      	= 0;
@@ -686,6 +691,7 @@ int main(int argc, char const *argv[]){
 	vector<double> vradSave(NVTOT,0.0);
 	vector<double> a0Save(NCELLS,0.0);
 	vector<double> l0Save(NCELLS,0.0);
+	vector<double> w0Save(NCELLS,0.0);
 
 
 	// save initial state
@@ -693,6 +699,7 @@ int main(int argc, char const *argv[]){
 	vradSave = vrad;
 	a0Save = a0;
 	l0Save = l0;
+	w0Save = w0;
 
 	// linked list variables
 	int boxid, bi, bj, pi, pj, sbtmp;
@@ -708,9 +715,9 @@ int main(int argc, char const *argv[]){
 	double rho0 = 0.0;
 
 	// shape force variables
-	double fa, fl, fb, l0tmp, atmp, li, lim1, kappai, cx, cy;
-	double da, dli, dlim1;
-	double lim2x, lim2y, lim1x, lim1y, lix, liy, lip1x, lip1y;
+	double fa, fl, fnnn, l0tmp, w0tmp, atmp, li, lim1, wi, wim2, cx, cy;
+	double da, dli, dlim1, dwi, dwim2;
+	double wim2x, wim2y, lim1x, lim1y, lix, liy, wix, wiy;
 	double rim2x, rim2y, rim1x, rim1y, rix, riy, rip1x, rip1y, rip2x, rip2y;
 	double ua, ul, ub;
 
@@ -723,7 +730,7 @@ int main(int argc, char const *argv[]){
 		k++;
 
 		// update tolerance
-		if (phi0 > phiJMin)
+		if (phi0 > 0.95*phiJMin)
 			Ftoltmp = Ftol;
 
 		// RESET FIRE VARIABLES
@@ -733,7 +740,7 @@ int main(int argc, char const *argv[]){
 		alpha   	= alpha0;
 
 		dtmax   	= 10*dt0;
-		dtmin   	= 1e-8*dt0;
+		dtmin   	= 1e-4*dt0;
 		dt 			= dt0;
 
 		npPos      	= 0;
@@ -806,8 +813,7 @@ int main(int argc, char const *argv[]){
 			}
 
 			// reset contact network
-			for (i=0; i<NCTCS; i++)
-				cij[i] = 0;
+			fill(cij.begin(), cij.end(), 0);
 
 			// FORCE UPDATE
 
@@ -965,15 +971,16 @@ int main(int argc, char const *argv[]){
 						nvtmp = nv[ci];
 						a0tmp = a0[ci];
 						l0tmp = l0[ci];
+						w0tmp = w0[ci];
 
 						// compute area deviation
 						atmp = area(vpos,ci,L,nv,szList);
 						da = (atmp/a0tmp) - 1.0;
 
 						// shape force parameters (kl and kl are unitless energy ratios)
-						fa = da*(rho0/a0tmp);		// derivation from the fact that rho0^2 does not necessarily cancel a0tmp
-						fl = kl*(rho0/l0tmp);
-						fb = kb*(rho0/(l0tmp*l0tmp));
+						fa 		= da*(rho0/a0tmp);		// derivation from the fact that rho0^2 does not necessarily cancel a0tmp
+						fl 		= nvtmp*kl*(rho0/l0tmp);
+						fnnn 	= nvtmp*knnn*(rho0/w0tmp);
 						
 						// compute cell center of mass
 						xi = vpos[NDIM*gi];
@@ -1000,7 +1007,13 @@ int main(int argc, char const *argv[]){
 						rix = vpos[NDIM*gi] - cx;
 						riy = vpos[NDIM*gi + 1] - cy;
 
-						// get (prior) adjacent vertices
+						// get adjacent vertices
+						rip1x = vpos.at(NDIM*ip1[gi]) - cx;
+						rip1x -= L[0]*round(rip1x/L[0]);
+
+						rip1y = vpos.at(NDIM*ip1[gi] + 1) - cy;
+						rip1y -= L[1]*round(rip1y/L[1]);
+
 						rim1x = vpos[NDIM*im1[gi]] - cx;
 						rim1x -= L[0]*round(rim1x/L[0]);
 
@@ -1020,12 +1033,11 @@ int main(int argc, char const *argv[]){
 
 
 				// get next adjacent vertices
-				rip1x = vpos.at(NDIM*ip1[gi]) - cx;
-				rip1x -= L[0]*round(rip1x/L[0]);
+				rip2x = vpos[NDIM*ip1[ip1[gi]]] - cx;
+				rip2x -= L[0]*round(rip2x/L[0]);
 
-				rip1y = vpos.at(NDIM*ip1[gi] + 1) - cy;
-				rip1y -= L[1]*round(rip1y/L[1]);
-
+				rip2y = vpos[NDIM*ip1[ip1[gi]] + 1] - cy;
+				rip2y -= L[1]*round(rip2y/L[1]);
 
 
 				// -- Area force
@@ -1055,34 +1067,40 @@ int main(int argc, char const *argv[]){
 				vF[NDIM*gi + 1] 	+= fl*(dli*(liy/li) - dlim1*(lim1y/lim1));
 
 
-				// -- Bending force
-				if (kb > 0){
-					// segment vectors for ip2
-					rip2x = vpos[NDIM*ip1[ip1[gi]]] - cx;
-					rip2x -= L[0]*round(rip2x/L[0]);
 
-					rip2y = vpos[NDIM*ip1[ip1[gi]] + 1] - cy;
-					rip2y -= L[1]*round(rip2y/L[1]);
 
-					lip1x = rip2x - rip1x;
-					lip1y = rip2y - rip1y;
+				// -- NNN spring force
 
-					lim2x = rim1x - rim2x;
-					lim2y = rim1y - rim2y;
+				// nnn bond vector elements
+				wim2x = rix - rim2x;
+				wim2y = riy - rim2y;
 
-					// add to force
-					vF[NDIM*gi] 		+= fb*(3.0*(lix - lim1x) + lim2x - lip1x);
-					vF[NDIM*gi + 1] 	+= fb*(3.0*(liy - lim1y) + lim2y - lip1y);
-				}
+				wix = rip2x - rix;
+				wiy = rip2y - riy;
+
+				// nnn bond lengths		
+				wim2 = sqrt(wim2x*wim2x + wim2y*wim2y);
+				wi = sqrt(wix*wix + wiy*wiy);
+				
+				// nnn bond deviations
+				dwim2 = (wim2/w0tmp) - 1.0;
+				dwi = (wi/w0tmp) - 1.0;
+
+				// add to forces
+				vF[NDIM*gi] 		+= fnnn*(dwi*(wix/wi) - dwim2*(wim2x/wim2));
+				vF[NDIM*gi + 1] 	+= fnnn*(dwi*(wiy/wi) - dwim2*(wim2y/wim2));
+
 
 				// update old coordinates
 				rim2x = rim1x;
 				rim1x = rix;
 				rix = rip1x;
+				rip1x = rip2x;
 
 				rim2y = rim1y;
 				rim1y = riy;
 				riy = rip1y;
+				rip1y = rip2y;
 			}
 
 
@@ -1267,12 +1285,8 @@ int main(int argc, char const *argv[]){
 		cout << "	* jammed = " << jammed << endl << endl;
 		cout << endl;
 
-
-		// print if sufficiently close to jamming
-		if (phi0 > 0.7){
-			cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl << endl;
-			printPos(posout, vpos, a0, l0, L, cij, nv, szList, phi0, NCELLS);
-		}
+		cout << "* printing positions to file ... " << endl;
+		printPos(posout, vpos, a0, l0, L, cij, nv, szList, phi0, NCELLS);
 
 		// update particle sizes based on target check
 		if (rH < 0){
@@ -1292,6 +1306,7 @@ int main(int argc, char const *argv[]){
 				vradSave = vrad;
 				a0Save = a0;
 				l0Save = l0;
+				w0Save = w0;
 
 	            // compute new scale factor
 	            scaleFactor = drshrink;
@@ -1312,6 +1327,7 @@ int main(int argc, char const *argv[]){
 					vrad = vradSave;
 					a0 = a0Save;
 					l0 = l0Save;
+					w0 = w0Save;
 
 					// compute new scale factor by root search
 		            scaleFactor = 0.5*(rH + rL)/r0;
@@ -1331,6 +1347,7 @@ int main(int argc, char const *argv[]){
 					vradSave = vrad;
 					a0Save = a0;
 					l0Save = l0;
+					w0Save = w0;
 
 		            // keep shrinking at same rate until unjamming
 		            scaleFactor = drshrink;
@@ -1350,6 +1367,7 @@ int main(int argc, char const *argv[]){
 					vrad = vradSave;
 					a0 = a0Save;
 					l0 = l0Save;
+					w0 = w0Save;
 
 					// compute new scale factor
 		            scaleFactor = 0.5*(rH + rL)/r0;
@@ -1367,6 +1385,7 @@ int main(int argc, char const *argv[]){
 					vrad = vradSave;
 					a0 = a0Save;
 					l0 = l0Save;
+					w0 = w0Save;
 
 					// compute new scale factor
 		            scaleFactor = 0.5*(rH + rL)/r0;
@@ -1394,6 +1413,7 @@ int main(int argc, char const *argv[]){
 		for (ci=0; ci<NCELLS; ci++){
 			// scale preferred lengths
 			l0[ci] *= scaleFactor;
+			w0[ci] *= scaleFactor;
 			a0[ci] *= scaleFactor*scaleFactor;
 
 			// first global index for ci
@@ -1471,11 +1491,12 @@ int main(int argc, char const *argv[]){
 	double delim1, deli, delA;
 	double ljm1x, ljm1y, ljx, ljy;
 	double ulim1x, ulim1y, ulix, uliy;
+	double uwim2x, uwim2y, uwix, uwiy;
 	double da_dxi, da_dyi, da_dxj, da_dyj;
 	double kapim1, kapi, kapip1;
 	double dkapi_dxi, dkapi_dyi, dkapip1_dxi, dkapip1_dyi, dkapim1_dxi, dkapim1_dyi;
 	double dkapi_dxip1, dkapi_dyip1, dkapip1_dxip1, dkapip1_dyip1, dkapip1_dxip2, dkapip1_dyip2;
-	double Kl1, Kl2, Kb1, Kb2;
+	double Kl1, Kl2, Knn1, Knn2;
 	double kij, h;
 	double uxij, uyij;
 
@@ -1486,8 +1507,8 @@ int main(int argc, char const *argv[]){
 	Eigen::MatrixXd Sa(vertDOF,vertDOF);		// stress matrix for area term
 	Eigen::MatrixXd Hl(vertDOF,vertDOF);		// stiffness matrix for perimeter term
 	Eigen::MatrixXd Sl(vertDOF,vertDOF);		// stress matrix for perimeter term
-	Eigen::MatrixXd Hb(vertDOF,vertDOF);		// stiffness matrix for bending energy
-	Eigen::MatrixXd Sb(vertDOF,vertDOF);		// stress matrix for bending term
+	Eigen::MatrixXd Hnn(vertDOF,vertDOF);		// stiffness matrix for NNN spring energy
+	Eigen::MatrixXd Snn(vertDOF,vertDOF);		// stress matrix for NNN spring term
 	Eigen::MatrixXd Hvv(vertDOF,vertDOF);		// stiffness matrix for interaction terms
 	Eigen::MatrixXd Svv(vertDOF,vertDOF);		// stress matrix for interaction terms
 	Eigen::MatrixXd H(vertDOF,vertDOF);			// stiffness matrix
@@ -1501,8 +1522,8 @@ int main(int argc, char const *argv[]){
 			Sa(k,l) = 0.0;
 			Hl(k,l) = 0.0;
 			Sl(k,l) = 0.0;
-			Hb(k,l) = 0.0;
-			Sb(k,l) = 0.0;
+			Hnn(k,l) = 0.0;
+			Snn(k,l) = 0.0;
 			Hvv(k,l) = 0.0;
 			Svv(k,l) = 0.0;
 			S(k,l) = 0.0;
@@ -1534,16 +1555,17 @@ int main(int argc, char const *argv[]){
 		// geometric factors
 		l0tmp = l0[ci];
 		a0tmp = a0[ci];
+		w0tmp = w0[ci];
 
 		// area deviations
 		delA = (area(vpos,ci,L,nv,szList)/a0tmp) - 1.0;
 
 		// dimensionless stiffness constants
-		Kl1 = kl*(rho0*rho0)/l0tmp;				// units = L
-		Kl2 = Kl1/l0tmp;						// units = 1
+		Kl1 	= kl*(rho0*rho0)/l0tmp;					// units = L
+		Kl2 	= Kl1/l0tmp;							// units = 1
 
-		Kb1 = kb*(rho0*rho0);					// units = L^2
-		Kb2 = Kb1/(l0tmp*l0tmp);				// units = 1
+		Knn1 	= knnn*(rho0*rho0)/w0tmp;				// units = L
+		Knn2 	= Knn1/w0tmp;							// units = 1
 
 		// loop over vertices, compute each DM element
 		for (vi=0; vi<nvtmp; vi++){
@@ -1556,28 +1578,21 @@ int main(int argc, char const *argv[]){
 
 			// vertex elements
 			kxm2 		= NDIM*(szList.at(ci) + vim2);
-			kym2 		= NDIM*(szList.at(ci) + vim2) + 1;
+			kym2 		= kxm2 + 1;
 
 			kxm1 		= NDIM*(szList.at(ci) + vim1);
-			kym1 		= NDIM*(szList.at(ci) + vim1) + 1;
+			kym1 		= kxm1 + 1;
 
 			kx 			= NDIM*(szList.at(ci) + vi);
-			ky 			= NDIM*(szList.at(ci) + vi) + 1;
+			ky 			= kx + 1;
 
 			kxp1 		= NDIM*(szList.at(ci) + vip1);
-			kyp1 		= NDIM*(szList.at(ci) + vip1) + 1;
+			kyp1 		= kxp1 + 1;
 
 			kxp2 		= NDIM*(szList.at(ci) + vip2);
-			kyp2 		= NDIM*(szList.at(ci) + vip2) + 1;
+			kyp2 		= kxp2 + 1;
 
 			// segment length vector components
-			lim2x 		= vpos[kxm1] - vpos[kxm2];
-			lim2x		-= L[0]*round(lim2x/L[0]);
-
-			lim2y 		= vpos[kym1] - vpos[kym2];
-			lim2y 		-= L[1]*round(lim2y/L[1]);
-
-
 			lim1x 		= vpos[kx] - vpos[kxm1];
 			lim1x		-= L[0]*round(lim1x/L[0]);
 
@@ -1590,13 +1605,6 @@ int main(int argc, char const *argv[]){
 
 			liy 		= vpos[kyp1] - vpos[ky];
 			liy 		-= L[1]*round(liy/L[1]);
-
-
-			lip1x 		= vpos[kxp2] - vpos[kxp1];
-			lip1x		-= L[0]*round(lip1x/L[0]);
-
-			lip1y 		= vpos[kyp2] - vpos[kyp1];
-			lip1y 		-= L[1]*round(lip1y/L[1]);
 
 
 			// segment lengths
@@ -1667,107 +1675,86 @@ int main(int argc, char const *argv[]){
 
 
 
-    		// -- CURVATURE SPRINGS
+
+    		// -- NNN springs
+
+    		// nnn bond vector components
+    		wim2x 		= vpos[kx] - vpos[kxm2];
+			wim2x		-= L[0]*round(wim2x/L[0]);
+
+			wim2y 		= vpos[ky] - vpos[kym2];
+			wim2y 		-= L[1]*round(wim2y/L[1]);
+
+			wix 		= vpos[kxp2] - vpos[kx];
+			wix 		-= L[0]*round(wix/L[0]);
+
+			wiy 		= vpos[kyp2] - vpos[ky];
+			wiy 		-= L[1]*round(wiy/L[1]);
+
+			// nnn bond lengths		
+			wim2 		= sqrt(wim2x*wim2x + wim2y*wim2y);
+			wi 			= sqrt(wix*wix + wiy*wiy); 
+
+			// unit vectors
+			uwim2x 		= wim2x/wim2;
+			uwim2y 		= wim2y/wim2;
+
+			uwix 		= wix/wi;
+			uwiy 		= wiy/wi;
+			
+			// nnn bond deviations
+			dwim2 = (wim2/w0tmp) - 1.0;
+			dwi = (wi/w0tmp) - 1.0;
 
 
-    		// curvatures
-    		kapim1 			= sqrt(pow(lim1x - lim2x,2.0) + pow(lim1y - lim2y,2.0))/l0tmp;
-    		kapi 			= sqrt(pow(lix - lim1x,2.0) + pow(liy - lim1y,2.0))/l0tmp;
-    		kapip1 			= sqrt(pow(lip1x - lix,2.0) + pow(lip1y - liy,2.0))/l0tmp;
+			// STIFFNESS MATRIX
 
-    		// curvature derivatives
-
-    		// derivatives of kapim1
-    		dkapim1_dxi 	= (lim1x - lim2x)/(kapim1*l0tmp*l0tmp);
-    		dkapim1_dyi 	= (lim1y - lim2y)/(kapim1*l0tmp*l0tmp);
-
-    		// derivatives of kapi
-    		dkapi_dxip1 	= (lix - lim1x)/(kapi*l0tmp*l0tmp);
-    		dkapi_dyip1 	= (liy - lim1y)/(kapi*l0tmp*l0tmp);
-    		dkapi_dxi 		= -2.0*dkapi_dxip1;
-    		dkapi_dyi 		= -2.0*dkapi_dyip1;	
-
-    		// derivatives of kapip1
-    		dkapip1_dxi 	= (lip1x - lix)/(kapip1*l0tmp*l0tmp);
-    		dkapip1_dyi 	= (lip1y - liy)/(kapip1*l0tmp*l0tmp);
-    		dkapip1_dxip1 	= -2.0*dkapip1_dxi;
-    		dkapip1_dyip1 	= -2.0*dkapip1_dyi;
-    		dkapip1_dxip2	= dkapip1_dxi;
-    		dkapip1_dyip2 	= dkapip1_dyi;
-
-
-    		// 	STIFFNESS MATRIX
-
-    		// block-diagonal terms
-		    Hb(kx,kx)       = Kb1*(dkapim1_dxi*dkapim1_dxi + dkapi_dxi*dkapi_dxi + dkapip1_dxi*dkapip1_dxi);
-		    Hb(ky,ky)       = Kb1*(dkapim1_dyi*dkapim1_dyi + dkapi_dyi*dkapi_dyi + dkapip1_dyi*dkapip1_dyi);
+			// main diagonal
+		    Hnn(kx,kx)       = Knn2*(uwix*uwix + uwim2x*uwim2x);
+		    Hnn(ky,ky)       = Knn2*(uwiy*uwiy + uwim2y*uwim2y);
 		    
-		    Hb(kx,ky)       = Kb1*(dkapim1_dxi*dkapim1_dyi + dkapi_dxi*dkapi_dyi + dkapip1_dxi*dkapip1_dyi);
-		    Hb(ky,kx)       = Hb(kx,ky);
+		    Hnn(kx,ky)       = Knn2*(uwix*uwiy + uwim2x*uwim2y);
+		    Hnn(ky,kx)       = Hnn(kx,ky);
 		    
-		    // 1off block-diagonal terms
-		    Hb(kx,kxp1)     = Kb1*(dkapi_dxi*dkapi_dxip1 + dkapip1_dxi*dkapip1_dxip1);
-		    Hb(ky,kyp1)     = Kb1*(dkapi_dyi*dkapi_dyip1 + dkapip1_dyi*dkapip1_dyip1);
+		    // 1off diagonal
+		    Hnn(kx,kxp2)     = -Knn2*uwix*uwix;
+		    Hnn(ky,kyp2)     = -Knn2*uwiy*uwiy;
 		    
-		    Hb(kx,kyp1)     = Kb1*(dkapi_dxi*dkapi_dyip1 + dkapip1_dxi*dkapip1_dyip1);
-		    Hb(ky,kxp1)     = Kb1*(dkapi_dyi*dkapi_dxip1 + dkapip1_dyi*dkapip1_dxip1);
-		    
-		    // 2off block-diagonal terms
-		    Hb(kx,kxp2)     = Kb1*dkapip1_dxi*dkapip1_dxip2;
-		    Hb(ky,kyp2)     = Kb1*dkapip1_dyi*dkapip1_dyip2;
-		    
-		    Hb(kx,kyp2)     = Kb1*dkapip1_dxi*dkapip1_dyip2;
-		    Hb(ky,kxp2)     = Kb1*dkapip1_dyi*dkapip1_dxip2;
+		    Hnn(kx,kyp2)     = -Knn2*uwix*uwiy;
+		    Hnn(ky,kxp2)     = Hnn(kx,kyp2);
 		    
 		    // enforce symmetry in lower triangle
-		    Hb(kxp1,kx)     = Hb(kx,kxp1);
-		    Hb(kyp1,ky)     = Hb(ky,kyp1);
+		    Hnn(kxp2,kx)     = Hnn(kx,kxp2);
+		    Hnn(kyp2,ky)     = Hnn(ky,kyp2);
 		    
-		    Hb(kxp1,ky)     = Hb(ky,kxp1);
-		    Hb(kyp1,kx)     = Hb(kx,kyp1);
+		    Hnn(kyp2,kx)     = Hnn(kx,kyp2);
+		    Hnn(kxp2,ky)     = Hnn(ky,kxp2);
+
+
+	        // STRESS MATRIX
+    
+		    // main diagonal
+		    Snn(kx,kx)       = Knn1*(dwim2*((uwim2y*uwim2y)/wim2) + dwi*((uwiy*uwiy)/wi));
+		    Snn(ky,ky)       = Knn1*(dwim2*((uwim2x*uwim2x)/wim2) + dwi*((uwix*uwix)/wi));
 		    
-		    Hb(kxp2,kx)     = Hb(kx,kxp2);
-		    Hb(kyp2,ky)     = Hb(ky,kyp2);
+		    Snn(kx,ky)       = -Knn1*(dwim2*((uwim2x*uwim2y)/wim2) + dwi*((uwix*uwiy)/wi));
+		    Snn(ky,kx)       = Snn(kx,ky);
 		    
-		    Hb(kyp2,kx)     = Hb(kx,kyp2);
-		    Hb(kxp2,ky)     = Hb(ky,kxp2);
+		    // 1off diagonal
+		    Snn(kx,kxp2)     = -Knn1*dwi*((uwiy*uwiy)/wi);
+		    Snn(ky,kyp2)     = -Knn1*dwi*((uwix*uwix)/wi);
 		    
-		    
-		    // 	STRESS MATRIX
-		    
-		    // block diagonal
-		    Sb(kx,kx)       = Kb2*(6.0 - (l0tmp*dkapim1_dxi)*(l0tmp*dkapim1_dxi) - (l0tmp*dkapi_dxi)*(l0tmp*dkapi_dxi) - (l0tmp*dkapip1_dxi)*(l0tmp*dkapip1_dxi));
-		    Sb(ky,ky)       = Kb2*(6.0 - (l0tmp*dkapim1_dyi)*(l0tmp*dkapim1_dyi) - (l0tmp*dkapi_dyi)*(l0tmp*dkapi_dyi) - (l0tmp*dkapip1_dyi)*(l0tmp*dkapip1_dyi));
-		    
-		    Sb(kx,ky)       = -Kb1*(dkapim1_dxi*dkapim1_dyi + dkapi_dxi*dkapi_dyi + dkapip1_dxi*dkapip1_dyi);
-		    Sb(ky,kx)       = Sb(kx,ky);
-		    
-		    // 1off block diagonal
-		    Sb(kx,kxp1)     = -2.0*Kb2*(2.0 - (l0tmp*dkapi_dxip1)*(l0tmp*dkapi_dxip1) - (l0tmp*dkapip1_dxi)*(l0tmp*dkapip1_dxi));
-		    Sb(ky,kyp1)     = -2.0*Kb2*(2.0 - (l0tmp*dkapi_dyip1)*(l0tmp*dkapi_dyip1) - (l0tmp*dkapip1_dyi)*(l0tmp*dkapip1_dyi));
-		    
-		    Sb(kx,kyp1)     = -Kb1*(dkapi_dxi*dkapi_dyip1 + dkapip1_dxi*dkapip1_dyip1);
-		    Sb(ky,kxp1)     = -Kb1*(dkapi_dyi*dkapi_dxip1 + dkapip1_dyi*dkapip1_dxip1);
-		    
-		    // 2off block diagonal
-		    Sb(kx,kxp2)     = Kb2*(1.0 - (l0tmp*dkapip1_dxi)*(l0tmp*dkapip1_dxi));
-		    Sb(ky,kyp2)     = Kb2*(1.0 - (l0tmp*dkapip1_dyi)*(l0tmp*dkapip1_dyi));
-		    
-		    Sb(kx,kyp2)     = -Kb1*dkapip1_dxi*dkapip1_dyip2;
-		    Sb(ky,kxp2)     = -Kb1*dkapip1_dyi*dkapip1_dxip2;
+		    Snn(kx,kyp2)     = Knn1*dwi*((uwix*uwiy)/wi);
+		    Snn(ky,kxp2)     = Snn(kx,kyp2);
 		    
 		    // enforce symmetry in lower triangle
-		    Sb(kxp1,kx)     = Sb(kx,kxp1);
-		    Sb(kyp1,ky)     = Sb(ky,kyp1);
+		    Snn(kxp2,kx)     = Snn(kx,kxp2);
+		    Snn(kyp2,ky)     = Snn(ky,kyp2);
 		    
-		    Sb(kxp1,ky)     = Sb(ky,kxp1);
-		    Sb(kyp1,kx)     = Sb(kx,kyp1);
-		    
-		    Sb(kxp2,kx)     = Sb(kx,kxp2);
-		    Sb(kyp2,ky)     = Sb(ky,kyp2);
-		    
-		    Sb(kxp2,ky)     = Sb(ky,kxp2);
-		    Sb(kyp2,kx)     = Sb(kx,kyp2);
+		    Snn(kyp2,kx)     = Snn(kx,kyp2);
+		    Snn(kxp2,ky)     = Snn(ky,kxp2);
+
+
     		
 
 		    // -- AREA SPRING (stress matrix)
@@ -1959,8 +1946,8 @@ int main(int argc, char const *argv[]){
 	// initialize all matrices to be 0 initially
 	for (k=0; k<vertDOF; k++){
 		for (l=0; l<vertDOF; l++){
-			H(k,l) = Ha(k,l) + Hl(k,l) + Hb(k,l) + Hvv(k,l);
-			S(k,l) = -Sa(k,l) - Sl(k,l) - Sb(k,l) - Svv(k,l);
+			H(k,l) = Ha(k,l) + Hl(k,l) + Hnn(k,l) + Hvv(k,l);
+			S(k,l) = -Sa(k,l) - Sl(k,l) - Snn(k,l) - Svv(k,l);
 			M(k,l) = H(k,l) - S(k,l);
 		}
 	}
@@ -1983,13 +1970,32 @@ int main(int argc, char const *argv[]){
 	vdosout << evecs << endl;
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	// close open objects
 	posout.close();
 	vdosout.close();
 
 
 	// print to console, return
-	cout << "\n\n\nFINISHED MAIN FOR bidRepulsiveCellJamming.cpp, ENDING." << endl << endl << endl;
+	cout << "\n\n\nFINISHED MAIN FOR nnnCellJamming.cpp, ENDING." << endl << endl << endl;
 	return 0;
 }
 

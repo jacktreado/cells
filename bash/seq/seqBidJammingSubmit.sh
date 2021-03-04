@@ -31,9 +31,9 @@ numRuns=$9
 startSeed="${10}"
 
 # other variables
-dphi=1e-3
-Ptol=1e-8
-Ftol=1e-14
+dphi=5e-4
+Ptol=1e-12
+Ftol=1e-15
 
 let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
@@ -54,7 +54,7 @@ echo Running $numSeeds jamming sims of $NCELLS cells with $NV verts, bidisperse 
 # run compiler
 rm -f $binf
 g++ --std=c++11 -I $srcdir $mainf -o $binf 
-echo compiling with : g++ --std=c++11 -I $srcdir $mainf -o $binf 
+echo compiling with : g++ --std=c++11 -O3 -I $srcdir $mainf -o $binf 
 
 # check compilation
 if [[ ! -f $binf ]]
