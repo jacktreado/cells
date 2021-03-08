@@ -28,7 +28,11 @@
 
 	NOTE 02/26/21
 		-- Add shear modulus computation, save the contact network periodically
-		-- Add quicker \Delta E computation, notes on iPad
+
+	NOTE 03/05/21
+		-- Do small system comparison between dU comp methods, should be identical 
+		-- So far not quite, but both seem reasonable ... check that they should be
+		* truly * identical, and if so debug dU function ... change in vertex-vertex overlap energies?
 
 	Jack Treado
 	11/03/2020, in the time of covid
@@ -63,7 +67,7 @@ const int pnum 				= 14;
 // simulation constants
 const int nvmin 			= 12;
 const double timeStepMag 	= 0.01;
-const double phiInit 		= 0.2;
+const double phiInit 		= 0.4;
 const double dphiGrow 		= 0.01;
 const double dphiShrink 	= 0.001;
 const double dphiPrint 		= 0.01;
@@ -105,20 +109,38 @@ double area(vector<double>& dpos, int ci, vector<double>& L, vector<int>& nv, ve
 double perimeter(vector<double>& dpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList);
 
 // system potential energy without spring network (for Metropolis choice)
-// double potentialEnergyNoNetwork(vector<double>& vpos, 
-// 	vector<double>& vrad, 
-// 	vector<double>& a0, 
-// 	vector<double>& l0, 
-// 	vector<double>& delta0,
-// 	vector<double>& s0,
-// 	vector<double>& L, 
-// 	vector<int>& nv, 
-// 	vector<int>& szList, 
-// 	vector<int> im1, 
-// 	vector<int> ip1, 
-// 	double kl, 
-// 	double kb, 
-// 	int NCELLS);
+double bondRemovalEnergyChange(vector<double>& vpos, 
+	vector<double>& altpos, 
+	vector<double>& a0, 
+	vector<double>& l0, 
+	vector<double>& delta0,
+	vector<double>& s0,
+	vector<double>& L, 
+	vector<int>& nv, 
+	vector<int>& szList, 
+	vector<int> im1, 
+	vector<int> ip1, 
+	double kl, 
+	double kb,
+	int gi,
+	int gj,
+	int mu,
+	int nu);
+
+double potentialEnergyNoNetwork(vector<double>& vpos, 
+	vector<double>& vrad, 
+	vector<double>& a0, 
+	vector<double>& l0, 
+	vector<double>& delta0,
+	vector<double>& s0,
+	vector<double>& L, 
+	vector<int>& nv, 
+	vector<int>& szList, 
+	vector<int> im1, 
+	vector<int> ip1, 
+	double kl, 
+	double kb, 
+	int NCELLS);
 
 // remove rattlers from contact network, return rattler number
 int removeRattlers(vector<int>& cij);
@@ -142,7 +164,7 @@ int main(int argc, char const *argv[]){
 
 	// read in parameters from command line input
 	// test: g++ -O3 sequential/mesoRigidify2D.cpp -o meso.cpp
-	// test: ./meso.o 16 32 1.01 0.1 1.05 0.4 1.0 0.01 0.01 0.01 1.0 1 pos.test
+	// test: ./meso.o 16 24 1.001 0.1 1.0 0.4 1.0 0.01 0.01 0.01 1.0 1 pos.test
 	string NCELLS_str 			= argv[1];
 	string NV_str 				= argv[2];
 	string calA0_str 			= argv[3];
@@ -1289,8 +1311,8 @@ int main(int argc, char const *argv[]){
 		cout << "	* Ncc 			= " << Ncc << endl;
 		cout << endl;
 
-		cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl << endl;
-		printPos(posout, vpos, vrad, a0, calA0, L, cij, nv, szList, phi, NCELLS);
+		// cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl << endl;
+		// printPos(posout, vpos, vrad, a0, calA0, L, cij, nv, szList, phi, NCELLS);
 
 		// grow or shrink particles by scale factor
 		phi = 0.0;
@@ -2064,7 +2086,7 @@ int main(int argc, char const *argv[]){
 						altpos[NDIM*gj + 1] 	+= (bondDisp*sij)*(dy/rij);
 
 						// compute change in potential energy
-						dU = bondRemovalEnergyChange(vpos,a0,l0,delta0,s0,L,nv,szList,im1,ip1,kl,kb,NCELLS,gi,gj);
+						dU = bondRemovalEnergyChange(vpos,altpos,a0,l0,delta0,s0,L,nv,szList,im1,ip1,kl,kb,gi,gj,ci,cj);
 
 						// OLD WAY: recomputing every single U
 						// dU = potentialEnergyNoNetwork(altpos, vrad, a0, l0, delta0, s0, L, nv, szList, im1, ip1, kl, kb, NCELLS);
@@ -2437,6 +2459,265 @@ double perimeter(vector<double>& vpos, int ci, vector<double>& L, vector<int>& n
 	// return perimeter
 	return perimVal;
 }
+
+
+
+
+
+
+
+
+
+
+// Change in potential energy due to shape change upon bond release
+// add: gi,gj,mu,nu
+double bondRemovalEnergyChange(vector<double>& vpos, 
+	vector<double>& altpos, 
+	vector<double>& a0, 
+	vector<double>& l0, 
+	vector<double>& delta0,
+	vector<double>& s0,
+	vector<double>& L, 
+	vector<int>& nv, 
+	vector<int>& szList, 
+	vector<int> im1, 
+	vector<int> ip1, 
+	double kl, 
+	double kb,
+	int gi,
+	int gj,
+	int mu,
+	int nu){
+
+
+	// local variables
+	vector<double> postmp;
+	double addSign;
+
+	int im2x, im2y, im1x, im1y, ix, iy, ip1x, ip1y, ip2x, ip2y;
+	int jm2x, jm2y, jm1x, jm1y, jx, jy, jp1x, jp1y, jp2x, jp2y;
+
+	double aPREV_mu, aPREV_nu, aCURR_mu, aCURR_nu, a0_mu, a0_nu;
+
+	double lim2x, lim2y, lim1x, lim1y, lix, liy, lip1x, lip1y;
+	double ljm2x, ljm2y, ljm1x, ljm1y, ljx, ljy, ljp1x, ljp1y;
+	double lim2, lim1, li, lip1, ljm2, ljm1, lj, ljp1;
+	double sim1, si, sip1, sjm1, sj, sjp1;
+
+	double l0im1_mu, l0i_mu, l0_mu, l0jm1_nu, l0j_nu, l0_nu;
+	double s0im1_mu, s0i_mu, s0ip1_mu, s0jm1_nu, s0j_nu, s0jp1_nu;
+
+	double dUShape = 0.0;
+
+
+	// Global vertex indices
+
+	// cell mu
+	im2x = NDIM*im1[im1[gi]];
+	im2y = im2x + 1;
+
+	im1x = NDIM*im1[gi];
+	im1y = im1x + 1;
+
+	ix = NDIM*gi;
+	iy = ix + 1;
+
+	ip1x = NDIM*ip1[gi];
+	ip1y = ip1x + 1;
+
+	ip2x = NDIM*ip1[ip1[gi]];
+	ip2y = ip2x + 1;
+
+
+	// cell nu
+	jm2x = NDIM*im1[im1[gi]];
+	jm2y = jm2x + 1;
+
+	jm1x = NDIM*im1[gj];
+	jm1y = jm1x + 1;
+
+	jx = NDIM*gj;
+	jy = jx + 1;
+
+	jp1x = NDIM*ip1[gj];
+	jp1y = jp1x + 1;
+
+	jp2x = NDIM*ip1[ip1[gj]];
+	jp2y = jp2x + 1;
+
+
+	// Static shape parameters (NOTE: to get non-dimension bending energy right, l0i are absorbed into s differences)
+
+	// cell mu
+	l0_mu 		= l0[mu];
+	l0im1_mu 	= l0_mu*delta0[im1[gi]];
+	l0i_mu 		= l0_mu*delta0[gi];
+
+	s0im1_mu 	= s0[im1[gi]];
+	s0i_mu 		= s0[gi];
+	s0ip1_mu 	= s0[ip1[gi]];
+
+
+	// cell nu
+	l0_nu 		= l0[nu];
+	l0jm1_nu 	= l0_nu*delta0[im1[gj]];
+	l0j_nu 		= l0_nu*delta0[gj];
+
+	s0jm1_nu 	= s0[im1[gj]];
+	s0j_nu 		= s0[gj];
+	s0jp1_nu 	= s0[ip1[gj]];
+
+
+
+
+
+	// use loop for before and after
+	for (int state=0; state<2; state++){
+		// initial
+		if (state == 0){
+			postmp = vpos;
+			addSign = -1.0;
+		}
+		else{
+			postmp = altpos;
+			addSign = 1.0;
+		}
+
+		// segment vectors
+
+		// cell mu
+		lim2x = postmp[im1x] - postmp[im2x];
+		lim2x -= L[0]*round(lim2x/L[0]);
+
+		lim2y = postmp[im1y] - postmp[im2y];
+		lim2y -= L[1]*round(lim2y/L[1]);
+
+		lim1x = postmp[ix] - postmp[im1x];
+		lim1x -= L[0]*round(lim1x/L[0]);
+
+		lim1y = postmp[iy] - postmp[im1y];
+		lim1y -= L[1]*round(lim1y/L[1]);
+
+		lix = postmp[ip1x] - postmp[ix];
+		lix -= L[0]*round(lix/L[0]);
+
+		liy = postmp[ip1y] - postmp[iy];
+		liy -= L[1]*round(liy/L[1]);
+
+		lip1x = postmp[ip2x] - postmp[ip1x];
+		lip1x -= L[0]*round(lip1x/L[0]);
+
+		lip1y = postmp[ip2y] - postmp[ip1y];
+		lip1y -= L[1]*round(lip1y/L[1]);
+
+
+		// cell nu
+		ljm2x = postmp[jm1x] - postmp[jm2x];
+		ljm2x -= L[0]*round(ljm2x/L[0]);
+
+		ljm2y = postmp[jm1y] - postmp[jm2y];
+		ljm2y -= L[1]*round(ljm2y/L[1]);
+
+		ljm1x = postmp[jx] - postmp[jm1x];
+		ljm1x -= L[0]*round(ljm1x/L[0]);
+
+		ljm1y = postmp[jy] - postmp[jm1y];
+		ljm1y -= L[1]*round(ljm1y/L[1]);
+
+		ljx = postmp[jp1x] - postmp[jx];
+		ljx -= L[0]*round(ljx/L[0]);
+
+		ljy = postmp[jp1y] - postmp[jy];
+		ljy -= L[1]*round(ljy/L[1]);
+
+		ljp1x = postmp[jp2x] - postmp[jp1x];
+		ljp1x -= L[0]*round(ljp1x/L[0]);
+
+		ljp1y = postmp[jp2y] - postmp[jp1y];
+		ljp1y -= L[1]*round(ljp1y/L[1]);
+
+
+
+		// segment lengths
+
+		// cell mu
+		lim2 = sqrt(lim2x*lim2x + lim2y*lim2y);
+		lim1 = sqrt(lim1x*lim1x + lim1y*lim1y);
+		li = sqrt(lix*lix + liy*liy);
+		lip1 = sqrt(lip1x*lip1x + lip1y*lip1y);
+
+		// cell nu
+		ljm2 = sqrt(ljm2x*ljm2x + ljm2y*ljm2y);
+		ljm1 = sqrt(ljm1x*ljm1x + ljm1y*ljm1y);
+		lj = sqrt(ljx*ljx + ljy*ljy);
+		ljp1 = sqrt(ljp1x*ljp1x + ljp1y*ljp1y);
+
+
+		// curvatures (NOTE: not non-dimensional yet, taken out of the energies to rescale the spring constant)
+
+		// cell mu
+		sim1 = sqrt(pow(lim1x - lim2x,2.0) + pow(lim1y - lim2y,2.0));
+		si = sqrt(pow(lix - lim1x,2.0) + pow(liy - lim1y,2.0));
+		sip1 = sqrt(pow(lip1x - lix,2.0) + pow(lip1y - liy,2.0));
+
+		// cell nu
+		sjm1 = sqrt(pow(ljm1x - ljm2x,2.0) + pow(ljm1y - ljm2y,2.0));
+		sj = sqrt(pow(ljx - ljm1x,2.0) + pow(ljy - ljm1y,2.0));
+		sjp1 = sqrt(pow(ljp1x - ljx,2.0) + pow(ljp1y - ljy,2.0));
+
+
+		// add to change in energy
+
+		// perimeter energy
+		dUShape += addSign*0.5*kl*(pow((li/l0i_mu)-1.0,2.0) + pow((lim1/l0im1_mu)-1.0,2.0));
+		dUShape += addSign*0.5*kl*(pow((lj/l0j_nu)-1.0,2.0) + pow((ljm1/l0jm1_nu)-1.0,2.0));
+
+		// bending energy
+		dUShape += addSign*0.5*(kb/(l0_mu*l0_mu))*(pow(sim1 - s0im1_mu,2.0) + pow(si - s0im1_mu,2.0) + pow(sip1 - s0ip1_mu,2.0));
+		dUShape += addSign*0.5*(kb/(l0_nu*l0_nu))*(pow(sjm1 - s0jm1_nu,2.0) + pow(sj - s0j_nu,2.0) + pow(sjp1 - s0jp1_nu,2.0));
+	}
+
+
+	// -- AREA ENERGY
+
+	// get static, preferred areas
+	a0_mu = a0[mu];
+	a0_nu = a0[nu];
+
+	// get initial areas of cells mu and nu
+	aPREV_mu = area(vpos,mu,L,nv,szList);
+	aPREV_nu = area(vpos,nu,L,nv,szList);
+	
+	// get new areas
+	aCURR_mu = area(altpos,mu,L,nv,szList);
+	aCURR_nu = area(altpos,nu,L,nv,szList);
+
+	// get update to energy
+	dUShape += 0.5*((aCURR_mu - aPREV_mu)/a0_mu)*(((aCURR_mu + aPREV_mu)/a0_mu) + 2.0);
+	dUShape += 0.5*((aCURR_nu - aPREV_nu)/a0_nu)*(((aCURR_nu + aPREV_nu)/a0_nu) + 2.0);
+
+
+	// return 
+	return dUShape;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
