@@ -91,7 +91,10 @@ const double eint 			= 1.0;			// baseline interaction energy
 const double del 			= 1.0;			// radius of vertices in units of l0
 
 // displacement magnitude for MC bonds
-const double bondDisp 		= 1.0;
+const double bondDisp 		= 0.1;
+
+// yield h for bonds
+const double h 				= 0.5;
 
 // shape aging constants
 const double contactScale 	= 2.0;			// rate of growth rel. to lambdal of contact vertices
@@ -157,14 +160,15 @@ int main(int argc, char const *argv[]){
 
 	// parameters to be read in 
 	int NCELLS, NV, NVTOT, cellDOF, vertDOF, seed;
-	double polyd, calA0Input, phi, phiMax, phiMin, kl, kb, espring, lambdaL, lambdaB, betaEff;
+	double polyd, calA0Input, phi, phiMax, phiMin, kl, kb, espring, h2, lambdaL, lambdaB, betaEff;
 
 	// set spring energy
 	espring = eint;
+	h2 = h*h;
 
 	// read in parameters from command line input
 	// test: g++ -O3 sequential/mesoRigidify2D.cpp -o meso.cpp
-	// test: ./meso.o 16 24 1.001 0.1 1.0 0.4 1.0 0.01 0.01 0.01 1.0 1 pos.test
+	// test: ./meso.o 16 24 1.001 0.1 1.0 0.4 1.0 0.01 0.01 0.01 1.0 1 pos.test ctc.test
 	string NCELLS_str 			= argv[1];
 	string NV_str 				= argv[2];
 	string calA0_str 			= argv[3];
@@ -178,6 +182,7 @@ int main(int argc, char const *argv[]){
 	string betaEff_str 			= argv[11];
 	string seed_str 			= argv[12];
 	string positionFile 		= argv[13];
+	string contactFile 			= argv[14];
 
 	stringstream NCELLSss(NCELLS_str);
 	stringstream NVss(NV_str);
@@ -213,6 +218,13 @@ int main(int argc, char const *argv[]){
 	posout.open(positionFile.c_str());
 	if (!posout.is_open()){
 		cout << "	** ERROR: position file " << positionFile << " could not be opened, ending." << endl;
+		return 1;
+	}
+
+	ofstream ctcout;
+	ctcout.open(contactFile.c_str());
+	if (!ctcout.is_open()){
+		cout << "	** ERROR: contactFile file " << contactFile << " could not be opened, ending." << endl;
 		return 1;
 	}
 
@@ -312,7 +324,8 @@ int main(int argc, char const *argv[]){
 	cout << "		betaEff 	= " << betaEff << " 				" << endl;
 	cout << "		seed 		= " << seed << "					" << endl << endl;
 
-	cout << "		pos file 	= " << positionFile << "			" << endl << endl;;
+	cout << "		pos file 	= " << positionFile << "			" << endl;
+	cout << "		ctc file 	= " << contactFile << "				" << endl << endl;
 	
 	cout << "=======================================================" << endl << endl;
 
@@ -1376,10 +1389,6 @@ int main(int argc, char const *argv[]){
 		return 1;
 	}
 
-	// print initial dense state
-	cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl << endl;
-	printPos(posout, vpos, vrad, a0, calA0, L, cij, nv, szList, phi, NCELLS);
-
 
 
 
@@ -1587,6 +1596,7 @@ int main(int argc, char const *argv[]){
 									// add to contacts
 									cindices(ci, vi, gi, NCELLS, szList);
 									cindices(cj, vj, gj, NCELLS, szList);
+
 
 									if (ci > cj)
 										cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
@@ -2033,7 +2043,7 @@ int main(int argc, char const *argv[]){
 		// BOND MC AND CONTACT NETWORK UPDATE
 		Nb 		= 0;
 		NbRmv 	= 0;
-		dUtot 	= 0.0;
+		dUtot 	= 0;
 		for (gi=0; gi<NVTOT; gi++){	
 			cindices(ci, vi, gi, NCELLS, szList);				
 			for (gj=gi+1; gj<NVTOT; gj++){
@@ -2066,37 +2076,27 @@ int main(int argc, char const *argv[]){
 
 						// add connection
 						gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 1;
-
-						// add bond to global contact network
-						if (ci > cj)
-							cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
-						else
-							cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++; 
 					}
 					// if extended and bond exists, detach if distance exceeds threshold
 					else if (rij > sij && gtmp){
-						// construct proposed configuration with displaced vertices
-						altpos = vpos;
+						// // construct proposed configuration with displaced vertices
+						// altpos = vpos;
 
-						// displace vertices in alternative configuration
-						altpos[NDIM*gi] 		-= (bondDisp*sij)*(dx/rij);
-						altpos[NDIM*gi + 1] 	-= (bondDisp*sij)*(dy/rij);
+						// // displace vertices in alternative configuration
+						// altpos[NDIM*gi] 		-= (bondDisp*sij)*(dx/rij);
+						// altpos[NDIM*gi + 1] 	-= (bondDisp*sij)*(dy/rij);
 
-						altpos[NDIM*gj] 		+= (bondDisp*sij)*(dx/rij);
-						altpos[NDIM*gj + 1] 	+= (bondDisp*sij)*(dy/rij);
+						// altpos[NDIM*gj] 		+= (bondDisp*sij)*(dx/rij);
+						// altpos[NDIM*gj + 1] 	+= (bondDisp*sij)*(dy/rij);
 
-						// compute change in potential energy
-						dU = bondRemovalEnergyChange(vpos,altpos,a0,l0,delta0,s0,L,nv,szList,im1,ip1,kl,kb,gi,gj,ci,cj);
+						// OLD WAYS: compute change in potential energy
+						// dU = bondRemovalEnergyChange(vpos,altpos,a0,l0,delta0,s0,L,nv,szList,im1,ip1,kl,kb,gi,gj,ci,cj);
+						// dUOld = potentialEnergyNoNetwork(altpos, vrad, a0, l0, delta0, s0, L, nv, szList, im1, ip1, kl, kb, NCELLS);
+						// dUOld -= U;
+						// dUOld += ((2.0*bondDisp*espring)/zij)*(((bondDisp*sij + rij)/sij) - 1.0);
 
-						// OLD WAY: recomputing every single U
-						// dU = potentialEnergyNoNetwork(altpos, vrad, a0, l0, delta0, s0, L, nv, szList, im1, ip1, kl, kb, NCELLS);
-						// dU -= U;
-
-						// add in change to potential energy based on bond displacement 
-						// 	-- note in prefactor, sij cancels out based on def of bondDisp vs delta in notes
-						dU += ((2.0*bondDisp*espring)/zij)*(((bondDisp*sij + rij)/sij) - 1.0);
-
-						// add to total possible change in U
+						// change in energy from bond breaking
+						dU = 1.0 - pow(1 - (rij/sij),2.0)/h2;
 						dUtot += dU;
 
 						// remove if bond detaching decreases energy
@@ -2111,7 +2111,10 @@ int main(int argc, char const *argv[]){
 
 							// detach
 							if (poff > rdraw){
+								// detach vv contact
 								gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 0;
+
+								// add to number of removed bonds
 								NbRmv++;
 							}
 							// else, keep and add bond to global contact network
@@ -2156,7 +2159,17 @@ int main(int argc, char const *argv[]){
 
 
 		// SHAPE AGING
-		fill(calA0.begin(), calA0.end(), 0.0);
+		gi = 0;
+		for (ci=0; ci<NCELLS; ci++){
+			p0tmp = 0.0;
+			for (vi=0; vi<nv[ci]; vi++){
+				l0tmp = l0[ci];
+				d0tmp = delta0[gi];
+				p0tmp += delta0[gi]*l0tmp;
+			}
+			calA0[ci] = pow(p0tmp,2.0)/(4.0*PI*a0[ci]);
+		}
+
 		meanPrefCurv = 0.0;
 		meanSegLength = 0.0;
 		gi = 0;
@@ -2233,8 +2246,14 @@ int main(int argc, char const *argv[]){
 
 		if ((lastPrintPhi - phi) > dphiPrint){
 			// print positions
-			cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl << endl;
+			cout << "\t** PRINTING POSITIONS TO FILE... " << endl;
 			printPos(posout, vpos, vrad, a0, calA0, L, cij, nv, szList, phi, NCELLS);
+
+			cout << "\t** PRINTING CONTACTS TO FILE..." << endl << endl;
+			for (ci=0; ci<NCTCS; ci++)
+				ctcout << setw(10) << cij[ci];
+			ctcout << endl;
+
 
 			// update last phi when printed, for next time
 			lastPrintPhi = phi;
@@ -2300,8 +2319,13 @@ int main(int argc, char const *argv[]){
 	}
 
 	// print final time
-	cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl << endl;
+	cout << "\t** PRINTING POSITIONS TO FILE... " << endl;
 	printPos(posout, vpos, vrad, a0, calA0, L, cij, nv, szList, phi, NCELLS);
+
+	cout << "\t** PRINTING CONTACTS TO FILE..." << endl << endl;
+	for (ci=0; ci<NCTCS; ci++)
+		ctcout << setw(10) << cij[ci];
+	ctcout << endl;
 
 	// close open objects
 	posout.close();
@@ -2504,8 +2528,7 @@ double bondRemovalEnergyChange(vector<double>& vpos,
 	double lim2, lim1, li, lip1, ljm2, ljm1, lj, ljp1;
 	double sim1, si, sip1, sjm1, sj, sjp1;
 
-	double l0im1_mu, l0i_mu, l0_mu, l0jm1_nu, l0j_nu, l0_nu;
-	double s0im1_mu, s0i_mu, s0ip1_mu, s0jm1_nu, s0j_nu, s0jp1_nu;
+	double l0_mu, l0_nu, s0im1_mu, s0i_mu, s0ip1_mu, s0jm1_nu, s0j_nu, s0jp1_nu;
 
 	double dUShape = 0.0;
 
@@ -2530,7 +2553,7 @@ double bondRemovalEnergyChange(vector<double>& vpos,
 
 
 	// cell nu
-	jm2x = NDIM*im1[im1[gi]];
+	jm2x = NDIM*im1[im1[gj]];
 	jm2y = jm2x + 1;
 
 	jm1x = NDIM*im1[gj];
@@ -2550,9 +2573,6 @@ double bondRemovalEnergyChange(vector<double>& vpos,
 
 	// cell mu
 	l0_mu 		= l0[mu];
-	l0im1_mu 	= l0_mu*delta0[im1[gi]];
-	l0i_mu 		= l0_mu*delta0[gi];
-
 	s0im1_mu 	= s0[im1[gi]];
 	s0i_mu 		= s0[gi];
 	s0ip1_mu 	= s0[ip1[gi]];
@@ -2560,9 +2580,6 @@ double bondRemovalEnergyChange(vector<double>& vpos,
 
 	// cell nu
 	l0_nu 		= l0[nu];
-	l0jm1_nu 	= l0_nu*delta0[im1[gj]];
-	l0j_nu 		= l0_nu*delta0[gj];
-
 	s0jm1_nu 	= s0[im1[gj]];
 	s0j_nu 		= s0[gj];
 	s0jp1_nu 	= s0[ip1[gj]];
@@ -2586,7 +2603,7 @@ double bondRemovalEnergyChange(vector<double>& vpos,
 		// segment vectors
 
 		// cell mu
-		lim2x = postmp[im1x] - postmp[im2x];
+		lim2x = postmp.at(im1x) - postmp[im2x];
 		lim2x -= L[0]*round(lim2x/L[0]);
 
 		lim2y = postmp[im1y] - postmp[im2y];
@@ -2669,8 +2686,8 @@ double bondRemovalEnergyChange(vector<double>& vpos,
 		// add to change in energy
 
 		// perimeter energy
-		dUShape += addSign*0.5*kl*(pow((li/l0i_mu)-1.0,2.0) + pow((lim1/l0im1_mu)-1.0,2.0));
-		dUShape += addSign*0.5*kl*(pow((lj/l0j_nu)-1.0,2.0) + pow((ljm1/l0jm1_nu)-1.0,2.0));
+		dUShape += addSign*0.5*kl*(pow((li/l0_mu)-delta0[gi],2.0) + pow((lim1/l0_mu)-delta0[im1[gi]],2.0));
+		dUShape += addSign*0.5*kl*(pow((lj/l0_nu)-delta0[gj],2.0) + pow((ljm1/l0_nu)-delta0[im1[gj]],2.0));
 
 		// bending energy
 		dUShape += addSign*0.5*(kb/(l0_mu*l0_mu))*(pow(sim1 - s0im1_mu,2.0) + pow(si - s0im1_mu,2.0) + pow(sip1 - s0ip1_mu,2.0));
@@ -2693,8 +2710,9 @@ double bondRemovalEnergyChange(vector<double>& vpos,
 	aCURR_nu = area(altpos,nu,L,nv,szList);
 
 	// get update to energy
-	dUShape += 0.5*((aCURR_mu - aPREV_mu)/a0_mu)*(((aCURR_mu + aPREV_mu)/a0_mu) + 2.0);
-	dUShape += 0.5*((aCURR_nu - aPREV_nu)/a0_nu)*(((aCURR_nu + aPREV_nu)/a0_nu) + 2.0);
+	// dUShape += 0.5*((aCURR_mu - aPREV_mu)/a0_mu)*(((aCURR_mu + aPREV_mu)/a0_mu) + 2.0);
+	// dUShape += 0.5*((aCURR_nu - aPREV_nu)/a0_nu)*(((aCURR_nu + aPREV_nu)/a0_nu) + 2.0);
+	dUShape += 0.5*(pow((aCURR_mu/a0_mu) - 1.0,2.0) - pow((aPREV_mu/a0_mu) - 1.0,2.0) + pow((aCURR_nu/a0_nu) - 1.0,2.0) - pow((aPREV_nu/a0_nu) - 1.0,2.0));
 
 
 	// return 
