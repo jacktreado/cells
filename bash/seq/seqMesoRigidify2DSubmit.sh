@@ -74,8 +74,6 @@ rm -f $taskf
 # loop over files
 let fcount=0
 
-for be in 4.0 5.0 6.0; do for lambdaL in 0.01 0.05 0.1 0.2; do for lambdaB in 0 0.01 0.05 0.1; do bash seqMesoRigidify2DSubmit.sh 32 32 1.0 0.005 $lambdaL $lambdaB $be day 0-12:00:00 1 10 1; done; done; done;
-
 # LOOP OVER FILES. 
 for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
     # count files
