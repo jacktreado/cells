@@ -934,9 +934,9 @@ int main(int argc, char const *argv[]){
 											cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++;
 										
 										if (gi > gj)
-											gij.at(NVTOT*gj + gi - (gj+1)*(gj+2)/2) = 1;
+											gij.at(NVTOT*gj + gi - (gj+1)*(gj+2)/2) = true;
 										else
-											gij.at(NVTOT*gi + gj - (gi+1)*(gi+2)/2) = 1; 
+											gij.at(NVTOT*gi + gj - (gi+1)*(gi+2)/2) = true; 
 									}
 
 								}
@@ -1004,9 +1004,9 @@ int main(int argc, char const *argv[]){
 												cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++;
 
 											if (gi > gj)
-												gij.at(NVTOT*gj + gi - (gj+1)*(gj+2)/2) = 1;
+												gij.at(NVTOT*gj + gi - (gj+1)*(gj+2)/2) = true;
 											else
-												gij.at(NVTOT*gi + gj - (gi+1)*(gi+2)/2) = 1; 
+												gij.at(NVTOT*gi + gj - (gi+1)*(gi+2)/2) = true; 
 										}
 									}
 								}
@@ -2075,7 +2075,7 @@ int main(int argc, char const *argv[]){
 						Nb++;
 
 						// add connection
-						gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 1;
+						gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = true;
 					}
 					// if extended and bond exists, detach if distance exceeds threshold
 					else if (rij > sij && gtmp){
@@ -2096,23 +2096,23 @@ int main(int argc, char const *argv[]){
 						// dUOld += ((2.0*bondDisp*espring)/zij)*(((bondDisp*sij + rij)/sij) - 1.0);
 
 						// change in energy from bond breaking
-						dU = 1.0 - pow(1 - (rij/sij),2.0)/h2;
+						dU = 1.0 - (pow(1 - (rij/sij),2.0)/h2);
 						dUtot += dU;
 
 						// remove if bond detaching decreases energy
 						if (dU < 0){
-							gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 0;
+							gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = false;
 							NbRmv++;
 						}
-						// else, remove conditionally
 						else{
+							// else, remove conditionally
 							poff = exp(-betaEff*dU);
 							rdraw = drand48();
 
 							// detach
 							if (poff > rdraw){
 								// detach vv contact
-								gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 0;
+								gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = false;
 
 								// add to number of removed bonds
 								NbRmv++;
