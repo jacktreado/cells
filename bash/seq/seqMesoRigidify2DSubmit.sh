@@ -153,16 +153,17 @@ sbatch -t $time $slurmf
 # ====================
 # 1. NCELLS
 # 2. NV
+# 3. calA0
 # 4. perimeter energy (kl)
 # 5. bending energy (kb)
-# 5. lambdaL
-# 6. lambdaB
-# 7. betaEff
-# 8. partition
-# 9. time
-# 10. num seeds per run (for each entry in array)
-# 11. number of runs (number of array entries, i.e. arraynum)
-# 12. start seed (end seed determined by number of runs)
+# 6. lambdaL
+# 7. lambdaB
+# 8. betaEff
+# 9. partition
+# 10. time
+# 11. num seeds per run (for each entry in array)
+# 12. number of runs (number of array entries, i.e. arraynum)
+# 13. start seed (end seed determined by number of runs)
 
 
 
