@@ -22,19 +22,19 @@ mkdir -p out
 # inputs
 NCELLS=$1
 NV=$2
-kl=$3
-kb=$4
-lambdaL=$5
-lambdaB=$6
-betaEff=$7
-partition=$8
-time=$9
-numSeedsPerRun="${10}"
-numRuns="${11}"
-startSeed="${12}"
+calA0=$3
+kl=$4
+kb=$5
+lambdaL=$6
+lambdaB=$7
+betaEff=$8
+partition=$9
+time=$10
+numSeedsPerRun="${11}"
+numRuns="${12}"
+startSeed="${13}"
 
 # other variables
-calA0=1.01
 polyd=0.1
 phiMax=1.05
 phiMin=0.4

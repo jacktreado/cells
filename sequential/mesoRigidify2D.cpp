@@ -1592,7 +1592,7 @@ int main(int argc, char const *argv[]){
 							// add to cell-cell contacts
 							if (ci > cj)
 								cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
-							else
+							else if (ci < cj)
 								cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++; 
 
 							// increae potential energy
