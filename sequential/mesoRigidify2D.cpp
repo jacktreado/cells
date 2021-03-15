@@ -92,7 +92,7 @@ const double bondDisp 		= 0.1;
 const double h 				= 0.5;
 
 // shape aging constants
-const double contactScale 	= 2.0;			// rate of growth rel. to lambdal of contact vertices
+const double contactScale 	= 1.0;			// rate of growth rel. to lambdal of contact vertices
 const double voidScale 		= 1.0;			// rate of growth rel. to lambdal of void-facing vertices
 const double calA0Thresh 	= 2.0;			// max preferred shape parameter allowable
 
