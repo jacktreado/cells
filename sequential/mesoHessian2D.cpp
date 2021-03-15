@@ -9,25 +9,14 @@
 		-- crosslinking with binding kinetics
 		-- perimeter aging
 		-- quasistatic decompression
+		-- AND COMPUTES THE HESSIAN
 
 	ADDED 
 
-	01/13/21
-		-- RIGIDIFICATION: cells all have preferred curvature that lags
-			behind instantaneous curvature, will rigidify shape
-			as decompression progresses
+	03/14/21
+		-- Hessian eigenvalues at each print step
+		-- Shear modulus at each print step
 
-	01/14/21
-		-- LOCALIZED CONTRACTILITY: each perimeter spring will have an l0
-			localized to it, rather than an l0 for each cell
-		-- CONTACT-DEPENDENT AGING: The perimeter will age twice as fast
-			on contacts that are engaged vs void contacts
-		-- SHAPE LIMIT: There is an upper limit to cell preferred shape
-
-
-
-	NOTE 02/26/21
-		-- Add shear modulus computation, save the contact network periodically
 
 	Jack Treado
 	11/03/2020, in the time of covid
@@ -106,39 +95,7 @@ void cindices(int& ci, int& vi, int gi, int NCELLS, vector<int>& szList);
 double area(vector<double>& dpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList);
 double perimeter(vector<double>& dpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList);
 
-// system potential energy without spring network (for Metropolis choice)
-double bondRemovalEnergyChange(vector<double>& vpos, 
-	vector<double>& altpos, 
-	vector<double>& a0, 
-	vector<double>& l0, 
-	vector<double>& delta0,
-	vector<double>& s0,
-	vector<double>& L, 
-	vector<int>& nv, 
-	vector<int>& szList, 
-	vector<int> im1, 
-	vector<int> ip1, 
-	double kl, 
-	double kb,
-	int gi,
-	int gj,
-	int mu,
-	int nu);
-
-double potentialEnergyNoNetwork(vector<double>& vpos, 
-	vector<double>& vrad, 
-	vector<double>& a0, 
-	vector<double>& l0, 
-	vector<double>& delta0,
-	vector<double>& s0,
-	vector<double>& L, 
-	vector<int>& nv, 
-	vector<int>& szList, 
-	vector<int> im1, 
-	vector<int> ip1, 
-	double kl, 
-	double kb, 
-	int NCELLS);
+// compute Hessian
 
 // remove rattlers from contact network, return rattler number
 int removeRattlers(vector<int>& cij);
@@ -2168,11 +2125,10 @@ int main(int argc, char const *argv[]){
 		gi = 0;
 		for (ci=0; ci<NCELLS; ci++){
 			p0tmp = 0.0;
-			l0tmp = l0[ci];
 			for (vi=0; vi<nv[ci]; vi++){
+				l0tmp = l0[ci];
 				d0tmp = delta0[gi];
-				p0tmp += d0tmp*l0tmp;
-				gi++;
+				p0tmp += delta0[gi]*l0tmp;
 			}
 			calA0[ci] = pow(p0tmp,2.0)/(4.0*PI*a0[ci]);
 		}
@@ -2184,7 +2140,6 @@ int main(int argc, char const *argv[]){
 
 			// loop over vertices, age curvature and perimeter rest values
 			p0tmp = 0.0;
-			l0tmp = l0[ci];
 			for (vi=0; vi<nv[ci]; vi++){
 				// update s0 (preferred curvature)
 				s0tmp = s0[gi];
@@ -2194,6 +2149,7 @@ int main(int argc, char const *argv[]){
 				meanPrefCurv += s0[gi];
 
 				// perimeter tmp variables
+				l0tmp = l0[ci];
 				d0tmp = delta0[gi];
 
 				// only grow if calA0 below threshold
@@ -2207,10 +2163,10 @@ int main(int argc, char const *argv[]){
 				}
 
 				// update total preferred perimeter
-				p0tmp += d0tmp*l0tmp;
+				p0tmp += delta0[gi]*l0tmp;
 
 				// update mean preferred segment length
-				meanSegLength += d0tmp*l0tmp;
+				meanSegLength += delta0[gi]*l0tmp;
 
 				// update global vertex index
 				gi++;

@@ -48,7 +48,7 @@ const int pnum 				= 14;
 // simulation constants
 const double phiInit 		= 0.5;
 const double phiJMin 		= 0.6;
-const double timeStepMag 	= 0.0025;
+const double timeStepMag 	= 0.01;
 const double sizeRatio 		= 1.4;
 const double sizeFraction 	= 0.5;
 
@@ -79,6 +79,7 @@ void cindices(int& ci, int& vi, int gi, int NCELLS, vector<int>& szList);
 
 // particle geometry
 double area(vector<double>& dpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList);
+double area(vector<double>& dpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList, double gamma);
 double perimeter(vector<double>& dpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList);
 
 // remove rattlers from contact network, return rattler number
@@ -86,6 +87,7 @@ int removeRattlers(vector<int>& cij);
 
 // print to file
 void printPos(ofstream& posout, vector<double>& vpos, vector<double>& a0, vector<double>& l0, vector<double>& L, vector<int>& cij, vector<int>& nv, vector<int>& szList, double phi, int NCELLS); 
+void printPos(ofstream& posout, vector<double>& vpos, vector<double>& a0, vector<double>& l0, vector<double>& L, vector<int>& cij, vector<int>& nv, vector<int>& szList, double phi, int NCELLS, double gamma);
 
 
 // MAIN
@@ -99,7 +101,7 @@ int main(int argc, char const *argv[]){
 
 	// read in parameters from command line input
 	// g++ -O3 -I src sequential/dpmShearModulus.cpp -o shear.o
-	// ./shear.o 16 24 1.04 1e-3 1.0 0.01 1e-7 1e-12 1 pos.test vdos.test shear.test
+	// ./shear.o 16 24 1.04 1e-3 1.0 0 1e-7 1e-12 1 pos.test vdos.test shear.test
 	string NCELLS_str 		= argv[1];
 	string smallNV_str 		= argv[2];
 	string calA0_str 		= argv[3];
@@ -887,7 +889,7 @@ int main(int argc, char const *argv[]){
 
 									if (ci > cj)
 										cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
-									else
+									else if (ci < cj)
 										cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++; 
 								}
 							}
@@ -948,7 +950,7 @@ int main(int argc, char const *argv[]){
 
 										if (ci > cj)
 											cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
-										else
+										else if (ci < cj)
 											cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++; 
 									}
 								}
@@ -1282,11 +1284,11 @@ int main(int argc, char const *argv[]){
 		cout << endl;
 
 
-		// print if sufficiently close to jamming
-		if (phi0 > 0.7){
-			cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl << endl;
-			printPos(posout, vpos, a0, l0, L, cij, nv, szList, phi0, NCELLS);
-		}
+		// // print if sufficiently close to jamming
+		// if (phi0 > 0.7){
+		// 	cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl << endl;
+		// 	printPos(posout, vpos, a0, l0, L, cij, nv, szList, phi0, NCELLS);
+		// }
 
 		// update particle sizes based on target check
 		if (rH < 0){
@@ -1875,8 +1877,10 @@ int main(int argc, char const *argv[]){
 			// 	i.e. if both ci and cj are non-rattlers
 			if (ci > cj)
 				inContact = cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2];
+			else if (ci < cj)
+				inContact = cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2];
 			else
-				inContact = cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]; 
+				inContact = 0;
 
 			if (inContact > 0){
 
@@ -2027,11 +2031,15 @@ int main(int argc, char const *argv[]){
 
 
 	// stress contributions to shear modulus
-	double G, Ga, Gna, Gnum, sxy, sxyLast, shearStress;
+	double G, Ga, Gna, Gnum, sxy, sxyLast, shearStress, lastShearStress;
 	vector<double> Fa(vertDOF,0.0);
 
 	// curvature segments
 	double bix, biy, b;
+
+	// initialize vertex-vertex spring network
+	int NVVCTCS = 0.5*NVTOT*(NVTOT-1);
+	vector<bool> gij(NVVCTCS,0);
 
 
 	// compute affine contribution to shear modulus
@@ -2043,6 +2051,8 @@ int main(int argc, char const *argv[]){
 
 		// shape contributions
 		for (vi=0; vi<nv[ci]; vi++){
+			// global vertex indices
+			gi = szList.at(ci) + vi;
 
 			// vertex indices
 			kxm1 		= NDIM*im1[gi];
@@ -2081,11 +2091,8 @@ int main(int argc, char const *argv[]){
 
 
 			// add to affine contribution (Born term)
-			Ga 			+= (kl/(l0tmp*l0tmp))*pow(lix*liy/li,2.0);
+			Ga 			+= (kl*(rho0*rho0)/(l0tmp*l0tmp))*pow((lix*liy)/li,2.0);
 			Ga 			+= (kb/(l0tmp*l0tmp))*pow(bix*biy/b,2.0);
-
-			// update global index
-			gi++;
 		}
 
 		// contact contribution
@@ -2095,12 +2102,14 @@ int main(int argc, char const *argv[]){
 			// 	i.e. if both ci and cj are non-rattlers
 			if (ci > cj)
 				inContact = cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2];
-			else
+			else if (ci < cj)
 				inContact = cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]; 
+			else
+				inContact = 0;
 
 			if (inContact > 0){
 				// loop over pairs of vertices on both cells, check for overlap, compute matrix elements
-				for (vi=0; vi<nvtmp; vi++){
+				for (vi=0; vi<nv[ci]; vi++){
 
 					// matrix element indices (cell ci, vertex vi)
 					gi = szList.at(ci) + vi;
@@ -2128,7 +2137,11 @@ int main(int argc, char const *argv[]){
 								rij = sqrt(dx*dx + dy*dy);
 								if (rij < sij){
 									// if overlapping, add bond curvature to affine contribution
-									Ga += eint*pow(dx*dy/(rij*sij),2.0);
+									Ga += eint*pow((dx*dy)/(rij*sij),2.0);
+									if (gj > gi)
+										gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = true;
+									else if (gi > gj)
+										gij[NVTOT*gj + gi - (gj+1)*(gj+2)/2] = true;
 								}
 							}
 						}
@@ -2146,8 +2159,8 @@ int main(int argc, char const *argv[]){
 		for (gj=0; gj<NVTOT; gj++){
 			lx = NDIM*gj;
 			ly = lx + 1;
-			Fa[kx] -= M(kx,lx)*(vpos[ly] + round((vpos[ky] - vpos[ly])/L[1]));
-			Fa[ky] -= M(ky,lx)*(vpos[ly] + round((vpos[ky] - vpos[ly])/L[1]));
+			Fa[kx] -= M(kx,lx)*(vpos[ly] + L[1]*round((vpos[ky] - vpos[ly])/L[1]))/rho0;
+			Fa[ky] -= M(ky,lx)*(vpos[ly] + L[1]*round((vpos[ky] - vpos[ly])/L[1]))/rho0;
 		}
 	}
 
@@ -2191,9 +2204,9 @@ int main(int argc, char const *argv[]){
 
 
 	// Shear protocol to compute G numerically
-	int NS = 10;
+	int NS = 100;
 	int ss, im;
-	double dgamma = 1e-8;
+	double dgamma = 1e-9;
 	double gamma = 0.0;
 	for (ss=0; ss<NS; ss++){
 
@@ -2202,7 +2215,7 @@ int main(int argc, char const *argv[]){
 
 		// take affine shear strain step
 		for (gi=0; gi<NVTOT; gi++)
-			vpos[NDIM*gi] += gamma*vpos[NDIM*gi + 1];
+			vpos[NDIM*gi] += dgamma*vpos[NDIM*gi + 1];
 
 		// RESET FIRE VARIABLES
 		P  			= 0;	
@@ -2299,39 +2312,16 @@ int main(int argc, char const *argv[]){
 				}
 			}
 
-			// reset contact network
-			for (i=0; i<NCTCS; i++)
-				cij[i] = 0;
-
 			// FORCE UPDATE
 
 			// interaction forces (USE BOX LINKED LIST)
 			U = 0.0;
 			pcheck = 0.0;
 			sxy = 0.0;
-			for (bi=0; bi<NBX; bi++){
-
-				// get start of list of particles
-				pi = head[bi];
-
-				// loop over linked list
-				while (pi > 0){
-					// real particle index
-					gi = pi - 1;
-
-					// next particle in list
-					pj = list[pi];
-
-					// loop down neighbors of pi in same cell
-					while (pj > 0){
-						// real index of pj
-						gj = pj - 1;
-
-						if (gj == ip1[gi] || gj == im1[gi]){
-							pj = list[pj];
-							continue;
-						}
-
+			shearStress = 0.0;
+			for (gi=0; gi<NVTOT; gi++){
+				for (gj=gi+1; gj<NVTOT; gj++){
+					if (gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2]){
 						// contact distance
 						sij = vrad[gi] + vrad[gj];
 
@@ -2339,124 +2329,42 @@ int main(int argc, char const *argv[]){
 						dy = vpos[NDIM*gj + 1] - vpos[NDIM*gi + 1];
 						im = round(dy/L[1]);
 						dy -= L[1]*im;
-						if (dy < sij){
-							dx = vpos[NDIM*gj] - vpos[NDIM*gi];
-							dx -= L[1]*im*gamma;
-							dx -= L[0]*round(dx/L[0]);
-							if (dx < sij){
-								rij = sqrt(dx*dx + dy*dy);
-								if (rij < sij){
-									// force scale
-									ftmp 				= eint*(1 - (rij/sij))*(rho0/sij);
-									fx 					= ftmp*(dx/rij);
-									fy 					= ftmp*(dy/rij);
 
-									// add to forces
-									vF[NDIM*gi] 		-= fx;
-									vF[NDIM*gi + 1] 	-= fy;
+						dx = vpos[NDIM*gj] - vpos[NDIM*gi];
+						dx -= L[1]*im*gamma;
+						dx -= L[0]*round(dx/L[0]);
 
-									vF[NDIM*gj] 		+= fx;
-									vF[NDIM*gj + 1] 	+= fy;
+						rij = sqrt(dx*dx + dy*dy);
 
-									// increae potential energy
-									U += 0.5*eint*pow((1 - (rij/sij)),2.0);
+						ftmp 				= eint*(1 - (rij/sij))*(rho0/sij);
+						fx 					= ftmp*(dx/rij);
+						fy 					= ftmp*(dy/rij);
 
-									// add to virial expression for pressure
-									pcheck += dx*fx + dy*fy;
+						// add to forces
+						vF[NDIM*gi] 		-= fx;
+						vF[NDIM*gi + 1] 	-= fy;
 
-									// update virial shear stress
-									sxy += (1 - (rij/sij) + gamma*(dx*dy)/(rij*sij))*((dx*dy)/(rij*sij));
+						vF[NDIM*gj] 		+= fx;
+						vF[NDIM*gj + 1] 	+= fy;
 
-									// add to contacts
-									cindices(ci, vi, gi, NCELLS, szList);
-									cindices(cj, vj, gj, NCELLS, szList);
+						// increae potential energy
+						U += 0.5*eint*pow((1 - (rij/sij)),2.0);
 
-									if (ci > cj)
-										cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
-									else
-										cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++; 
-								}
-							}
-						}
+						// add to virial expression for pressure
+						pcheck += dx*fx + dy*fy;
 
-						// update pj
-						pj = list[pj];
+						// update virial shear stress
+						sxy += (1 - (rij/sij) + gamma*(dx*dy)/(rij*sij))*((dx*dy)/(rij*sij));
+
+						// update shear stress from stress tensor
+						shearStress += dx*fy;
 					}
-
-					// test overlaps with forward neighboring cells
-					for (bj=0; bj<NNN; bj++){
-						// get first particle in neighboring cell
-						pj = head[nn[bi][bj]];
-
-						// loop down neighbors of pi in same cell
-						while (pj > 0){
-							// real index of pj
-							gj = pj - 1;
-
-							if (gj == ip1[gi] || gj == im1[gi]){
-								pj = list[pj];
-								continue;
-							}
-
-							// contact distance
-							sij = vrad[gi] + vrad[gj];
-
-							// particle distance
-							dy = vpos[NDIM*gj + 1] - vpos[NDIM*gi + 1];
-							im = round(dy/L[1]);
-							dy -= L[1]*im;
-							if (dy < sij){
-								dx = vpos[NDIM*gj] - vpos[NDIM*gi];
-								dx -= L[1]*im*gamma;
-								dx -= L[0]*round(dx/L[0]);
-								if (dx < sij){
-									rij = sqrt(dx*dx + dy*dy);
-									if (rij < sij){
-										// force scale
-										ftmp 				= eint*(1 - (rij/sij))*(rho0/sij);
-										fx 					= ftmp*(dx/rij);
-										fy 					= ftmp*(dy/rij);
-
-										// add to forces
-										vF[NDIM*gi] 		-= fx;
-										vF[NDIM*gi + 1] 	-= fy;
-
-										vF[NDIM*gj] 		+= fx;
-										vF[NDIM*gj + 1] 	+= fy;
-
-										// increae potential energy
-										U += 0.5*eint*pow((1 - (rij/sij)),2.0);
-
-										// add to virial expression for pressure
-										pcheck += dx*fx + dy*fy;
-
-										// update virial shear stress
-										sxy += (1 - (rij/sij) + gamma*(dx*dy)/(rij*sij))*((dx*dy)/(rij*sij));
-
-										// add to contacts
-										cindices(ci, vi, gi, NCELLS, szList);
-										cindices(cj, vj, gj, NCELLS, szList);
-
-										if (ci > cj)
-											cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
-										else
-											cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++; 
-									}
-								}
-							}
-
-							// update pj
-							pj = list[pj];
-						}
-					}
-
-					// update pi index to be next
-					pi = list[pi];
 				}
 			}
 
 			// normalize pressure by box area (make dimensionless with extra factor of rho)
 			pcheck *= (rho0/(2.0*L[0]*L[1]));
+			shearStress *= rho0;
 
 
 			// shape forces (loop over global vertex labels)
@@ -2468,7 +2376,17 @@ int main(int argc, char const *argv[]){
 					if (gi == szList[ci]){
 						// compute shape parameter
 						nvtmp = nv[ci];
+						a0tmp = a0[ci];
 						l0tmp = l0[ci];
+
+						// compute area deviation
+						atmp = area(vpos,ci,L,nv,szList,gamma);
+						da = (atmp/a0tmp) - 1.0;
+
+						// shape force parameters (kl and kl are unitless energy ratios)
+						fa = da*(rho0/a0tmp);		// derivation from the fact that rho0^2 does not necessarily cancel a0tmp
+						fl = kl*(rho0/l0tmp);
+						fb = kb*(rho0/(l0tmp*l0tmp));
 						
 						// compute cell center of mass
 						xi = vpos[NDIM*gi];
@@ -2476,11 +2394,13 @@ int main(int argc, char const *argv[]){
 						cx = xi; 
 						cy = yi;
 						for (vi=1; vi<nvtmp; vi++){
-							dx = vpos.at(NDIM*(gi+vi)) - xi;
-							dx -= L[0]*round(dx/L[0]);
-
 							dy = vpos.at(NDIM*(gi+vi) + 1) - yi;
-							dy -= L[1]*round(dy/L[1]);
+							im = round(dy/L[1]);
+							dy -= L[1]*im;
+
+							dx = vpos.at(NDIM*(gi+vi)) - xi;
+							dx -= L[1]*im*gamma;
+							dx -= L[0]*round(dx/L[0]);
 
 							xi += dx;
 							yi += dy;
@@ -2492,15 +2412,32 @@ int main(int argc, char const *argv[]){
 						cy /= nvtmp;
 
 						// get coordinates relative to center of mass
-						rix = vpos[NDIM*gi] - cx;
 						riy = vpos[NDIM*gi + 1] - cy;
+						im = round(riy/L[1]);
+						riy -= L[1]*im;
+
+						rix = vpos[NDIM*gi] - cx;
+						rix -= im*L[1]*gamma;
+						rix -= L[0]*round(rix/L[0]);
+
 
 						// get (prior) adjacent vertices
+						rim1y = vpos[NDIM*im1[gi] + 1] - cy;
+						im = round(rim1y/L[1]);
+						rim1y -= L[1]*im;
+
 						rim1x = vpos[NDIM*im1[gi]] - cx;
+						rim1x -= L[1]*im*gamma;
 						rim1x -= L[0]*round(rim1x/L[0]);
 
-						rim1y = vpos[NDIM*im1[gi] + 1] - cy;
-						rim1y -= L[1]*round(rim1y/L[1]);
+
+						rim2y = vpos[NDIM*im1[im1[gi]] + 1] - cy;
+						im = round(rim2y/L[1]);
+						rim2y -= L[1]*im;
+
+						rim2x = vpos[NDIM*im1[im1[gi]]] - cx;
+						rim2x -= L[1]*im*gamma;
+						rim2x -= L[0]*round(rim2x/L[0]);
 
 						// increment cell index
 						ci++;
@@ -2509,37 +2446,70 @@ int main(int argc, char const *argv[]){
 
 
 				// get next adjacent vertices
+				rip1y = vpos.at(NDIM*ip1[gi] + 1) - cy;
+				im = round(rip1y/L[1]);
+				rip1y -= L[1]*im;
+
 				rip1x = vpos.at(NDIM*ip1[gi]) - cx;
+				rip1x -= L[1]*im*gamma;
 				rip1x -= L[0]*round(rip1x/L[0]);
 
-				rip1y = vpos.at(NDIM*ip1[gi] + 1) - cy;
-				rip1y -= L[1]*round(rip1y/L[1]);
-
-				// get perimeter segments
-				lim1x = rix - rim1x;
-				lim1y = riy - rim1y;
-				lim1 = sqrt(lim1x*lim1x + lim1y*lim1y);
-
-				lix = rip1x - rix;
-				liy = rip1y - riy;
-				li = sqrt(lix*lix + liy*liy);
 
 
-				// get curvature segments
-				bix = lix - lim1x;
-				biy = liy - lim1y;
-				b = sqrt(bix*bix + biy*biy);
+				// -- Area force
+				vF[NDIM*gi] 		+= 0.5*fa*(rim1y - rip1y);
+				vF[NDIM*gi + 1] 	+= 0.5*fa*(rip1x - rim1x);
 
 
-				// add to shear stress 
-				sxy += kl*((li/l0tmp) - 1.0 + gamma*(lix*liy)/(li*l0tmp))*(lix*liy/(li*l0tmp));
-				sxy += (kb/(l0tmp*l0tmp))*(b + gamma*((bix*biy)/b))*((bix*biy)/b);
+				// -- Perimeter force
 
+				// segment vector elements
+				lim1x 	= rix - rim1x;
+				lim1y 	= riy - rim1y;
+
+				lix 	= rip1x - rix;
+				liy 	= rip1y - riy;
+
+				// segment lengths
+				lim1 	= sqrt(lim1x*lim1x + lim1y*lim1y);
+				li 		= sqrt(lix*lix + liy*liy);
+
+				// segment deviations
+				dlim1  	= (lim1/l0tmp) - 1.0;
+				dli 	= (li/l0tmp) - 1.0;
+
+				// add to forces
+				vF[NDIM*gi] 		+= fl*(dli*(lix/li) - dlim1*(lim1x/lim1));
+				vF[NDIM*gi + 1] 	+= fl*(dli*(liy/li) - dlim1*(lim1y/lim1));
+
+
+				// -- Bending force
+
+				// segment vectors for ip2
+				rip2y = vpos[NDIM*ip1[ip1[gi]] + 1] - cy;
+				im = round(rip2y/L[1]);
+				rip2y -= L[1]*im;
+
+				rip2x = vpos[NDIM*ip1[ip1[gi]]] - cx;
+				rip2x -= L[1]*im*gamma;
+				rip2x -= L[0]*round(rip2x/L[0]);
+
+				lip1x = rip2x - rip1x;
+				lip1y = rip2y - rip1y;
+
+				lim2x = rim1x - rim2x;
+				lim2y = rim1y - rim2y;
+
+				// add to force
+				vF[NDIM*gi] 		+= fb*(3.0*(lix - lim1x) + lim2x - lip1x);
+				vF[NDIM*gi + 1] 	+= fb*(3.0*(liy - lim1y) + lim2y - lip1y);
 
 				// update old coordinates
+				rim2x = rim1x;
 				rim1x = rix;
 				rix = rip1x;
 
+				rim2y = rim1y;
 				rim1y = riy;
 				riy = rip1y;
 			}
@@ -2683,34 +2653,43 @@ int main(int argc, char const *argv[]){
 			cout << endl << endl;
 		}
 
-		if (ss == 1)
+		if (ss == 1){
 			sxyLast = sxy;
+			lastShearStress = shearStress;
+		}
 		else{
 			// compute numerical shear modulus
-			Gnum = -(sxy - sxyLast)/dgamma;
+			Gnum = (sxy - sxyLast)/dgamma;
+			sxyLast = sxy;
 			shearout << setw(15) << ss;
 			shearout << setw(15) << G;
 			shearout << setw(15) << Gnum;
 			shearout << setw(15) << sxy;
 			shearout << endl;
+
+			// output to console
+			cout << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&" << endl;
+			cout << "===============================================" << endl << endl;
+			cout << " 	S H E A R  									" << endl;
+			cout << " 	  	P R O T O C O L 						" << endl << endl;
+			cout << "===============================================" << endl;
+			cout << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&" << endl;
+			cout << endl;
+			cout << "ss 		= " << ss << endl;
+			cout << "gamma 		= " << gamma << endl;
+			cout << "sxy 		= " << sxy << endl;
+			cout << "Gnum 		= " << Gnum << endl;
+			cout << "Gnum2		= " << -(shearStress - lastShearStress)/dgamma << endl;	
+			cout << "Ga 		= " << Ga << endl;
+			cout << "Gna 		= " << Gna << endl;
+			cout << "G 			= " << Ga + Gna << endl;
+			cout << endl;
+
+			lastShearStress = shearStress;
 		}
 
-		// output to console
-		cout << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&" << endl;
-		cout << "===============================================" << endl << endl;
-		cout << " 	S H E A R  							" << endl;
-		cout << " 	  	P R O T O C O L 				" << endl << endl;
-		cout << "===============================================" << endl;
-		cout << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&" << endl;
-		cout << endl;
-		cout << "ss 		= " << ss << endl;
-		cout << "gamma 		= " << gamma << endl;
-		cout << "sxy 		= " << sxy << endl;
-		cout << "Gnum 		= " << Gnum << endl;
-		cout << "Ga 		= " << Ga << endl;
-		cout << "Gna 		= " << Gna << endl;
-		cout << "G 			= " << Ga + Gna << endl;
-		cout << endl;
+		cout << "\t** PRINTING POSITIONS TO FILE... " << endl << endl << endl;
+		printPos(posout, vpos, a0, l0, L, cij, nv, szList, phi0, NCELLS, gamma);
 
 	}
 	if (k == kmax){
@@ -2835,6 +2814,47 @@ double area(vector<double>& vpos, int ci, vector<double>& L, vector<int>& nv, ve
 }
 
 
+// get cell area (given strain gamma)
+double area(vector<double>& vpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList, double gamma){
+	// local variables
+	int im, vi, vip1, gi, gip1;
+	double dx, dy, xi, yi, xip1, yip1, areaVal = 0.0;
+
+	// initial position: vi = 0
+	gi = gindex(ci,0,szList);
+	xi = vpos[NDIM*gi];
+	yi = vpos[NDIM*gi + 1];
+
+	// loop over vertices of cell ci, get area by shoe-string method
+	for (vi=0; vi<nv.at(ci); vi++){
+		// next vertex
+		vip1 	= (vi + 1) % nv.at(ci);
+		gip1 	= gindex(ci,vip1,szList);
+
+		dy 		= vpos[NDIM*gip1 + 1] - yi;
+		im 		= round(dy/L[1]);
+		dy 		-= L[1]*im;
+		yip1 	= yi + dy;
+
+		// get positions (check minimum images, use LEBCs)
+		dx 		= vpos[NDIM*gip1] - xi;
+		dx 		-= L[1]*im*gamma;
+		dx 		-= L[0]*round(dx/L[0]);
+		xip1 	= xi + dx;
+
+		// increment area
+		areaVal += xi*yip1 - xip1*yi;
+
+		// set next coordinates
+		xi = xip1;
+		yi = yip1;
+	}
+	areaVal *= 0.5;
+
+	return abs(areaVal);
+}
+
+
 // get cell perimeter
 double perimeter(vector<double>& vpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList){
 		// local variables
@@ -2908,7 +2928,7 @@ int removeRattlers(vector<int>& cij){
 			if (ci != cj){
 				if (ci > cj)
 					ctmp = cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2];
-				else
+				else if (ci < cj)
 					ctmp = cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2];
 			}
 			else
@@ -2934,7 +2954,7 @@ int removeRattlers(vector<int>& cij){
 					if (ci != cj){
 						if (ci > cj)
 							cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2] = 0;
-						else
+						else if (ci < cj)
 							cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2] = 0; 
 					}
 				}
@@ -2988,7 +3008,7 @@ void printPos(ofstream& posout, vector<double>& vpos, vector<double>& a0, vector
 				ctmp = 0;
 				if (ci > cj)
 					ctmp = cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2];
-				else
+				else if (ci < cj)
 					ctmp = cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]; 
 
 				// add to contact information
@@ -3056,6 +3076,110 @@ void printPos(ofstream& posout, vector<double>& vpos, vector<double>& a0, vector
 }
 
 
+
+
+// print cell positions
+void printPos(ofstream& posout, vector<double>& vpos, vector<double>& a0, vector<double>& l0, vector<double>& L, vector<int>& cij, vector<int>& nv, vector<int>& szList, double phi, int NCELLS, double gamma){
+	// local variables
+	int im, ci, cj, vi, gi, ctmp, zc, zv;
+	double xi, yi, dx, dy, Lx, Ly;
+
+	// save box sizes
+	Lx = L.at(0);
+	Ly = L.at(1);
+
+	// print information starting information
+	posout << setw(w) << left << "NEWFR" << " " << endl;
+	posout << setw(w) << left << "NUMCL" << setw(w) << right << NCELLS << endl;
+	posout << setw(w) << left << "PACKF" << setw(wnum) << setprecision(pnum) << right << phi << endl;
+
+	// print box sizes
+	posout << setw(w) << left << "BOXSZ";
+	posout << setw(wnum) << setprecision(pnum) << right << Lx;
+	posout << setw(wnum) << setprecision(pnum) << right << Ly;
+	posout << endl;
+
+	// print coordinate for rest of the cells
+	for (ci=0; ci<NCELLS; ci++){
+
+		// get cell contact data
+		zc = 0;
+		zv = 0;
+		for (cj=0; cj<NCELLS; cj++){
+			if (ci != cj){
+				// grab contact info from entry ci, cj
+				ctmp = 0;
+				if (ci > cj)
+					ctmp = cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2];
+				else if (ci < cj)
+					ctmp = cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]; 
+
+				// add to contact information
+				zv += ctmp;
+				if (ctmp > 0)
+					zc++;
+			}
+		}
+
+		// cell information
+		posout << setw(w) << left << "CINFO";
+		posout << setw(w) << right << nv.at(ci);
+		posout << setw(w) << right << zc;
+		posout << setw(w) << right << zv;
+		posout << setw(wnum) << right << a0.at(ci);
+		posout << setw(wnum) << right << l0.at(ci);
+		posout << endl;
+
+		// get initial vertex positions
+		gi = gindex(ci,0,szList);
+		xi = vpos.at(NDIM*gi);
+		yi = vpos.at(NDIM*gi + 1);
+
+		// place back in box center
+		xi = fmod(xi,Lx);
+		yi = fmod(yi,Ly);
+
+		posout << setw(w) << left << "VINFO";
+		posout << setw(w) << left << ci;
+		posout << setw(w) << left << 0;
+
+		// output initial vertex information
+		posout << setw(wnum) << setprecision(pnum) << right << xi;
+		posout << setw(wnum) << setprecision(pnum) << right << yi;
+		posout << endl;
+
+		// vertex information for next vertices
+		for (vi=1; vi<nv.at(ci); vi++){
+			// get global vertex index for next vertex
+			gi++;
+
+			// get next vertex positions (use MIC)
+			dy = vpos.at(NDIM*gi + 1) - yi;
+			im = round(dy/Ly);
+			dy -= Ly*im;
+			yi += dy;
+
+
+			dx = vpos.at(NDIM*gi) - xi;
+			dx -= Ly*im*gamma;
+			dx -= Lx*round(dx/Lx);
+			xi += dx;
+
+			// Print indexing information
+			posout << setw(w) << left << "VINFO";
+			posout << setw(w) << left << ci;
+			posout << setw(w) << left << vi;
+
+			// output vertex information
+			posout << setw(wnum) << setprecision(pnum) << right << xi;
+			posout << setw(wnum) << setprecision(pnum) << right << yi;
+			posout << endl;
+		}
+	}
+
+	// print end frame
+	posout << setw(w) << left << "ENDFR" << " " << endl;
+}
 
 
 
