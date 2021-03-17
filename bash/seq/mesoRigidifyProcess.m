@@ -17,7 +17,7 @@ end
 
 % phi0 bins
 pbins       = 20;
-phi0BE      = linspace(0.95,0.385,pbins+1);
+phi0BE      = linspace(0.385,0.95,pbins+1);
 phi0BC      = 0.5*(phi0BE(2:end) + phi0BE(1:end-1));
 
 % face bins
@@ -49,6 +49,7 @@ for ii = 1:NF
 
     % get number of frames
     NFRAMES     = mesophyllTrajectoryData.NFRAMES;
+    NFRAMES = 1;
     NCELLS      = mesophyllTrajectoryData.NCELLS;
     nv          = mesophyllTrajectoryData.nv(1,:);
     L           = mesophyllTrajectoryData.L(1,:);
