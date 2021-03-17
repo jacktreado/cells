@@ -61,7 +61,7 @@ const int pnum 				= 14;
 
 // simulation constants
 const int nvmin 			= 12;
-const double timeStepMag 	= 0.01;
+const double timeStepMag 	= 0.005;
 const double phiInit 		= 0.4;
 const double dphiGrow 		= 0.01;
 const double dphiShrink 	= 0.001;
