@@ -28,6 +28,7 @@ faceBC      = (1:fbins)' + 2;
 faceCounts  = zeros(fbins,pbins);
 
 % -- save simulation info
+NCELLSList  = zeros(NF,1);
 LList       = zeros(NF,2);
 nvList      = cell(NF,1);
 phi0List    = cell(NF,1);
@@ -80,6 +81,7 @@ for ii = 1:NF
     end
     
     % save data
+    NCELLSList(ii)  = NCELLS;
     LList(ii,:)     = L;
     phi0List{ii}    = phi0;
     calA0List{ii}   = calA0;
@@ -227,7 +229,7 @@ end
 %% Save to save string
 
 save(savefstr,'flist','pbins','fbins','faceBC','phi0BC',...
-    'LList','nvList','phi0List','calAList','calA0List',...
-    'cijList','NFvalsList');
+    'NCELLSList','LList','nvList','phi0List','calAList',...
+    'calA0List','cijList','NFvalsList','faceCounts');
 
 end
