@@ -49,7 +49,6 @@ for ii = 1:NF
 
     % get number of frames
     NFRAMES     = mesophyllTrajectoryData.NFRAMES;
-    NFRAMES = 1;
     NCELLS      = mesophyllTrajectoryData.NCELLS;
     nv          = mesophyllTrajectoryData.nv(1,:);
     L           = mesophyllTrajectoryData.L(1,:);
