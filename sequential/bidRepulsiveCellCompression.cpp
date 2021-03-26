@@ -81,6 +81,22 @@ double perimeter(vector<double>& dpos, int ci, vector<double>& L, vector<int>& n
 // remove rattlers from contact network, return rattler number
 int removeRattlers(vector<int>& cij);
 
+// compute and print Hessian information
+void getHessian(ofstream& vdosout,
+	vector<double>& vpos,
+	vector<double>& vrad,
+	vector<double>& a0,
+	vector<double>& l0,
+	vector<double>& dc,
+	vector<double>& L,
+	vector<int>& cij,
+	vector<int>& nv,
+	vector<int>& szList,
+	double kl,
+	double kb,
+	double kbb,
+	int NCELLS);
+
 // print to file
 void printPos(ofstream& posout, vector<double>& vpos, vector<double>& a0, vector<double>& l0, vector<double>& L, vector<int>& cij, vector<int>& nv, vector<int>& szList, double phi, int NCELLS); 
 
@@ -92,7 +108,7 @@ int main(int argc, char const *argv[]){
 
 	// parameters to be read in 
 	int NCELLS, smallNV, largeNV, smallN, largeN, NVTOT, NVSMALL, cellDOF, vertDOF, seed;
-	double Ptol, Ftol, phi0, dphi, T0, kl, kb, calA0, smallCalA0, largeCalA0;
+	double Ptol, Ftol, phi0, dphi, T0, kl, kb, kbb, calA0, smallCalA0, largeCalA0;
 
 	// read in parameters from command line input
 	string NCELLS_str 		= argv[1];
@@ -101,11 +117,12 @@ int main(int argc, char const *argv[]){
 	string dphi_str 		= argv[4];
 	string kl_str 			= argv[5];
 	string kb_str 			= argv[6];
-	string Ptol_str 		= argv[7];
-	string Ftol_str 		= argv[8];
-	string seed_str 		= argv[9];
-	string positionFile 	= argv[10];
-	string vdosFile  		= argv[11];
+	string kbb_str 			= argv[7];
+	string Ptol_str 		= argv[8];
+	string Ftol_str 		= argv[9];
+	string seed_str 		= argv[10];
+	string positionFile 	= argv[11];
+	string vdosFile  		= argv[12];
 
 	stringstream NCELLSss(NCELLS_str);
 	stringstream smallNVss(smallNV_str);
@@ -113,6 +130,7 @@ int main(int argc, char const *argv[]){
 	stringstream dphiss(dphi_str);
 	stringstream klss(kl_str);
 	stringstream kbss(kb_str);
+	stringstream kbbss(kbb_str);
 	stringstream Ptolss(Ptol_str);
 	stringstream Ftolss(Ftol_str);
 	stringstream seedss(seed_str);
@@ -123,6 +141,7 @@ int main(int argc, char const *argv[]){
 	dphiss >> dphi;
 	klss >> kl;
 	kbss >> kb;
+	kbbss >> kbb;
 	Ptolss >> Ptol;
 	Ftolss >> Ftol;
 	seedss >> seed;
@@ -206,9 +225,9 @@ int main(int argc, char const *argv[]){
 	// output opening statement to console
 	cout << "=======================================================" << endl << endl;
 
-	cout << "		cellNVE.cpp 									" << endl;
-	cout << "		Jack Treado, 2020   							" << endl;
-	cout << "		NVE ensemble of deformable particles 			" << endl << endl;
+	cout << "		bidRepulsiveCellCompression.cpp 				" << endl;
+	cout << "		Jack Treado, 2021   							" << endl;
+	cout << "		Compress + print dynamical matrix info 			" << endl << endl;
 
 	cout << "		NCELLS 		= " << NCELLS << "					" << endl;
 	cout << "		# small 	= " << smallN << "					" << endl;
@@ -225,6 +244,7 @@ int main(int argc, char const *argv[]){
 	cout << "		phi0 		= " << phiInit << " 					" << endl;
 	cout << "		kl 			= " << kl << "						" << endl;
 	cout << "		kb 			= " << kb << "						" << endl;
+	cout << "		kbb 		= " << kbb << " 					" << endl;
 	cout << "		seed 		= " << seed << "					" << endl << endl;
 
 	cout << "		pos file 	= " << positionFile << "			" << endl;
@@ -257,6 +277,7 @@ int main(int argc, char const *argv[]){
 
 	vector<double> a0(NCELLS,1.0);
 	vector<double> l0(NCELLS,1.0);
+	vector<double> dc(NCELLS,1.0);
 
 	// initialize effective disk radius (for minimization), and l0 parameter
 	for (ci=0; ci<NCELLS; ci++){
@@ -280,8 +301,9 @@ int main(int argc, char const *argv[]){
 		// set disk radius
 		drad.at(ci) 	= 1.1*sqrt((2.0*a0tmp)/(nvtmp*sin(2.0*PI/nvtmp)));
 
-		// set l0, vector radius
+		// set l0, dc, vertex radius
 		l0.at(ci) 	= 2.0*lenscale*sqrt(PI*calA0tmp)/nvtmp;
+		dc.at(ci) 	= l0.at(ci)/(sin(PI/nvtmp));
 		gi 			= szList.at(ci);
 		for (vi=0; vi<nvtmp; vi++)
 			vrad.at(gi+vi)	= 0.5*l0.at(ci)*del;
@@ -708,10 +730,11 @@ int main(int argc, char const *argv[]){
 	double rho0 = 0.0;
 
 	// shape force variables
-	double fa, fl, fb, l0tmp, atmp, li, lim1, kappai, cx, cy;
+	double fa, fl, fb, fbb, l0tmp, dctmp, atmp, li, lim1, kappai, cx, cy;
 	double da, dli, dlim1;
 	double lim2x, lim2y, lim1x, lim1y, lix, liy, lip1x, lip1y;
 	double rim2x, rim2y, rim1x, rim1y, rix, riy, rip1x, rip1y, rip2x, rip2y;
+	double lbbx, lbby, lbb, meanL;
 	double ua, ul, ub;
 
 	// contact variables
@@ -965,6 +988,7 @@ int main(int argc, char const *argv[]){
 						nvtmp = nv[ci];
 						a0tmp = a0[ci];
 						l0tmp = l0[ci];
+						dctmp = dc[ci];
 
 						// compute area deviation
 						atmp = area(vpos,ci,L,nv,szList);
@@ -974,6 +998,7 @@ int main(int argc, char const *argv[]){
 						fa = da*(rho0/a0tmp);		// derivation from the fact that rho0^2 does not necessarily cancel a0tmp
 						fl = kl*(rho0/l0tmp);
 						fb = kb*(rho0/(l0tmp*l0tmp));
+						fbb = kbb*(2.0*rho0/(nvtmp*dctmp));
 						
 						// compute cell center of mass
 						xi = vpos[NDIM*gi];
@@ -996,6 +1021,27 @@ int main(int argc, char const *argv[]){
 						cx /= nvtmp;
 						cy /= nvtmp;
 
+						// compute mean belt length
+						if (kbb > 0){
+							meanL = 0.0;
+							for (vi=0; vi<=(nvtmp-1)/2; vi++){
+								rix = vpos[NDIM*(gi + vi)] - cx;
+								rix -= L[0]*round(rix/L[0]);
+
+								riy = vpos[NDIM*(gi + vi) + 1] - cy;
+								riy -= L[1]*round(riy/L[1]);
+
+								lbbx = vpos[NDIM*(gi + vi + (nvtmp-1)/2)] - rix;
+								lbbx -= L[0]*round(lbbx/L[0]);
+
+								lbby = vpos[NDIM*(gi + vi + (nvtmp-1)/2) + 1] - riy;
+								lbby -= L[1]*round(lbby/L[1]);
+
+								meanL += sqrt(lbbx*lbbx + lbby*lbby);
+							}
+							meanL /= (nvtmp-1)/2;
+						}
+
 						// get coordinates relative to center of mass
 						rix = vpos[NDIM*gi] - cx;
 						riy = vpos[NDIM*gi + 1] - cy;
@@ -1017,7 +1063,6 @@ int main(int argc, char const *argv[]){
 						ci++;
 					}
 				}
-
 
 				// get next adjacent vertices
 				rip1x = vpos.at(NDIM*ip1[gi]) - cx;
@@ -1056,23 +1101,43 @@ int main(int argc, char const *argv[]){
 
 
 				// -- Bending force
-				if (kb > 0){
-					// segment vectors for ip2
-					rip2x = vpos[NDIM*ip1[ip1[gi]]] - cx;
-					rip2x -= L[0]*round(rip2x/L[0]);
 
-					rip2y = vpos[NDIM*ip1[ip1[gi]] + 1] - cy;
-					rip2y -= L[1]*round(rip2y/L[1]);
+				// segment vectors for ip2
+				rip2x = vpos[NDIM*ip1[ip1[gi]]] - cx;
+				rip2x -= L[0]*round(rip2x/L[0]);
 
-					lip1x = rip2x - rip1x;
-					lip1y = rip2y - rip1y;
+				rip2y = vpos[NDIM*ip1[ip1[gi]] + 1] - cy;
+				rip2y -= L[1]*round(rip2y/L[1]);
 
-					lim2x = rim1x - rim2x;
-					lim2y = rim1y - rim2y;
+				lip1x = rip2x - rip1x;
+				lip1y = rip2y - rip1y;
+
+				lim2x = rim1x - rim2x;
+				lim2y = rim1y - rim2y;
+
+				// add to force
+				vF[NDIM*gi] 		+= fb*(3.0*(lix - lim1x) + lim2x - lip1x);
+				vF[NDIM*gi + 1] 	+= fb*(3.0*(liy - lim1y) + lim2y - lip1y);
+
+				// -- Belt force
+
+				// segment vectors across particle (bc of int algebra, (nv-1)/2 either nv/2 (even) or (nv-1)/2 (odd))
+				if (kbb > 0 && gi - szList[ci-1] <= (nvtmp-1)/2){
+					// get current belt vector
+					lbbx = vpos[NDIM*(gi + (nvtmp-1)/2)] - rix;
+					lbbx -= L[0]*round(lbbx/L[0]);
+
+					lbby = vpos[NDIM*(gi + (nvtmp-1)/2) + 1] - riy;
+					lbby -= L[1]*round(lbby/L[1]);
+
+					lbb = sqrt(lbbx*lbbx + lbby*lbby);
 
 					// add to force
-					vF[NDIM*gi] 		+= fb*(3.0*(lix - lim1x) + lim2x - lip1x);
-					vF[NDIM*gi + 1] 	+= fb*(3.0*(liy - lim1y) + lim2y - lip1y);
+					vF[NDIM*gi] 					+= fbb*((meanL/dctmp) - 1.0)*(lbbx/lbb);
+					vF[NDIM*gi + 1] 				+= fbb*((meanL/dctmp) - 1.0)*(lbby/lbb);
+
+					vF[NDIM*(gi + (nvtmp-1)/2)] 	-= fbb*((meanL/dctmp) - 1.0)*(lbbx/lbb);
+					vF[NDIM*(gi + (nvtmp-1)/2) + 1] -= fbb*((meanL/dctmp) - 1.0)*(lbby/lbb);
 				}
 
 				// update old coordinates
@@ -1267,6 +1332,14 @@ int main(int argc, char const *argv[]){
 		cout << "	* jammed = " << jammed << endl << endl;
 		cout << endl;
 
+
+		// print if sufficiently close to jamming
+		if (phi0 > 0.7){
+			cout << "\t** PRINTING POSITIONS/HESSIAN EVALS TO FILE... " << endl << endl << endl;
+			printPos(posout, vpos, a0, l0, L, cij, nv, szList, phi0, NCELLS);
+			getHessian(vdosout, vpos, vrad, a0, l0, dc, L, cij, nv, szList, kl, kb, kbb, NCELLS);
+		}
+
 		// update particle sizes based on target check
 		if (rH < 0){
 			// if still undercompressed, then grow until overcompressed found
@@ -1376,7 +1449,6 @@ int main(int argc, char const *argv[]){
 					cout << "	** Ncc = " << Ncc << endl;
 					cout << " WRITING ENTHALPY-MINIMIZED CONFIG TO .jam FILE" << endl;
 					cout << " ENDING COMPRESSION SIMULATION" << endl;
-					printPos(posout, vpos, a0, l0, L, cij, nv, szList, phi0, NCELLS);
 					break;
 				}
 			}
@@ -1443,31 +1515,282 @@ int main(int argc, char const *argv[]){
 		return 1;
 	}
 
+	// close open objects
+	posout.close();
+	vdosout.close();
 
-	/* * * * * * * * * * * * * * * * * * 
 
-			   COMPUTE VDOS
+	// print to console, return
+	cout << "\n\n\nFINISHED MAIN FOR bidRepulsiveCellJamming.cpp, ENDING." << endl << endl << endl;
+	return 0;
+}
 
-	 * * * * * * * * * * * * * * * * * */
+
+
+
+
+
+
+
+/* 
+
+	&&&&&&&&&&&&&&&&&&&&&&& FUNCTION DEFINITIONS &&&&&&&&&&&&&&&&&&&&&
+
+	FUNCTIONS DEFINED
+
+	gindex 			: returns global vertex index (gi) given cell (ci) and local vertex index (vi)
+	cindex 			: returns cell index (ci) given global vertex index (gi)
+
+	area 			: returns area of cell ci
+	perimeter 		: returns perimeter of cell ci
+
+	removeRattlers	: remove all rattlers from a contact network
+
+	getHessian 		: compute + print Hessian eigenvalues
+
+	printPos 		: output vertex positions to .pos file for processing and visualization
+
+	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& 
+
+*/
+
+
+
+// -- INDEXING
+
+
+// get global vertex index gi given input cell index ci and vertex index vi
+int gindex(int ci, int vi, vector<int>& szList){
+	return szList[ci] + vi;
+} 
+
+
+// get cell index ci and vertex index 
+void cindices(int& ci, int& vi, int gi, int NCELLS, vector<int>& szList){
+	if (gi >= szList[NCELLS-1]){
+		ci = NCELLS - 1;
+		vi = gi - szList[NCELLS-1];
+	}
+	else{
+		for (int i=1; i<NCELLS; i++){
+			if (szList[i] > gi){
+				ci = i-1;
+				vi = gi - szList[i-1];
+				break;
+			}
+		}
+	}
+}
+
+
+
+
+
+
+
+
+// -- CELL SHAPE
+
+
+// get cell area
+double area(vector<double>& vpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList){
+	// local variables
+	int vi, vip1, gi, gip1;
+	double dx, dy, xi, yi, xip1, yip1, areaVal = 0.0;
+
+	// initial position: vi = 0
+	gi = gindex(ci,0,szList);
+	xi = vpos[NDIM*gi];
+	yi = vpos[NDIM*gi + 1];
+
+	// loop over vertices of cell ci, get area by shoe-string method
+	for (vi=0; vi<nv.at(ci); vi++){
+		// next vertex
+		vip1 = (vi + 1) % nv.at(ci);
+		gip1 = gindex(ci,vip1,szList);
+
+		// get positions (check minimum images)
+		dx 		= vpos[NDIM*gip1] - xi;
+		dx 		-= L[0]*round(dx/L[0]);
+		xip1 	= xi + dx;
+
+		dy 		= vpos[NDIM*gip1 + 1] - yi;
+		dy 		-= L[1]*round(dy/L[1]);
+		yip1 	= yi + dy;
+
+		// increment area
+		areaVal += xi*yip1 - xip1*yi;
+
+		// set next coordinates
+		xi = xip1;
+		yi = yip1;
+	}
+	areaVal *= 0.5;
+
+	return abs(areaVal);
+}
+
+
+// get cell perimeter
+double perimeter(vector<double>& vpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList){
+		// local variables
+	int vi, vip1, gi, gip1;
+	double dx, dy, xi, yi, xip1, yip1, l, perimVal = 0.0;
+
+	// initial position: vi = 0
+	gi = gindex(ci,0,szList);
+	xi = vpos[NDIM*gi];
+	yi = vpos[NDIM*gi + 1];
+
+	// loop over vertices of cell ci, get perimeter
+	for (vi=0; vi<nv.at(ci); vi++){
+		// next vertex
+		vip1 = (vi + 1) % nv.at(ci);
+		gip1 = gindex(ci,vip1,szList);
+
+		// get positions (check minimum images)
+		dx 		= vpos[NDIM*gip1] - xi;
+		dx 		-= L[0]*round(dx/L[0]);
+		xip1 	= xi + dx;
+
+		dy 		= vpos[NDIM*gip1 + 1] - yi;
+		dy 		-= L[1]*round(dy/L[1]);
+		yip1 	= yi + dy;
+
+		// compute segment length
+		l = sqrt(dx*dx + dy*dy);
+
+		// add to perimeter
+		perimVal += l;
+
+		// update coordinates
+		xi = xip1;
+		yi = yip1;
+	}
+
+	// return perimeter
+	return perimVal;
+}
+
+
+
+
+
+
+// RECURSIVELY REMOVE RATTLERS FROM CONTACT NETWORK
+
+int removeRattlers(vector<int>& cij){
+	// local variables
+	int NCTCS, NCELLS, ci, cj, ctmp, rvv, rcc, nr, nm;
+
+	// total size of contact space
+	NCTCS = cij.size();
+
+	// get NCELLS from contact network
+	NCELLS = (1 + sqrt(1 + 8*NCTCS))/2;
+
+	// number of rattlers
+	nr = 0;
+
+	// number of "marginal" rattlers to be removed
+	nm = 0;
+
+	// loop over rows, eliminate contacts to rattlers
+	for (ci=0; ci<NCELLS; ci++) {
+		// get number of contacts on cell ci
+		rvv = 0;
+		rcc = 0;
+		for (cj=0; cj<NCELLS; cj++){
+			if (ci != cj){
+				if (ci > cj)
+					ctmp = cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2];
+				else
+					ctmp = cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2];
+			}
+			else
+				ctmp = 0;
+			
+
+			rvv += ctmp;
+			if (ctmp > 0)
+				rcc++;
+		}
+
+		// check to see if particle should be removed from network
+		if (rcc <= NDIM && rvv <= 3) {
+			// increment # of rattlers
+			nr++;
+
+			// if in contact, remove contacts
+			if (rvv > 0) {
+				nm++;
+
+				for (cj=0; cj<NCELLS; cj++) {
+					// delete contact between ci and cj
+					if (ci != cj){
+						if (ci > cj)
+							cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2] = 0;
+						else
+							cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2] = 0; 
+					}
+				}
+			}
+		}
+	}
+
+	// recursively check once rattlers are removed
+	if (nm == 0)
+		return nr;
+	else
+		return removeRattlers(cij);
+}
+
+
+
+
+// -- Hessian function
+
+// compute and print Hessian information
+void getHessian(ofstream& vdosout,
+	vector<double>& vpos,
+	vector<double>& vrad,
+	vector<double>& a0,
+	vector<double>& l0,
+	vector<double>& dc,
+	vector<double>& L,
+	vector<int>& cij,
+	vector<int>& nv,
+	vector<int>& szList,
+	double kl,
+	double kb,
+	double kbb,
+	int NCELLS){
 
 
 	// LOCAL VARIABLES
 
 	// integers
-	int l, lxm1, lym1, lxp1, lyp1;
+	int i, gi, gj, ci, cj, vi, vj, vim1, vip1, vertDOF, nvtmp, ctmp;
+	int k, l, lxm1, lym1, lxp1, lyp1;
 	int vim2, vip2, vjm1, vjp1;
 	int kxm2, kym2, kxm1, kym1, kx, kxp1, kxp2, ky, kyp1, kyp2, lx, ly;
 	int mxi, myi, mxj, myj;
 	int inContact;
 
+	vertDOF = 0;
+	for (ci=0; ci<NCELLS; ci++)
+		vertDOF += 2*nv[ci];
+
 	// doubles
-	double delim1, deli, delA;
-	double ljm1x, ljm1y, ljx, ljy;
+	double rho0, a0tmp, l0tmp, dctmp, rij, sij;
+	double delim1, deli, delA, dx, dy;
+	double li, lim1, lim2x, lim2y, lim1x, lim1y, lix, liy, lip1x, lip1y, ljm1x, ljm1y, ljx, ljy;
 	double ulim1x, ulim1y, ulix, uliy;
 	double da_dxi, da_dyi, da_dxj, da_dyj;
 	double kapim1, kapi, kapip1;
 	double dkapi_dxi, dkapi_dyi, dkapip1_dxi, dkapip1_dyi, dkapim1_dxi, dkapim1_dyi;
 	double dkapi_dxip1, dkapi_dyip1, dkapip1_dxip1, dkapip1_dyip1, dkapip1_dxip2, dkapip1_dyip2;
+	double kxbb, kybb, lbbx, lbby, lbb, ulbbx, ulbby, meanL, delBB;
 	double Kl1, Kl2, Kb1, Kb2;
 	double kij, h;
 	double uxij, uyij;
@@ -1480,7 +1803,9 @@ int main(int argc, char const *argv[]){
 	Eigen::MatrixXd Hl(vertDOF,vertDOF);		// stiffness matrix for perimeter term
 	Eigen::MatrixXd Sl(vertDOF,vertDOF);		// stress matrix for perimeter term
 	Eigen::MatrixXd Hb(vertDOF,vertDOF);		// stiffness matrix for bending energy
-	Eigen::MatrixXd Sb(vertDOF,vertDOF);		// stress matrix for bending term
+	Eigen::MatrixXd Sb(vertDOF,vertDOF);		// stress matrix for bending energy
+	Eigen::MatrixXd Hbb(vertDOF,vertDOF);		// stiffness matrix for belt term
+	Eigen::MatrixXd Sbb(vertDOF,vertDOF);		// stiffness matrix for belt term
 	Eigen::MatrixXd Hvv(vertDOF,vertDOF);		// stiffness matrix for interaction terms
 	Eigen::MatrixXd Svv(vertDOF,vertDOF);		// stress matrix for interaction terms
 	Eigen::MatrixXd H(vertDOF,vertDOF);			// stiffness matrix
@@ -1496,6 +1821,8 @@ int main(int argc, char const *argv[]){
 			Sl(k,l) = 0.0;
 			Hb(k,l) = 0.0;
 			Sb(k,l) = 0.0;
+			Hbb(k,l) = 0.0;
+			Sbb(k,l) = 0.0;
 			Hvv(k,l) = 0.0;
 			Svv(k,l) = 0.0;
 			S(k,l) = 0.0;
@@ -1506,11 +1833,11 @@ int main(int argc, char const *argv[]){
 
 	// Loop over cells, compute shape forces for each individual cell and contributions from
 	// vertex-vertex interactions
-	cout << "	** COMPUTING VDOS ... " << endl;
+	cout << "	** Filling dynamical matrix elements ... " << endl;
 	rho0 = sqrt(a0.at(0));
 	for (ci=0; ci<NCELLS; ci++){
 
-		// print statement
+		// print to console
 		cout << "		-- Computing dynamical matrix elements for cell ci = " << ci << endl;
 		
 
@@ -1527,6 +1854,7 @@ int main(int argc, char const *argv[]){
 		// geometric factors
 		l0tmp = l0[ci];
 		a0tmp = a0[ci];
+		dctmp = dc[ci];
 
 		// area deviations
 		delA = (area(vpos,ci,L,nv,szList)/a0tmp) - 1.0;
@@ -1537,6 +1865,25 @@ int main(int argc, char const *argv[]){
 
 		Kb1 = kb*(rho0*rho0);					// units = L^2
 		Kb2 = Kb1/(l0tmp*l0tmp);				// units = 1
+
+
+		// compute mean belt length
+		delBB = 0.0;
+		meanL = 0.0;
+		if (kbb > 0){
+			gi = szList[ci];
+			for (vi=0; vi<=(nvtmp-1)/2; vi++){
+				lbbx = vpos[NDIM*(gi + vi + (nvtmp-1)/2)] - vpos[NDIM*(gi + vi)];
+				lbbx -= L[0]*round(lbbx/L[0]);
+
+				lbby = vpos[NDIM*(gi + vi + (nvtmp-1)/2) + 1] - vpos[NDIM*(gi + vi) + 1];
+				lbby -= L[1]*round(lbby/L[1]);
+
+				meanL += sqrt(lbbx*lbbx + lbby*lbby);
+			}
+			meanL /= (nvtmp-1)/2;
+			delBB = (meanL/dctmp) - 1.0;
+		}
 
 		// loop over vertices, compute each DM element
 		for (vi=0; vi<nvtmp; vi++){
@@ -1761,6 +2108,84 @@ int main(int argc, char const *argv[]){
 		    
 		    Sb(kxp2,ky)     = Sb(ky,kxp2);
 		    Sb(kyp2,kx)     = Sb(kx,kyp2);
+
+
+
+
+
+		    // -- BELT SPRING
+
+		    // unit vectors in belt direction
+		    if (kbb > 0 && vi <= (nvtmp-1)/2){
+		    	// belt indices
+		    	kxbb = kx + NDIM*(nvtmp-1)/2;
+		    	kybb = kxbb + 1;
+
+		    	lbbx = vpos[kxbb] - vpos[kx];
+		    	lbbx -= L[0]*round(lbbx/L[0]);
+
+		    	lbby = vpos[kybb] - vpos[ky];
+		    	lbby -= L[1]*round(lbby/L[1]);
+
+		    	// unit vectors
+		    	lbb = lbbx*lbbx + lbby*lbby;
+		    	ulbbx = lbbx/lbb;
+		    	ulbby = lbby/lbb;
+
+		    	// -- stiffness elements
+	        
+		        // main diagonal (vi)
+		        Hbb(kx,kx)          = ((4.0*kbb*rho0)/(pow(nvtmp*dctmp,2.0)))*ulbbx*ulbbx;
+		        Hbb(ky,ky)          = ((4.0*kbb*rho0)/(pow(nvtmp*dctmp,2.0)))*ulbby*ulbby;
+		        Hbb(kx,ky)          = ((4.0*kbb*rho0)/(pow(nvtmp*dctmp,2.0)))*ulbbx*ulbby;
+		        Hbb(ky,kx)          = Hbb(kx,ky);
+		        
+		        // off diagonals
+		        Hbb(kx,kxbb)       = -Hbb(kx,kx);
+		        Hbb(ky,kybb)       = -Hbb(ky,ky);
+		        Hbb(kx,kybb)       = -Hbb(kx,ky);
+		        Hbb(ky,kxbb)       = -Hbb(ky,kx);
+		        
+		        Hbb(kxbb,kx)       = Hbb(kx,kxbb);
+		        Hbb(kybb,ky)       = Hbb(ky,kybb);
+		        Hbb(kxbb,ky)       = Hbb(ky,kxbb);
+		        Hbb(kybb,kx)       = Hbb(kx,kybb);
+		        
+		        // main diagonal (belt pair)
+		        Hbb(kxbb,kxbb)    = Hbb(kx,kx);
+		        Hbb(kybb,kybb)    = Hbb(ky,ky);
+		        Hbb(kxbb,kybb)    = Hbb(kx,ky);
+		        Hbb(kybb,kxbb)    = Hbb(ky,kx);
+		        
+		        
+		        // -- stress elements
+		        
+		        // main diagonal (vi)
+		        Sbb(kx,kx)          = ((2.0*kbb*delBB*rho0)/(nvtmp*dctmp*lbb))*ulbby*ulbby;
+		        Sbb(ky,ky)          = ((2.0*kbb*delBB*rho0)/(nvtmp*dctmp*lbb))*ulbbx*ulbbx;
+		        Sbb(kx,ky)          = -((2.0*kbb*delBB*rho0)/(nvtmp*dctmp*lbb))*ulbbx*ulbby;
+		        Sbb(ky,kx)          = Sbb(kx,ky);
+		        
+		        // off diagonals
+		        Sbb(kx,kxbb)       = -Sbb(kx,kx);
+		        Sbb(ky,kybb)       = -Sbb(ky,ky);
+		        Sbb(kx,kybb)       = -Sbb(kx,ky);
+		        Sbb(ky,kxbb)       = -Sbb(ky,kx);
+		        
+		        Sbb(kxbb,kx)       = Sbb(kx,kxbb);
+		        Sbb(kybb,ky)       = Sbb(ky,kybb);
+		        Sbb(kxbb,ky)       = Sbb(ky,kxbb);
+		        Sbb(kybb,kx)       = Sbb(kx,kybb);
+		        
+		        // main diagonal (belt pair)
+		        Sbb(kxbb,kxbb)    = Sbb(kx,kx);
+		        Sbb(kybb,kybb)    = Sbb(ky,ky);
+		        Sbb(kxbb,kybb)    = Sbb(kx,ky);
+		        Sbb(kybb,kxbb)    = Sbb(ky,kx);
+		    }
+	        
+	        
+	        
     		
 
 		    // -- AREA SPRING (stress matrix)
@@ -1841,10 +2266,7 @@ int main(int argc, char const *argv[]){
 
 			// only check overlaps if contact is force-bearing, 
 			// 	i.e. if both ci and cj are non-rattlers
-			if (ci > cj)
-				inContact = cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2];
-			else
-				inContact = cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]; 
+			inContact = cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2];
 
 			if (inContact > 0){
 
@@ -1952,272 +2374,40 @@ int main(int argc, char const *argv[]){
 	// initialize all matrices to be 0 initially
 	for (k=0; k<vertDOF; k++){
 		for (l=0; l<vertDOF; l++){
-			H(k,l) = Ha(k,l) + Hl(k,l) + Hb(k,l) + Hvv(k,l);
-			S(k,l) = -Sa(k,l) - Sl(k,l) - Sb(k,l) - Svv(k,l);
+			H(k,l) = Ha(k,l) + Hl(k,l) + Hb(k,l) + Hbb(k,l) + Hvv(k,l);
+			S(k,l) = -Sa(k,l) - Sl(k,l) - Sb(k,l) - Sbb(k,l) - Svv(k,l);
 			M(k,l) = H(k,l) - S(k,l);
 		}
 	}
 
 	// compute eigenvalues
-	cout << "\t** Computing eigenvalues and eigenvectors of M, H and S matrices" << endl;
+	cout << "\t** Computing eigenvalues and eigenvectors of dynamical matrix M" << endl;
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> allModes(M);
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> hModes(H);
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> sModes(S);
+	cout << "\t** Computing eigenvalues and eigenvectors of stiffness matrix H" << endl;
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> stiffModes(H);
 
-	// define eigenvector matrix
-	Eigen::MatrixXd evecs = allModes.eigenvectors();
+	// // define eigenvector matrix
+	// Eigen::MatrixXd evecs = allModes.eigenvectors();
+
+	// // computing projections onto H
+	// cout << "\t** Computing eigenvector projections on stiffness matrix H" << endl;
+	// vector<double> evecProj(vertDOF,0.0);
+	// for (i=0; i<vertDOF; i++){
+	// 	for (k=0; k<vertDOF; k++){
+	// 		evecProj[i] += H(k,k)*evecs(k,i)*evecs(k,i);
+	// 		for (l=(k+1); l<vertDOF; l++){
+	// 			evecProj[i] += 2.0*H(k,l)*evecs(k,i)*evecs(l,i);
+	// 		}
+	// 	}
+	// }
 
 	// print eigenvalues to vdos file
 	cout << "\t** Printing evals to file" << endl;
 	vdosout << vertDOF << endl;
 	vdosout << allModes.eigenvalues() << endl;
-	// vdosout << sModes.eigenvalues() << endl;
-
-	// computing projections onto H
-	cout << "\t** Computing eigenvector projections on stiffness matrix H" << endl;
-	double evecProj = 0.0;
-	for (i=0; i<vertDOF; i++){
-		evecProj = 0.0;
-		for (k=0; k<vertDOF; k++){
-			evecProj += M(k,k)*evecs(k,i)*evecs(k,i);
-			for (l=(k+1); l<vertDOF; l++){
-				evecProj += 2.0*M(k,l)*evecs(k,i)*evecs(l,i);
-			}
-		}
-		vdosout << evecProj << endl;
-	}
-	vdosout << hModes.eigenvalues() << endl;
-	vdosout << evecs << endl;
-
-
-
-
-	// close open objects
-	posout.close();
-	vdosout.close();
-
-
-	// print to console, return
-	cout << "\n\n\nFINISHED MAIN FOR bidRepulsiveCellJamming.cpp, ENDING." << endl << endl << endl;
-	return 0;
-}
-
-
-
-
-
-
-
-
-/* 
-
-	&&&&&&&&&&&&&&&&&&&&&&& FUNCTION DEFINITIONS &&&&&&&&&&&&&&&&&&&&&
-
-	FUNCTIONS DEFINED
-
-	gindex 			: returns global vertex index (gi) given cell (ci) and local vertex index (vi)
-	cindex 			: returns cell index (ci) given global vertex index (gi)
-
-	area 			: returns area of cell ci
-	perimeter 		: returns perimeter of cell ci
-
-	removeRattlers	: remove all rattlers from a contact network
-
-	printPos 		: output vertex positions to .pos file for processing and visualization
-
-	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& 
-
-*/
-
-
-
-// -- INDEXING
-
-
-// get global vertex index gi given input cell index ci and vertex index vi
-int gindex(int ci, int vi, vector<int>& szList){
-	return szList[ci] + vi;
-} 
-
-
-// get cell index ci and vertex index 
-void cindices(int& ci, int& vi, int gi, int NCELLS, vector<int>& szList){
-	if (gi >= szList[NCELLS-1]){
-		ci = NCELLS - 1;
-		vi = gi - szList[NCELLS-1];
-	}
-	else{
-		for (int i=1; i<NCELLS; i++){
-			if (szList[i] > gi){
-				ci = i-1;
-				vi = gi - szList[i-1];
-				break;
-			}
-		}
-	}
-}
-
-
-
-
-
-
-
-
-// -- CELL SHAPE
-
-
-// get cell area
-double area(vector<double>& vpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList){
-	// local variables
-	int vi, vip1, gi, gip1;
-	double dx, dy, xi, yi, xip1, yip1, areaVal = 0.0;
-
-	// initial position: vi = 0
-	gi = gindex(ci,0,szList);
-	xi = vpos[NDIM*gi];
-	yi = vpos[NDIM*gi + 1];
-
-	// loop over vertices of cell ci, get area by shoe-string method
-	for (vi=0; vi<nv.at(ci); vi++){
-		// next vertex
-		vip1 = (vi + 1) % nv.at(ci);
-		gip1 = gindex(ci,vip1,szList);
-
-		// get positions (check minimum images)
-		dx 		= vpos[NDIM*gip1] - xi;
-		dx 		-= L[0]*round(dx/L[0]);
-		xip1 	= xi + dx;
-
-		dy 		= vpos[NDIM*gip1 + 1] - yi;
-		dy 		-= L[1]*round(dy/L[1]);
-		yip1 	= yi + dy;
-
-		// increment area
-		areaVal += xi*yip1 - xip1*yi;
-
-		// set next coordinates
-		xi = xip1;
-		yi = yip1;
-	}
-	areaVal *= 0.5;
-
-	return abs(areaVal);
-}
-
-
-// get cell perimeter
-double perimeter(vector<double>& vpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList){
-		// local variables
-	int vi, vip1, gi, gip1;
-	double dx, dy, xi, yi, xip1, yip1, l, perimVal = 0.0;
-
-	// initial position: vi = 0
-	gi = gindex(ci,0,szList);
-	xi = vpos[NDIM*gi];
-	yi = vpos[NDIM*gi + 1];
-
-	// loop over vertices of cell ci, get perimeter
-	for (vi=0; vi<nv.at(ci); vi++){
-		// next vertex
-		vip1 = (vi + 1) % nv.at(ci);
-		gip1 = gindex(ci,vip1,szList);
-
-		// get positions (check minimum images)
-		dx 		= vpos[NDIM*gip1] - xi;
-		dx 		-= L[0]*round(dx/L[0]);
-		xip1 	= xi + dx;
-
-		dy 		= vpos[NDIM*gip1 + 1] - yi;
-		dy 		-= L[1]*round(dy/L[1]);
-		yip1 	= yi + dy;
-
-		// compute segment length
-		l = sqrt(dx*dx + dy*dy);
-
-		// add to perimeter
-		perimVal += l;
-
-		// update coordinates
-		xi = xip1;
-		yi = yip1;
-	}
-
-	// return perimeter
-	return perimVal;
-}
-
-
-
-
-
-
-// RECURSIVELY REMOVE RATTLERS FROM CONTACT NETWORK
-
-int removeRattlers(vector<int>& cij){
-	// local variables
-	int NCTCS, NCELLS, ci, cj, ctmp, rvv, rcc, nr, nm;
-
-	// total size of contact space
-	NCTCS = cij.size();
-
-	// get NCELLS from contact network
-	NCELLS = (1 + sqrt(1 + 8*NCTCS))/2;
-
-	// number of rattlers
-	nr = 0;
-
-	// number of "marginal" rattlers to be removed
-	nm = 0;
-
-	// loop over rows, eliminate contacts to rattlers
-	for (ci=0; ci<NCELLS; ci++) {
-		// get number of contacts on cell ci
-		rvv = 0;
-		rcc = 0;
-		for (cj=0; cj<NCELLS; cj++){
-			if (ci != cj){
-				if (ci > cj)
-					ctmp = cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2];
-				else
-					ctmp = cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2];
-			}
-			else
-				ctmp = 0;
-			
-
-			rvv += ctmp;
-			if (ctmp > 0)
-				rcc++;
-		}
-
-		// check to see if particle should be removed from network
-		if (rcc <= NDIM && rvv <= 3) {
-			// increment # of rattlers
-			nr++;
-
-			// if in contact, remove contacts
-			if (rvv > 0) {
-				nm++;
-
-				for (cj=0; cj<NCELLS; cj++) {
-					// delete contact between ci and cj
-					if (ci != cj){
-						if (ci > cj)
-							cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2] = 0;
-						else
-							cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2] = 0; 
-					}
-				}
-			}
-		}
-	}
-
-	// recursively check once rattlers are removed
-	if (nm == 0)
-		return nr;
-	else
-		return removeRattlers(cij);
+	vdosout << stiffModes.eigenvalues() << endl;
+	// for (i=0; i<vertDOF; i++)
+	// 	vdosout << evecProj[i] << endl;
 }
 
 

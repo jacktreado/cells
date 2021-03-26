@@ -89,7 +89,22 @@ int main(int argc, char const *argv[]){
 
 	// read in parameters from command line input
 	// test: g++ -O3 sequential/shapeMobility.cpp -o shape.o
-	// test: ./shape.o 24 32 0.15 0.975 1.10 1e-1 1e-3 1e-2 1e-1 1e6 200 5000 1 pos.test shape.test
+	// test: ./shape.o 24 32 0.1 1.0 1.10 1 1e-3 1e-1 1e-3 1e6 200 5000 1 pos.test shape.test
+	// 1. Number of cells
+	// 2. Mean number of vertices / cell
+	// 3. sample polydispersity
+	// 4. largest packing fraction phi
+	// 5. preferred shape parameter calA0
+	// 6. perimeter spring constant kl
+	// 7. bending spring constant kb
+	// 8. self-propelled velocity v0
+	// 9. angular diffusion coefficient Dr
+	// 10. number of time steps NT
+	// 11. number of print frames (positions)
+	// 12. number of print frames (shape info)
+	// 13. seed for random number generator
+	// 14. position file string
+	// 15. shape file string
 	string NCELLS_str 			= argv[1];
 	string NV_str 				= argv[2];
 	string polyd_str 			= argv[3];

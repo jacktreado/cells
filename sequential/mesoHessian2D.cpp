@@ -9,7 +9,7 @@
 		-- crosslinking with binding kinetics
 		-- perimeter aging
 		-- quasistatic decompression
-		-- AND COMPUTES THE HESSIAN
+		-- AND COMPUTES THE HESSIAN + SHEAR MODULUS
 
 	ADDED 
 
@@ -96,6 +96,21 @@ double area(vector<double>& dpos, int ci, vector<double>& L, vector<int>& nv, ve
 double perimeter(vector<double>& dpos, int ci, vector<double>& L, vector<int>& nv, vector<int>& szList);
 
 // compute Hessian
+void computeResponse(ofstream& hessout,
+	vector<double>& vpos,
+	vector<double>& vrad,
+	vector<double>& a0,
+	vector<double>& l0,
+	vector<double>& delta0,
+	vector<double>& s0,
+	vector<double>& dc,
+	vector<double>& L,
+	vector<int>& cij,
+	vector<int>& nv,
+	vector<int>& szList,
+	double kl,
+	double kb,
+	int NCELLS);
 
 // remove rattlers from contact network, return rattler number
 int removeRattlers(vector<int>& cij);
