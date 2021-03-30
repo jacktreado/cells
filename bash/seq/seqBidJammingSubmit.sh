@@ -55,7 +55,7 @@ mkdir -p $simdatadir
 # compile into binary using packing.h
 binf=bin/"$runstr".o
 mainf=$maindir/bidRepulsiveCellJamming.cpp
-echo Running $numSeeds jamming sims of $NCELLS cells with $NV verts, bidisperse , calA0 = $calA0 , and bending energy kb = $kb
+echo Running $numSeeds jamming sims of $NCELLS cells with $NV verts, bidisperse , calA0 = $calA0 , and bending energy kb = $kb, kbb = $kbb
 
 # run compiler
 rm -f $binf
@@ -154,13 +154,14 @@ sbatch -t $time $slurmf
 # 1. NCELLS
 # 2. NV
 # 3. calA0
-# 4. perimeter force (kl)
+# 4. perimeter energy (kl)
 # 5. bending energy (kb)
-# 6. partition
-# 7. time
-# 8. num seeds per run (for each entry in array)
-# 9. number of runs (number of array entries, i.e. arraynum)
-# 10. start seed (end seed determined by number of runs)
+# 6. belt energy (kbb)
+# 7. partition
+# 8. time
+# 9. num seeds per run (for each entry in array)
+# 10. number of runs (number of array entries, i.e. arraynum)
+# 11. start seed (end seed determined by number of runs)
 
 
 
