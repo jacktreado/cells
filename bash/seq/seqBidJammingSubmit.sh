@@ -59,7 +59,7 @@ echo Running $numSeeds jamming sims of $NCELLS cells with $NV verts, bidisperse 
 
 # run compiler
 rm -f $binf
-g++ --std=c++11 -I $srcdir $mainf -o $binf 
+g++ --std=c++11 -O3 -I $srcdir $mainf -o $binf 
 echo compiling with : g++ --std=c++11 -O3 -I $srcdir $mainf -o $binf 
 
 # check compilation
