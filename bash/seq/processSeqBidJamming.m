@@ -29,11 +29,6 @@ phiJList            = cell(NSIM,2);         % packing fractions (both from a and
 % VDOS list
 evalsList           = cell(NSIM,1);         % list of eigenvalues at jamming
 hvalsList           = cell(NSIM,1);         % list of projections of eigenvectors onto H
-svalsList           = cell(NSIM,1);         % list of projections of eignevectors onto S
-pvList              = cell(NSIM,1);         % vertex-based participation ratio at jamming
-pcList              = cell(NSIM,1);         % cell-based participation ratio at jamming
-projList            = cell(NSIM,3);         % list of projections onto T, R, S directions
-
 
 %% Loop over simulations
 
@@ -153,132 +148,12 @@ for ss = 1:NSIM
     hvals = textscan(fid,'%f',dof);
     hvals = hvals{1};
 
-
-    % stiffness eval data
-    svals = textscan(fid,'%f',dof);
-    svals = svals{1};
-    
-    % eigenvector data
-    frmt = repmat('%f ',1,dof);
-    evecs = textscan(fid,frmt,dof);
-    if isempty(evecs)
-        fprintf('Evecs from %s not read, skipping\n',vdosfname);
-        fclose(fid);
-        simSkip(ss) = true;
-        continue;
-    else
-        evecs = cell2mat(evecs);
-    end
-
     % close the file
     fclose(fid);
     
     % save data
     evalsList{ss} = evals;
     hvalsList{ss} = hvals;
-    svalsList{ss} = svals;
-    
-    % vertex-based participation ratio
-    pv = zeros(dof,1);
-    for kk = 1:dof
-        pvnum = 0.0;
-        for ll = 1:2:dof-1
-            pvnum = pvnum + evecs(ll,kk)*evecs(ll,kk) + evecs(ll+1,kk)*evecs(ll+1,kk);
-        end
-        pvnum = pvnum * pvnum;
-
-        pvdenom = 0.0;
-        for ll = 1:2:dof-1
-            pvdenom = pvdenom + (evecs(ll,kk)*evecs(ll,kk) + evecs(ll+1,kk)*evecs(ll+1,kk))^2;
-        end
-        pvdenom = 0.5 * dof * pvdenom;
-
-
-        pv(kk) = pvnum/pvdenom;
-    end
-
-    
-    % cell-based participation ratio
-    xi = 1:2:dof-1;
-    sz = cumsum(nv);
-
-    pc = zeros(dof,1);
-    for kk = 1:dof
-        pvnum = 0.0;
-        gi = 1;
-        for ii = 1:NCELLS
-            xinds = xi(gi:sz(ii));
-            yinds = xinds + 1;
-            ex = evecs(xinds,kk);
-            ey = evecs(yinds,kk);
-            Ex = sum(ex);
-            Ey = sum(ey);
-            gi = sz(ii) + 1;
-
-            pvnum = pvnum + Ex*Ex + Ey*Ey;
-        end
-        pvnum = pvnum * pvnum;
-
-        pvdenom = 0.0;
-        gi = 1;
-        for ii = 1:NCELLS
-            xinds = xi(gi:sz(ii));
-            yinds = xinds + 1;
-            ex = evecs(xinds,kk);
-            ey = evecs(yinds,kk);
-            Ex = sum(ex);
-            Ey = sum(ey);
-            gi = sz(ii) + 1;
-
-            pvdenom = pvdenom + (Ex*Ex + Ey*Ey)^2;
-        end
-        pvdenom = NCELLS * pvdenom;
-
-
-        pc(kk) = pvnum/pvdenom;
-    end
-    
-    % save participation ratios
-    pvList{ss} = pv;
-    pcList{ss} = pc;
-    
-    
-    % construct data for projection computation
-    NVTOT = sum(nv);
-    xall = zeros(NVTOT,1);
-    yall = zeros(NVTOT,1);
-    Dc = zeros(NCELLS,1);
-    last = 1;
-    for nn = 1:NCELLS
-        next = last + nv(nn) - 1;
-        xall(last:next) = xpos{nn};
-        yall(last:next) = ypos{nn};
-        last = next + 1;
-
-        % compute effective cell diameter
-        Dc(nn) = l0(nn)/sin(pi/nv(nn));
-    end
-    
-    evecsSwap = evecs;
-        
-    % my indexing
-    x0inds = 1:2:(dof-1);
-    y0inds = 2:2:dof;
-
-    % Dong's indexing
-    xinds = 1:NVTOT;
-    yinds = (NVTOT + 1):dof;
-
-    evecsSwap(xinds,:) = evecs(x0inds,:);
-    evecsSwap(yinds,:) = evecs(y0inds,:);
-    
-    % use Dong's code
-    V2_norm = ModeProj_DPM(NCELLS, nv, Dc, xall, yall, evecsSwap);
-
-    % save projections for this pressure
-    projList{ss,1} = V2_norm(1,:)';
-    projList{ss,2} = V2_norm(2,:)';
-    projList{ss,3} = V2_norm(3,:)';
 end
 
 % remove problematic sims
@@ -294,14 +169,10 @@ calAList(simSkip,:)     = [];
 phiJList(simSkip,:)     = [];
 evalsList(simSkip)      = [];
 hvalsList(simSkip)      = [];
-svalsList(simSkip)      = [];
-pvList(simSkip)         = [];
-pcList(simSkip)         = [];
-projList(simSkip)       = [];
 
 % save to matfile
 save(saveStr,'simList','NCELLSList','NvList','LList','zcList','zvList','a0List',...
-    'l0List','calAList','phiJList','evalsList','hvalsList','svalsList','pvList','pcList','projList');
+    'l0List','calAList','phiJList','evalsList','hvalsList');
 
 
 end
