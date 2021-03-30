@@ -34,7 +34,7 @@ startSeed="${11}"
 # other variables
 dphi=5e-4
 Ptol=1e-7
-if [[ $kbb -eq 0 ]]
+if [[ "$kbb" == 0 ]]
 then
     Ftol=1e-12
 else
