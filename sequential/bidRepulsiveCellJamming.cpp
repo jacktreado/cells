@@ -43,9 +43,9 @@ const int wnum 				= 25;
 const int pnum 				= 14;
 
 // simulation constants
-const double phiInit 		= 0.5;
+const double phiInit 		= 0.3;
 const double phiJMin 		= 0.6;
-const double timeStepMag 	= 0.0025;
+const double timeStepMag 	= 0.005;
 const double sizeRatio 		= 1.4;
 const double sizeFraction 	= 0.5;
 
@@ -92,20 +92,23 @@ int main(int argc, char const *argv[]){
 
 	// parameters to be read in 
 	int NCELLS, smallNV, largeNV, smallN, largeN, NVTOT, NVSMALL, cellDOF, vertDOF, seed;
-	double Ptol, Ftol, phi0, dphi, T0, kl, kb, calA0, smallCalA0, largeCalA0;
+	double Ptol, Ftol, phi0, dphi, T0, kl, kb, kbb, calA0, smallCalA0, largeCalA0;
 
 	// read in parameters from command line input
+	// g++ -O3 -I src sequential/bidRepulsiveCellJamming.cpp -o jam.o
+	// ./jam.o 12 24 1.04 1e-3 1.0 0.01 0 1e-7 1e-12 1 pos.test vdos.test
 	string NCELLS_str 		= argv[1];
 	string smallNV_str 		= argv[2];
 	string calA0_str 		= argv[3];
 	string dphi_str 		= argv[4];
 	string kl_str 			= argv[5];
 	string kb_str 			= argv[6];
-	string Ptol_str 		= argv[7];
-	string Ftol_str 		= argv[8];
-	string seed_str 		= argv[9];
-	string positionFile 	= argv[10];
-	string vdosFile  		= argv[11];
+	string kbb_str 			= argv[7];
+	string Ptol_str 		= argv[8];
+	string Ftol_str 		= argv[9];
+	string seed_str 		= argv[10];
+	string positionFile 	= argv[11];
+	string vdosFile  		= argv[12];
 
 	stringstream NCELLSss(NCELLS_str);
 	stringstream smallNVss(smallNV_str);
@@ -113,6 +116,7 @@ int main(int argc, char const *argv[]){
 	stringstream dphiss(dphi_str);
 	stringstream klss(kl_str);
 	stringstream kbss(kb_str);
+	stringstream kbbss(kbb_str);
 	stringstream Ptolss(Ptol_str);
 	stringstream Ftolss(Ftol_str);
 	stringstream seedss(seed_str);
@@ -123,6 +127,7 @@ int main(int argc, char const *argv[]){
 	dphiss >> dphi;
 	klss >> kl;
 	kbss >> kb;
+	kbbss >> kbb;
 	Ptolss >> Ptol;
 	Ftolss >> Ftol;
 	seedss >> seed;
@@ -257,6 +262,7 @@ int main(int argc, char const *argv[]){
 
 	vector<double> a0(NCELLS,1.0);
 	vector<double> l0(NCELLS,1.0);
+	vector<double> dc(NCELLS,1.0);
 
 	// initialize effective disk radius (for minimization), and l0 parameter
 	for (ci=0; ci<NCELLS; ci++){
@@ -282,6 +288,7 @@ int main(int argc, char const *argv[]){
 
 		// set l0, vector radius
 		l0.at(ci) 	= 2.0*lenscale*sqrt(PI*calA0tmp)/nvtmp;
+		dc.at(ci) 	= l0.at(ci)/(sin(PI/nvtmp));
 		gi 			= szList.at(ci);
 		for (vi=0; vi<nvtmp; vi++)
 			vrad.at(gi+vi)	= 0.5*l0.at(ci)*del;
@@ -708,10 +715,11 @@ int main(int argc, char const *argv[]){
 	double rho0 = 0.0;
 
 	// shape force variables
-	double fa, fl, fb, l0tmp, atmp, li, lim1, kappai, cx, cy;
+	double fa, fl, fb, fbb, l0tmp, dctmp, atmp, li, lim1, kappai, cx, cy;
 	double da, dli, dlim1;
 	double lim2x, lim2y, lim1x, lim1y, lix, liy, lip1x, lip1y;
 	double rim2x, rim2y, rim1x, rim1y, rix, riy, rip1x, rip1y, rip2x, rip2y;
+	double lbbx, lbby, lbb, meanL;
 	double ua, ul, ub;
 
 	// contact variables
@@ -723,7 +731,7 @@ int main(int argc, char const *argv[]){
 		k++;
 
 		// update tolerance
-		if (phi0 > phiJMin)
+		if (phi0 > 0.35)
 			Ftoltmp = Ftol;
 
 		// RESET FIRE VARIABLES
@@ -732,8 +740,8 @@ int main(int argc, char const *argv[]){
 		vnorm 		= 0;
 		alpha   	= alpha0;
 
-		dtmax   	= 10*dt0;
-		dtmin   	= 1e-8*dt0;
+		dtmax   	= 20*dt0;
+		dtmin   	= 1e-2*dt0;
 		dt 			= dt0;
 
 		npPos      	= 0;
@@ -965,6 +973,7 @@ int main(int argc, char const *argv[]){
 						nvtmp = nv[ci];
 						a0tmp = a0[ci];
 						l0tmp = l0[ci];
+						dctmp = dc[ci];
 
 						// compute area deviation
 						atmp = area(vpos,ci,L,nv,szList);
@@ -974,6 +983,7 @@ int main(int argc, char const *argv[]){
 						fa = da*(rho0/a0tmp);		// derivation from the fact that rho0^2 does not necessarily cancel a0tmp
 						fl = kl*(rho0/l0tmp);
 						fb = kb*(rho0/(l0tmp*l0tmp));
+						fbb = kbb*(2.0*rho0/(nvtmp*dctmp));
 						
 						// compute cell center of mass
 						xi = vpos[NDIM*gi];
@@ -995,6 +1005,22 @@ int main(int argc, char const *argv[]){
 						}
 						cx /= nvtmp;
 						cy /= nvtmp;
+
+						// compute mean belt length
+						if (kbb > 0){
+							meanL = 0.0;
+							for (vi=0; vi<(nvtmp-1)/2; vi++){
+								// get current belt vector
+								lbbx = vpos[NDIM*(gi + vi + (nvtmp-1)/2)] - vpos[NDIM*(gi + vi)];
+								lbbx -= L[0]*round(lbbx/L[0]);
+
+								lbby = vpos[NDIM*(gi + vi + (nvtmp-1)/2) + 1] - vpos[NDIM*(gi + vi) + 1];
+								lbby -= L[1]*round(lbby/L[1]);
+
+								meanL += sqrt(lbbx*lbbx + lbby*lbby);
+							}
+							meanL /= ((nvtmp-1)/2);
+						}
 
 						// get coordinates relative to center of mass
 						rix = vpos[NDIM*gi] - cx;
@@ -1073,6 +1099,27 @@ int main(int argc, char const *argv[]){
 					// add to force
 					vF[NDIM*gi] 		+= fb*(3.0*(lix - lim1x) + lim2x - lip1x);
 					vF[NDIM*gi + 1] 	+= fb*(3.0*(liy - lim1y) + lim2y - lip1y);
+				}
+
+				// -- Belt force
+
+				// segment vectors across particle (bc of int algebra, (nv-1)/2 either nv/2 (even) or (nv-1)/2 (odd))
+				if (kbb > 0 && gi - szList[ci-1] < (nvtmp-1)/2){
+					// get current belt vector
+					lbbx = vpos[NDIM*(gi + (nvtmp-1)/2)] - vpos[NDIM*gi];
+					lbbx -= L[0]*round(lbbx/L[0]);
+
+					lbby = vpos[NDIM*(gi + (nvtmp-1)/2) + 1] - vpos[NDIM*gi + 1];
+					lbby -= L[1]*round(lbby/L[1]);
+
+					lbb = sqrt(lbbx*lbbx + lbby*lbby);
+
+					// add to force
+					vF[NDIM*gi] 					+= fbb*((meanL/dctmp) - 1.0)*(lbbx/lbb);
+					vF[NDIM*gi + 1] 				+= fbb*((meanL/dctmp) - 1.0)*(lbby/lbb);
+
+					vF[NDIM*(gi + (nvtmp-1)/2)] 	-= fbb*((meanL/dctmp) - 1.0)*(lbbx/lbb);
+					vF[NDIM*(gi + (nvtmp-1)/2) + 1] -= fbb*((meanL/dctmp) - 1.0)*(lbby/lbb);
 				}
 
 				// update old coordinates
@@ -1239,7 +1286,7 @@ int main(int argc, char const *argv[]){
 		// boolean check for jamming
 		undercompressed = ((pcheck < 2.0*Ptol && rH < 0) || (pcheck < Ptol && rH > 0));
 		overcompressed = (pcheck > 2.0*Ptol && phi0 > phiJMin);
-		jammed = (pcheck < 2.0*Ptol && pcheck > Ptol && rH > 0);
+		jammed = (pcheck < 2.0*Ptol && pcheck > Ptol && rH > 0 && rL > 0);
 
 		// output to console
 		cout << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&" << endl;
@@ -1387,6 +1434,7 @@ int main(int argc, char const *argv[]){
 		for (ci=0; ci<NCELLS; ci++){
 			// scale preferred lengths
 			l0[ci] *= scaleFactor;
+			dc[ci] *= scaleFactor;
 			a0[ci] *= scaleFactor*scaleFactor;
 
 			// first global index for ci
@@ -1468,6 +1516,7 @@ int main(int argc, char const *argv[]){
 	double kapim1, kapi, kapip1;
 	double dkapi_dxi, dkapi_dyi, dkapip1_dxi, dkapip1_dyi, dkapim1_dxi, dkapim1_dyi;
 	double dkapi_dxip1, dkapi_dyip1, dkapip1_dxip1, dkapip1_dyip1, dkapip1_dxip2, dkapip1_dyip2;
+	double kxbb, kybb, ulbbx, ulbby, delBB;
 	double Kl1, Kl2, Kb1, Kb2;
 	double kij, h;
 	double uxij, uyij;
@@ -1481,6 +1530,8 @@ int main(int argc, char const *argv[]){
 	Eigen::MatrixXd Sl(vertDOF,vertDOF);		// stress matrix for perimeter term
 	Eigen::MatrixXd Hb(vertDOF,vertDOF);		// stiffness matrix for bending energy
 	Eigen::MatrixXd Sb(vertDOF,vertDOF);		// stress matrix for bending term
+	Eigen::MatrixXd Hbb(vertDOF,vertDOF);		// stiffness matrix for belt term
+	Eigen::MatrixXd Sbb(vertDOF,vertDOF);		// stiffness matrix for belt term
 	Eigen::MatrixXd Hvv(vertDOF,vertDOF);		// stiffness matrix for interaction terms
 	Eigen::MatrixXd Svv(vertDOF,vertDOF);		// stress matrix for interaction terms
 	Eigen::MatrixXd H(vertDOF,vertDOF);			// stiffness matrix
@@ -1496,6 +1547,8 @@ int main(int argc, char const *argv[]){
 			Sl(k,l) = 0.0;
 			Hb(k,l) = 0.0;
 			Sb(k,l) = 0.0;
+			Hbb(k,l) = 0.0;
+			Sbb(k,l) = 0.0;
 			Hvv(k,l) = 0.0;
 			Svv(k,l) = 0.0;
 			S(k,l) = 0.0;
@@ -1527,6 +1580,7 @@ int main(int argc, char const *argv[]){
 		// geometric factors
 		l0tmp = l0[ci];
 		a0tmp = a0[ci];
+		dctmp = dc[ci];
 
 		// area deviations
 		delA = (area(vpos,ci,L,nv,szList)/a0tmp) - 1.0;
@@ -1537,6 +1591,24 @@ int main(int argc, char const *argv[]){
 
 		Kb1 = kb*(rho0*rho0);					// units = L^2
 		Kb2 = Kb1/(l0tmp*l0tmp);				// units = 1
+
+		// compute mean belt length
+		delBB = 0.0;
+		meanL = 0.0;
+		if (kbb > 0){
+			gi = szList[ci];
+			for (vi=0; vi<(nvtmp-1)/2; vi++){
+				lbbx = vpos[NDIM*(gi + vi + (nvtmp-1)/2)] - vpos[NDIM*(gi + vi)];
+				lbbx -= L[0]*round(lbbx/L[0]);
+
+				lbby = vpos[NDIM*(gi + vi + (nvtmp-1)/2) + 1] - vpos[NDIM*(gi + vi) + 1];
+				lbby -= L[1]*round(lbby/L[1]);
+
+				meanL += sqrt(lbbx*lbbx + lbby*lbby);
+			}
+			meanL /= (nvtmp-1)/2;
+			delBB = (meanL/dctmp) - 1.0;
+		}
 
 		// loop over vertices, compute each DM element
 		for (vi=0; vi<nvtmp; vi++){
@@ -1761,6 +1833,82 @@ int main(int argc, char const *argv[]){
 		    
 		    Sb(kxp2,ky)     = Sb(ky,kxp2);
 		    Sb(kyp2,kx)     = Sb(kx,kyp2);
+
+
+
+		    // -- BELT SPRING
+
+		    // unit vectors in belt direction
+		    if (kbb > 0 && vi < (nvtmp-1)/2){
+		    	// belt indices
+		    	kxbb = kx + NDIM*(nvtmp-1)/2;
+		    	kybb = kxbb + 1;
+
+		    	lbbx = vpos[kxbb] - vpos[kx];
+		    	lbbx -= L[0]*round(lbbx/L[0]);
+
+		    	lbby = vpos[kybb] - vpos[ky];
+		    	lbby -= L[1]*round(lbby/L[1]);
+
+		    	// unit vectors
+		    	lbb = sqrt(lbbx*lbbx + lbby*lbby);
+		    	ulbbx = lbbx/lbb;
+		    	ulbby = lbby/lbb;
+
+		    	// -- stiffness elements
+	        
+		        // main diagonal (vi)
+		        Hbb(kx,kx)          = ((4.0*kbb*rho0)/(pow(nvtmp*dctmp,2.0)))*ulbbx*ulbbx;
+		        Hbb(ky,ky)          = ((4.0*kbb*rho0)/(pow(nvtmp*dctmp,2.0)))*ulbby*ulbby;
+		        Hbb(kx,ky)          = ((4.0*kbb*rho0)/(pow(nvtmp*dctmp,2.0)))*ulbbx*ulbby;
+		        Hbb(ky,kx)          = Hbb(kx,ky);
+		        
+		        // off diagonals
+		        Hbb(kx,kxbb)       = -Hbb(kx,kx);
+		        Hbb(ky,kybb)       = -Hbb(ky,ky);
+		        Hbb(kx,kybb)       = -Hbb(kx,ky);
+		        Hbb(ky,kxbb)       = -Hbb(ky,kx);
+		        
+		        Hbb(kxbb,kx)       = Hbb(kx,kxbb);
+		        Hbb(kybb,ky)       = Hbb(ky,kybb);
+		        Hbb(kxbb,ky)       = Hbb(ky,kxbb);
+		        Hbb(kybb,kx)       = Hbb(kx,kybb);
+		        
+		        // main diagonal (belt pair)
+		        Hbb(kxbb,kxbb)    = Hbb(kx,kx);
+		        Hbb(kybb,kybb)    = Hbb(ky,ky);
+		        Hbb(kxbb,kybb)    = Hbb(kx,ky);
+		        Hbb(kybb,kxbb)    = Hbb(ky,kx);
+		        
+		        
+		        // -- stress elements
+		        
+		        // main diagonal (vi)
+		        Sbb(kx,kx)          = ((2.0*kbb*delBB*rho0)/(nvtmp*dctmp*lbb))*ulbby*ulbby;
+		        Sbb(ky,ky)          = ((2.0*kbb*delBB*rho0)/(nvtmp*dctmp*lbb))*ulbbx*ulbbx;
+		        Sbb(kx,ky)          = -((2.0*kbb*delBB*rho0)/(nvtmp*dctmp*lbb))*ulbbx*ulbby;
+		        Sbb(ky,kx)          = Sbb(kx,ky);
+		        
+		        // off diagonals
+		        Sbb(kx,kxbb)       = -Sbb(kx,kx);
+		        Sbb(ky,kybb)       = -Sbb(ky,ky);
+		        Sbb(kx,kybb)       = -Sbb(kx,ky);
+		        Sbb(ky,kxbb)       = -Sbb(ky,kx);
+		        
+		        Sbb(kxbb,kx)       = Sbb(kx,kxbb);
+		        Sbb(kybb,ky)       = Sbb(ky,kybb);
+		        Sbb(kxbb,ky)       = Sbb(ky,kxbb);
+		        Sbb(kybb,kx)       = Sbb(kx,kybb);
+		        
+		        // main diagonal (belt pair)
+		        Sbb(kxbb,kxbb)    = Sbb(kx,kx);
+		        Sbb(kybb,kybb)    = Sbb(ky,ky);
+		        Sbb(kxbb,kybb)    = Sbb(kx,ky);
+		        Sbb(kybb,kxbb)    = Sbb(ky,kx);
+		    }
+
+
+
     		
 
 		    // -- AREA SPRING (stress matrix)
@@ -1952,8 +2100,8 @@ int main(int argc, char const *argv[]){
 	// initialize all matrices to be 0 initially
 	for (k=0; k<vertDOF; k++){
 		for (l=0; l<vertDOF; l++){
-			H(k,l) = Ha(k,l) + Hl(k,l) + Hb(k,l) + Hvv(k,l);
-			S(k,l) = -Sa(k,l) - Sl(k,l) - Sb(k,l) - Svv(k,l);
+			H(k,l) = Ha(k,l) + Hl(k,l) + Hb(k,l) + Hbb(k,l) + Hvv(k,l);
+			S(k,l) = -Sa(k,l) - Sl(k,l) - Sb(k,l) - Sbb(k,l) - Svv(k,l);
 			M(k,l) = H(k,l) - S(k,l);
 		}
 	}
@@ -1962,10 +2110,9 @@ int main(int argc, char const *argv[]){
 	cout << "\t** Computing eigenvalues and eigenvectors of M, H and S matrices" << endl;
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> allModes(M);
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> hModes(H);
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> sModes(S);
 
-	// define eigenvector matrix
-	Eigen::MatrixXd evecs = allModes.eigenvectors();
+	// // define eigenvector matrix
+	// Eigen::MatrixXd evecs = allModes.eigenvectors();
 
 	// print eigenvalues to vdos file
 	cout << "\t** Printing evals to file" << endl;
@@ -1974,20 +2121,20 @@ int main(int argc, char const *argv[]){
 	// vdosout << sModes.eigenvalues() << endl;
 
 	// computing projections onto H
-	cout << "\t** Computing eigenvector projections on stiffness matrix H" << endl;
-	double evecProj = 0.0;
-	for (i=0; i<vertDOF; i++){
-		evecProj = 0.0;
-		for (k=0; k<vertDOF; k++){
-			evecProj += M(k,k)*evecs(k,i)*evecs(k,i);
-			for (l=(k+1); l<vertDOF; l++){
-				evecProj += 2.0*M(k,l)*evecs(k,i)*evecs(l,i);
-			}
-		}
-		vdosout << evecProj << endl;
-	}
+	// cout << "\t** Computing eigenvector projections on stiffness matrix H" << endl;
+	// double evecProj = 0.0;
+	// for (i=0; i<vertDOF; i++){
+	// 	evecProj = 0.0;
+	// 	for (k=0; k<vertDOF; k++){
+	// 		evecProj += M(k,k)*evecs(k,i)*evecs(k,i);
+	// 		for (l=(k+1); l<vertDOF; l++){
+	// 			evecProj += 2.0*M(k,l)*evecs(k,i)*evecs(l,i);
+	// 		}
+	// 	}
+	// 	vdosout << evecProj << endl;
+	// }
 	vdosout << hModes.eigenvalues() << endl;
-	vdosout << evecs << endl;
+	// vdosout << evecs << endl;
 
 
 

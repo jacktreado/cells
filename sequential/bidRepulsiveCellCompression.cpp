@@ -1459,6 +1459,7 @@ int main(int argc, char const *argv[]){
 		for (ci=0; ci<NCELLS; ci++){
 			// scale preferred lengths
 			l0[ci] *= scaleFactor;
+			dc[ci] *= scaleFactor;
 			a0[ci] *= scaleFactor*scaleFactor;
 
 			// first global index for ci
