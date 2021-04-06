@@ -162,6 +162,7 @@ int main(int argc, char const *argv[]){
 	cout << "makin vectors" << endl;
 	vector<int> szList(NCELLS,0);
 	vector<int> nv(NCELLS,0);
+	vector<int> hw(NCELLS,0);
 	nv.at(0) = smallNV;
 	for (ci=1; ci<NCELLS; ci++){
 		if (ci < smallN){
@@ -172,6 +173,7 @@ int main(int argc, char const *argv[]){
 			nv.at(ci) = largeNV;
 			szList.at(ci) = szList.at(ci-1) + nv.at(ci-1);
 		}
+		hw.at(ci) = ceil((nv.at(ci) - 1)/2);
 	}
 
 	// degree of freedom counts
@@ -250,7 +252,7 @@ int main(int argc, char const *argv[]){
 	 * * * * * * * * * * * * * * * * * */
 
 	// initialization variables
-	int nvtmp;
+	int nvtmp, hwtmp;
 	double a0tmp, lenscale, calA0tmp, areaSum = 0.0;
 
 	// initialize vectors for storing coordinates, shape information
@@ -693,6 +695,7 @@ int main(int argc, char const *argv[]){
 	vector<double> vradSave(NVTOT,0.0);
 	vector<double> a0Save(NCELLS,0.0);
 	vector<double> l0Save(NCELLS,0.0);
+	vector<double> dcSave(NCELLS,0.0);
 
 
 	// save initial state
@@ -706,7 +709,9 @@ int main(int argc, char const *argv[]){
 	int d0, dend;
 
 	// temporary tolerance (to speed initial compression)
-	double Ftoltmp = 0.01*Ptol;
+	double Ftoltmp;
+	if (Ftol < 0.01*Ptol)
+		Ftoltmp = 0.01*Ptol;
 
 	// total potential energy
 	double U = 0.0;
@@ -730,8 +735,8 @@ int main(int argc, char const *argv[]){
 		// update iterator
 		k++;
 
-		// update tolerance
-		if (phi0 > 0.35)
+		// // update tolerance
+		if (phi0 > 0.6)
 			Ftoltmp = Ftol;
 
 		// RESET FIRE VARIABLES
@@ -740,8 +745,8 @@ int main(int argc, char const *argv[]){
 		vnorm 		= 0;
 		alpha   	= alpha0;
 
-		dtmax   	= 20*dt0;
-		dtmin   	= 1e-2*dt0;
+		dtmax   	= 5.0*dt0;
+		dtmin   	= 1e-8*dt0;
 		dt 			= dt0;
 
 		npPos      	= 0;
@@ -971,6 +976,7 @@ int main(int argc, char const *argv[]){
 					if (gi == szList[ci]){
 						// compute shape parameter
 						nvtmp = nv[ci];
+						hwtmp = hw[ci];
 						a0tmp = a0[ci];
 						l0tmp = l0[ci];
 						dctmp = dc[ci];
@@ -1009,17 +1015,17 @@ int main(int argc, char const *argv[]){
 						// compute mean belt length
 						if (kbb > 0){
 							meanL = 0.0;
-							for (vi=0; vi<(nvtmp-1)/2; vi++){
+							for (vi=0; vi<hwtmp; vi++){
 								// get current belt vector
-								lbbx = vpos[NDIM*(gi + vi + (nvtmp-1)/2)] - vpos[NDIM*(gi + vi)];
+								lbbx = vpos[NDIM*(gi + vi + hwtmp)] - vpos[NDIM*(gi + vi)];
 								lbbx -= L[0]*round(lbbx/L[0]);
 
-								lbby = vpos[NDIM*(gi + vi + (nvtmp-1)/2) + 1] - vpos[NDIM*(gi + vi) + 1];
+								lbby = vpos[NDIM*(gi + vi + hwtmp) + 1] - vpos[NDIM*(gi + vi) + 1];
 								lbby -= L[1]*round(lbby/L[1]);
 
 								meanL += sqrt(lbbx*lbbx + lbby*lbby);
 							}
-							meanL /= ((nvtmp-1)/2);
+							meanL /= hwtmp;
 						}
 
 						// get coordinates relative to center of mass
@@ -1104,12 +1110,12 @@ int main(int argc, char const *argv[]){
 				// -- Belt force
 
 				// segment vectors across particle (bc of int algebra, (nv-1)/2 either nv/2 (even) or (nv-1)/2 (odd))
-				if (kbb > 0 && gi - szList[ci-1] < (nvtmp-1)/2){
+				if (kbb > 0 && gi - szList[ci-1] < hwtmp){
 					// get current belt vector
-					lbbx = vpos[NDIM*(gi + (nvtmp-1)/2)] - vpos[NDIM*gi];
+					lbbx = vpos[NDIM*(gi + hwtmp)] - vpos[NDIM*gi];
 					lbbx -= L[0]*round(lbbx/L[0]);
 
-					lbby = vpos[NDIM*(gi + (nvtmp-1)/2) + 1] - vpos[NDIM*gi + 1];
+					lbby = vpos[NDIM*(gi + hwtmp) + 1] - vpos[NDIM*gi + 1];
 					lbby -= L[1]*round(lbby/L[1]);
 
 					lbb = sqrt(lbbx*lbbx + lbby*lbby);
@@ -1118,8 +1124,8 @@ int main(int argc, char const *argv[]){
 					vF[NDIM*gi] 					+= fbb*((meanL/dctmp) - 1.0)*(lbbx/lbb);
 					vF[NDIM*gi + 1] 				+= fbb*((meanL/dctmp) - 1.0)*(lbby/lbb);
 
-					vF[NDIM*(gi + (nvtmp-1)/2)] 	-= fbb*((meanL/dctmp) - 1.0)*(lbbx/lbb);
-					vF[NDIM*(gi + (nvtmp-1)/2) + 1] -= fbb*((meanL/dctmp) - 1.0)*(lbby/lbb);
+					vF[NDIM*(gi + hwtmp)] 	-= fbb*((meanL/dctmp) - 1.0)*(lbbx/lbb);
+					vF[NDIM*(gi + hwtmp) + 1] -= fbb*((meanL/dctmp) - 1.0)*(lbby/lbb);
 				}
 
 				// update old coordinates
@@ -1332,6 +1338,7 @@ int main(int argc, char const *argv[]){
 				vradSave = vrad;
 				a0Save = a0;
 				l0Save = l0;
+				dcSave = dc;
 
 	            // compute new scale factor
 	            scaleFactor = drshrink;
@@ -1352,6 +1359,7 @@ int main(int argc, char const *argv[]){
 					vrad = vradSave;
 					a0 = a0Save;
 					l0 = l0Save;
+					dc = dcSave;
 
 					// compute new scale factor by root search
 		            scaleFactor = 0.5*(rH + rL)/r0;
@@ -1371,6 +1379,7 @@ int main(int argc, char const *argv[]){
 					vradSave = vrad;
 					a0Save = a0;
 					l0Save = l0;
+					dcSave = dc;
 
 		            // keep shrinking at same rate until unjamming
 		            scaleFactor = drshrink;
@@ -1390,6 +1399,7 @@ int main(int argc, char const *argv[]){
 					vrad = vradSave;
 					a0 = a0Save;
 					l0 = l0Save;
+					dc = dcSave;
 
 					// compute new scale factor
 		            scaleFactor = 0.5*(rH + rL)/r0;
@@ -1407,6 +1417,7 @@ int main(int argc, char const *argv[]){
 					vrad = vradSave;
 					a0 = a0Save;
 					l0 = l0Save;
+					dc = dcSave;
 
 					// compute new scale factor
 		            scaleFactor = 0.5*(rH + rL)/r0;
@@ -1576,6 +1587,7 @@ int main(int argc, char const *argv[]){
 
 		// number of vertices of cell ci
 		nvtmp = nv[ci];
+		hwtmp = hw[ci];
 
 		// geometric factors
 		l0tmp = l0[ci];
@@ -1597,16 +1609,16 @@ int main(int argc, char const *argv[]){
 		meanL = 0.0;
 		if (kbb > 0){
 			gi = szList[ci];
-			for (vi=0; vi<(nvtmp-1)/2; vi++){
-				lbbx = vpos[NDIM*(gi + vi + (nvtmp-1)/2)] - vpos[NDIM*(gi + vi)];
+			for (vi=0; vi<hwtmp; vi++){
+				lbbx = vpos[NDIM*(gi + vi + hwtmp)] - vpos[NDIM*(gi + vi)];
 				lbbx -= L[0]*round(lbbx/L[0]);
 
-				lbby = vpos[NDIM*(gi + vi + (nvtmp-1)/2) + 1] - vpos[NDIM*(gi + vi) + 1];
+				lbby = vpos[NDIM*(gi + vi + hwtmp) + 1] - vpos[NDIM*(gi + vi) + 1];
 				lbby -= L[1]*round(lbby/L[1]);
 
 				meanL += sqrt(lbbx*lbbx + lbby*lbby);
 			}
-			meanL /= (nvtmp-1)/2;
+			meanL /= hwtmp;
 			delBB = (meanL/dctmp) - 1.0;
 		}
 
@@ -1839,9 +1851,9 @@ int main(int argc, char const *argv[]){
 		    // -- BELT SPRING
 
 		    // unit vectors in belt direction
-		    if (kbb > 0 && vi < (nvtmp-1)/2){
+		    if (kbb > 0 && vi < hwtmp){
 		    	// belt indices
-		    	kxbb = kx + NDIM*(nvtmp-1)/2;
+		    	kxbb = kx + NDIM*hwtmp;
 		    	kybb = kxbb + 1;
 
 		    	lbbx = vpos[kxbb] - vpos[kx];
@@ -1858,9 +1870,9 @@ int main(int argc, char const *argv[]){
 		    	// -- stiffness elements
 	        
 		        // main diagonal (vi)
-		        Hbb(kx,kx)          = ((4.0*kbb*rho0)/(pow(nvtmp*dctmp,2.0)))*ulbbx*ulbbx;
-		        Hbb(ky,ky)          = ((4.0*kbb*rho0)/(pow(nvtmp*dctmp,2.0)))*ulbby*ulbby;
-		        Hbb(kx,ky)          = ((4.0*kbb*rho0)/(pow(nvtmp*dctmp,2.0)))*ulbbx*ulbby;
+		        Hbb(kx,kx)          = ((4.0*kbb*rho0*rho0)/(pow(nvtmp*dctmp,2.0)))*ulbbx*ulbbx;
+		        Hbb(ky,ky)          = ((4.0*kbb*rho0*rho0)/(pow(nvtmp*dctmp,2.0)))*ulbby*ulbby;
+		        Hbb(kx,ky)          = ((4.0*kbb*rho0*rho0)/(pow(nvtmp*dctmp,2.0)))*ulbbx*ulbby;
 		        Hbb(ky,kx)          = Hbb(kx,ky);
 		        
 		        // off diagonals
@@ -1884,9 +1896,9 @@ int main(int argc, char const *argv[]){
 		        // -- stress elements
 		        
 		        // main diagonal (vi)
-		        Sbb(kx,kx)          = ((2.0*kbb*delBB*rho0)/(nvtmp*dctmp*lbb))*ulbby*ulbby;
-		        Sbb(ky,ky)          = ((2.0*kbb*delBB*rho0)/(nvtmp*dctmp*lbb))*ulbbx*ulbbx;
-		        Sbb(kx,ky)          = -((2.0*kbb*delBB*rho0)/(nvtmp*dctmp*lbb))*ulbbx*ulbby;
+		        Sbb(kx,kx)          = ((2.0*kbb*delBB*rho0*rho0)/(nvtmp*dctmp*lbb))*ulbby*ulbby;
+		        Sbb(ky,ky)          = ((2.0*kbb*delBB*rho0*rho0)/(nvtmp*dctmp*lbb))*ulbbx*ulbbx;
+		        Sbb(kx,ky)          = -((2.0*kbb*delBB*rho0*rho0)/(nvtmp*dctmp*lbb))*ulbbx*ulbby;
 		        Sbb(ky,kx)          = Sbb(kx,ky);
 		        
 		        // off diagonals
@@ -2112,7 +2124,7 @@ int main(int argc, char const *argv[]){
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> hModes(H);
 
 	// // define eigenvector matrix
-	// Eigen::MatrixXd evecs = allModes.eigenvectors();
+	Eigen::MatrixXd evecs = allModes.eigenvectors();
 
 	// print eigenvalues to vdos file
 	cout << "\t** Printing evals to file" << endl;
