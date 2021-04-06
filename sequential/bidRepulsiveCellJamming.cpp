@@ -1059,7 +1059,6 @@ int main(int argc, char const *argv[]){
 				rip1y -= L[1]*round(rip1y/L[1]);
 
 
-
 				// -- Area force
 				vF[NDIM*gi] 		+= 0.5*fa*(rim1y - rip1y);
 				vF[NDIM*gi + 1] 	+= 0.5*fa*(rip1x - rim1x);
