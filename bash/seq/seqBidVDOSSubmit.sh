@@ -39,7 +39,7 @@ mkdir -p $simdatadir
 
 # compile into binary using packing.h
 binf=bin/"$runstr".o
-mainf=$maindir/bidRepulsiveCellVDOS.cpp
+mainf=$maindir/jamming/bidRepulsiveCellVDOS.cpp
 
 # run compiler
 rm -f $binf

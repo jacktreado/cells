@@ -95,7 +95,7 @@ int main(int argc, char const *argv[]){
 	double Ptol, Ftol, phi0, dphi, T0, kl, kb, kbb, calA0, smallCalA0, largeCalA0;
 
 	// read in parameters from command line input
-	// g++ -O3 -I src sequential/bidRepulsiveCellJamming.cpp -o jam.o
+	// g++ -O3 -I src sequential/jamming/bidRepulsiveCellJamming.cpp -o jam.o
 	// ./jam.o 12 24 1.04 1e-3 1.0 0.01 0 1e-7 1e-12 1 pos.test vdos.test
 	string NCELLS_str 		= argv[1];
 	string smallNV_str 		= argv[2];

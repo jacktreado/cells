@@ -59,7 +59,7 @@ mkdir -p $simdatadir
 
 # compile into binary using packing.h
 binf=bin/"$runstr".o
-mainf=$maindir/adiposeBoundary2D.cpp
+mainf=$maindir/active/adiposeBoundary2D.cpp
 echo Running $numSeeds adipose boundary invasion sims of $aN adipocytes 
 echo - - - Area ratio                   $areaRatio
 echo - - - tumor cells shape param      $tcalA0

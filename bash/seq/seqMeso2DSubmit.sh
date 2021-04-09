@@ -51,7 +51,7 @@ mkdir -p $simdatadir
 
 # compile into binary using packing.h
 binf=bin/"$runstr".o
-mainf=$maindir/mesophyll2D.cpp
+mainf=$maindir/meso/mesophyll2D.cpp
 echo Running $numSeeds mesophyll sims of $NCELLS cells with $NV verts, polydispersity = $polyd , agep = $agep , and betaEff = $betaEff
 
 # run compiler

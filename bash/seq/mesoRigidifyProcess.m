@@ -32,6 +32,8 @@ NCELLSList  = zeros(NF,1);
 LList       = zeros(NF,2);
 nvList      = cell(NF,1);
 phi0List    = cell(NF,1);
+aList       = cell(NF,1);
+pList       = cell(NF,1);
 calAList    = cell(NF,1);
 calA0List   = cell(NF,1);
 cijList     = cell(NF,1);
@@ -93,6 +95,8 @@ for ii = 1:NF
     
     % Loop over frames, get particle shapes and void polygons
     calA = zeros(NFRAMES,NCELLS);
+    p = zeros(NFRAMES,NCELLS);
+    a = zeros(NFRAMES,NCELLS);
     NFvals = zeros(NFRAMES,2);
     for ff = 1:NFRAMES
         % get contacts
@@ -123,7 +127,9 @@ for ii = 1:NF
             l = sqrt(lx.^2 + ly.^2);
             ptmp = sum(l);
             
-            % save instantaneous shape parameter
+            % save instantaneous shape info
+            p(ff,nn) = ptmp;
+            a(ff,nn) = atmp;
             calA(ff,nn) = ptmp^2/(4.0*pi*atmp);
         end
         
@@ -221,7 +227,9 @@ for ii = 1:NF
         NFvals(ff,2) = NFMAIN;
     end
     
-    % save [article info
+    % save particle info
+    pList{ii} = p;
+    aList{ii} = a;
     calAList{ii} = calA;
     NFvalsList{ii} = NFvals;
 end
@@ -230,6 +238,7 @@ end
 
 save(savefstr,'flist','pbins','fbins','faceBC','phi0BC',...
     'NCELLSList','LList','nvList','phi0List','calAList',...
-    'calA0List','cijList','NFvalsList','faceCounts');
+    'calA0List','cijList','NFvalsList','faceCounts',...
+    'aList','pList');
 
 end

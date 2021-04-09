@@ -49,7 +49,7 @@ mkdir -p $simdatadir
 
 # compile into binary using packing.h
 binf=bin/"$runstr".o
-mainf=$maindir/adipose2D.cpp
+mainf=$maindir/active/adipose2D.cpp
 echo Running $numSeeds tumor invasion sims of $NCELLS cells, $tN tumor cells, with $NV verts, tumor calA0 = $calA0, and WAT gam = $gam
 
 # run compiler

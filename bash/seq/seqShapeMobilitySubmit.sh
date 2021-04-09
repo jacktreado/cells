@@ -53,7 +53,7 @@ mkdir -p $simdatadir
 
 # compile into binary using packing.h
 binf=bin/"$runstr".o
-mainf=$maindir/shapeMobility.cpp
+mainf=$maindir/active/shapeMobility.cpp
 echo Running $numSeeds active sims of $NCELLS DPM particles 
 echo - - - NV                           $NV
 echo - - - calA0                        $calA0
