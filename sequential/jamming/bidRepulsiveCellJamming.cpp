@@ -173,7 +173,12 @@ int main(int argc, char const *argv[]){
 			nv.at(ci) = largeNV;
 			szList.at(ci) = szList.at(ci-1) + nv.at(ci-1);
 		}
-		hw.at(ci) = ceil((nv.at(ci) - 1)/2);
+
+		// determine half-way belt pair depending on number of vertices (odd or even matters)
+		if (nv.at(ci) % 2 == 0)
+			hw.at(ci) = nv.at(ci)/2;
+		else		
+			hw.at(ci) = ceil((nv.at(ci) - 1)/2);
 	}
 
 	// degree of freedom counts
@@ -989,7 +994,7 @@ int main(int argc, char const *argv[]){
 						fa = da*(rho0/a0tmp);		// derivation from the fact that rho0^2 does not necessarily cancel a0tmp
 						fl = kl*(rho0/l0tmp);
 						fb = kb*(rho0/(l0tmp*l0tmp));
-						fbb = kbb*(2.0*rho0/(nvtmp*dctmp));
+						fbb = kbb*(rho0/(hwtmp*dctmp));
 						
 						// compute cell center of mass
 						xi = vpos[NDIM*gi];
@@ -1512,7 +1517,7 @@ int main(int argc, char const *argv[]){
 	// LOCAL VARIABLES
 
 	// integers
-	int l, lxm1, lym1, lxp1, lyp1;
+	int l, lxm1, lym1, lxp1, lyp1, lxbb, lybb, kxbb, kybb;
 	int vim2, vip2, vjm1, vjp1;
 	int kxm2, kym2, kxm1, kym1, kx, kxp1, kxp2, ky, kyp1, kyp2, lx, ly;
 	int mxi, myi, mxj, myj;
@@ -1526,7 +1531,9 @@ int main(int argc, char const *argv[]){
 	double kapim1, kapi, kapip1;
 	double dkapi_dxi, dkapi_dyi, dkapip1_dxi, dkapip1_dyi, dkapim1_dxi, dkapim1_dyi;
 	double dkapi_dxip1, dkapi_dyip1, dkapip1_dxip1, dkapip1_dyip1, dkapip1_dxip2, dkapip1_dyip2;
-	double kxbb, kybb, ulbbx, ulbby, delBB;
+	double ulbbx, ulbby, delBB;
+	double dL_dxi, dL_dyi, dL_dxj, dL_dyj; // should really be called D instead of L to match PRM
+	double Lbb_kx, Lbb_ky, Lbb_k, uLbb_kx, uLbb_ky, Lbb_lx, Lbb_ly, Lbb_l, uLbb_lx, uLbb_ly;
 	double Kl1, Kl2, Kb1, Kb2;
 	double kij, h;
 	double uxij, uyij;
@@ -1855,24 +1862,28 @@ int main(int argc, char const *argv[]){
 		    	kxbb = kx + NDIM*hwtmp;
 		    	kybb = kxbb + 1;
 
-		    	lbbx = vpos[kxbb] - vpos[kx];
-		    	lbbx -= L[0]*round(lbbx/L[0]);
+		    	Lbb_kx = vpos[kxbb] - vpos[kx];
+		    	Lbb_kx -= L[0]*round(Lbb_kx/L[0]);
 
-		    	lbby = vpos[kybb] - vpos[ky];
-		    	lbby -= L[1]*round(lbby/L[1]);
+		    	Lbb_ky = vpos[kybb] - vpos[ky];
+		    	Lbb_ky -= L[1]*round(Lbb_ky/L[1]);
 
 		    	// unit vectors
-		    	lbb = sqrt(lbbx*lbbx + lbby*lbby);
-		    	ulbbx = lbbx/lbb;
-		    	ulbby = lbby/lbb;
+		    	Lbb_k = sqrt(Lbb_kx*Lbb_kx + Lbb_ky*Lbb_ky);
+		    	uLbb_kx = Lbb_kx/Lbb_k;
+		    	uLbb_ky = Lbb_ky/Lbb_k;
+
+		    	// derivatives for stiffness elements
+		    	dL_dxi = -uLbb_kx/(dctmp*hwtmp);
+		    	dL_dyi = -uLbb_ky/(dctmp*hwtmp);
 
 		    	// -- stiffness elements
 	        
 		        // main diagonal (vi)
-		        Hbb(kx,kx)          = ((4.0*kbb*rho0*rho0)/(pow(nvtmp*dctmp,2.0)))*ulbbx*ulbbx;
-		        Hbb(ky,ky)          = ((4.0*kbb*rho0*rho0)/(pow(nvtmp*dctmp,2.0)))*ulbby*ulbby;
-		        Hbb(kx,ky)          = ((4.0*kbb*rho0*rho0)/(pow(nvtmp*dctmp,2.0)))*ulbbx*ulbby;
-		        Hbb(ky,kx)          = Hbb(kx,ky);
+		        Hbb(kx,kx)          = kbb*(rho0*rho0)*dL_dxi*dL_dxi;
+		        Hbb(ky,ky)          = kbb*(rho0*rho0)*dL_dyi*dL_dyi;
+		        Hbb(kx,ky)          = kbb*(rho0*rho0)*dL_dxi*dL_dyi;
+		        Hbb(ky,kx)          = Hbb(ky,kx);
 		        
 		        // off diagonals
 		        Hbb(kx,kxbb)       = -Hbb(kx,kx);
@@ -1980,6 +1991,75 @@ int main(int argc, char const *argv[]){
 		        
 		        Ha(lx,ky) = Ha(ky,lx);
 		        Ha(ly,ky) = Ha(ky,ly);
+
+		        // also compute stiffness matrix for Belt energy if applicable
+		        if (kbb > 0 && vj < hwtmp && vj > vi){
+		        	// vj bb indexing
+    				lxbb 		= lx + NDIM*hwtmp;
+    				lybb 		= lxbb + 1;
+
+    				// vj bb vectors
+		        	Lbb_lx = vpos[lxbb] - vpos[lx];
+			    	Lbb_lx -= L[0]*round(Lbb_lx/L[0]);
+
+			    	Lbb_ly = vpos[lybb] - vpos[ly];
+			    	Lbb_ly -= L[1]*round(Lbb_ly/L[1]);
+
+			    	// unit vectors
+			    	Lbb_l = sqrt(Lbb_lx*Lbb_lx + Lbb_ly*Lbb_ly);
+			    	uLbb_lx = Lbb_lx/Lbb_l;
+			    	uLbb_ly = Lbb_ly/Lbb_l;
+
+			    	// derivatives for vj stiffness elements
+			    	dL_dxj = -uLbb_lx/(dctmp*hwtmp);
+			    	dL_dyj = -uLbb_ly/(dctmp*hwtmp);
+
+
+			    	// Stiffness matrix elements (off-diagonals)
+			    	// main off-diagonal block
+		            Hbb(kx,lx) = kbb*(rho0*rho0)*dL_dxi*dL_dxj;
+		            Hbb(ky,ly) = kbb*(rho0*rho0)*dL_dyi*dL_dyj;
+		            Hbb(kx,ly) = kbb*(rho0*rho0)*dL_dxi*dL_dyj;
+		            Hbb(ky,lx) = kbb*(rho0*rho0)*dL_dyi*dL_dxj;
+		            
+		            // enforce symmetry
+		            Hbb(lx,kx) = Hbb(kx,lx);
+		            Hbb(ly,ky) = Hbb(ky,ly);
+		            Hbb(lx,ky) = Hbb(ky,lx);
+		            Hbb(ly,kx) = Hbb(kx,ly);
+		            
+		            // use r + hw parity
+		            Hbb(kx,lxbb) = -Hbb(kx,lx);
+		            Hbb(ky,lybb) = -Hbb(ky,ly);
+		            Hbb(kx,lybb) = -Hbb(kx,ly);
+		            Hbb(ky,lxbb) = -Hbb(ky,lx);
+		            
+		            Hbb(kxbb,lx) = -Hbb(kx,lx);
+		            Hbb(kybb,ly) = -Hbb(ky,ly);
+		            Hbb(kxbb,ly) = -Hbb(kx,ly);
+		            Hbb(kybb,lx) = -Hbb(ky,lx);
+		            
+		            Hbb(kxbb,lxbb) = Hbb(kx,lx);
+		            Hbb(kybb,lybb) = Hbb(ky,ly);
+		            Hbb(kxbb,lybb) = Hbb(kx,ly);
+		            Hbb(kybb,lxbb) = Hbb(ky,lx);
+		            
+		            // enforce symmetry
+		            Hbb(lxbb,kx) = Hbb(kx,lxbb);
+		            Hbb(lybb,ky) = Hbb(ky,lybb);
+		            Hbb(lxbb,ky) = Hbb(ky,lxbb);
+		            Hbb(lybb,kx) = Hbb(kx,lybb);
+		            
+		            Hbb(lx,kxbb) = Hbb(kxbb,lx);
+		            Hbb(ly,kybb) = Hbb(kybb,ly);
+		            Hbb(lx,kybb) = Hbb(kybb,lx);
+		            Hbb(ly,kxbb) = Hbb(kxbb,ly);
+		            
+		            Hbb(lxbb,kxbb) = Hbb(kxbb,lxbb);
+		            Hbb(lybb,kybb) = Hbb(kybb,lybb);
+		            Hbb(lxbb,kybb) = Hbb(kybb,lxbb);
+		            Hbb(lybb,kxbb) = Hbb(kxbb,lybb);
+		        }
     		}
 		}
 
