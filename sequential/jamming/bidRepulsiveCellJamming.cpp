@@ -43,7 +43,7 @@ const int wnum 				= 25;
 const int pnum 				= 14;
 
 // simulation constants
-const double phiInit 		= 0.3;
+const double phiInit 		= 0.05;
 const double phiJMin 		= 0.6;
 const double timeStepMag 	= 0.005;
 const double sizeRatio 		= 1.4;
@@ -1531,9 +1531,8 @@ int main(int argc, char const *argv[]){
 	double kapim1, kapi, kapip1;
 	double dkapi_dxi, dkapi_dyi, dkapip1_dxi, dkapip1_dyi, dkapim1_dxi, dkapim1_dyi;
 	double dkapi_dxip1, dkapi_dyip1, dkapip1_dxip1, dkapip1_dyip1, dkapip1_dxip2, dkapip1_dyip2;
-	double ulbbx, ulbby, delBB;
 	double dL_dxi, dL_dyi, dL_dxj, dL_dyj; // should really be called D instead of L to match PRM
-	double Lbb_kx, Lbb_ky, Lbb_k, uLbb_kx, uLbb_ky, Lbb_lx, Lbb_ly, Lbb_l, uLbb_lx, uLbb_ly;
+	double delBB, Lbb_kx, Lbb_ky, Lbb_k, uLbb_kx, uLbb_ky, Lbb_lx, Lbb_ly, Lbb_l, uLbb_lx, uLbb_ly;
 	double Kl1, Kl2, Kb1, Kb2;
 	double kij, h;
 	double uxij, uyij;
@@ -1883,7 +1882,7 @@ int main(int argc, char const *argv[]){
 		        Hbb(kx,kx)          = kbb*(rho0*rho0)*dL_dxi*dL_dxi;
 		        Hbb(ky,ky)          = kbb*(rho0*rho0)*dL_dyi*dL_dyi;
 		        Hbb(kx,ky)          = kbb*(rho0*rho0)*dL_dxi*dL_dyi;
-		        Hbb(ky,kx)          = Hbb(ky,kx);
+		        Hbb(ky,kx)          = Hbb(kx,ky);
 		        
 		        // off diagonals
 		        Hbb(kx,kxbb)       = -Hbb(kx,kx);
@@ -1906,9 +1905,9 @@ int main(int argc, char const *argv[]){
 		        // -- stress elements
 		        
 		        // main diagonal (vi)
-		        Sbb(kx,kx)          = ((2.0*kbb*delBB*rho0*rho0)/(nvtmp*dctmp*lbb))*ulbby*ulbby;
-		        Sbb(ky,ky)          = ((2.0*kbb*delBB*rho0*rho0)/(nvtmp*dctmp*lbb))*ulbbx*ulbbx;
-		        Sbb(kx,ky)          = -((2.0*kbb*delBB*rho0*rho0)/(nvtmp*dctmp*lbb))*ulbbx*ulbby;
+		        Sbb(kx,kx)          = ((kbb*delBB*rho0*rho0)/(hwtmp*dctmp*Lbb_k))*uLbb_ky*uLbb_ky;
+		        Sbb(ky,ky)          = ((kbb*delBB*rho0*rho0)/(hwtmp*dctmp*Lbb_k))*uLbb_kx*uLbb_kx;
+		        Sbb(kx,ky)          = -((kbb*delBB*rho0*rho0)/(hwtmp*dctmp*Lbb_k))*uLbb_kx*uLbb_ky;
 		        Sbb(ky,kx)          = Sbb(kx,ky);
 		        
 		        // off diagonals
@@ -2059,7 +2058,7 @@ int main(int argc, char const *argv[]){
 		            Hbb(lybb,kybb) = Hbb(kybb,lybb);
 		            Hbb(lxbb,kybb) = Hbb(kybb,lxbb);
 		            Hbb(lybb,kxbb) = Hbb(kxbb,lybb);
-		        }
+		      //   }
     		}
 		}
 
