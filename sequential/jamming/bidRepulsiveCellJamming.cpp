@@ -1403,6 +1403,9 @@ int main(int argc, char const *argv[]){
 		cout << "	* jammed = " << jammed << endl << endl;
 		cout << endl;
 
+		// cout << " 	* Printing positions to file" << endl;
+		// printPos(posout, vpos, a0, l0, L, cij, nv, szList, phi0, NCELLS);
+
 		// update particle sizes based on target check
 		if (rH < 0){
 			// if still undercompressed, then grow until overcompressed found
@@ -1522,7 +1525,7 @@ int main(int argc, char const *argv[]){
 				}
 			}
 		}
-
+		
 		// grow or shrink particles by scale factor
 		phi0 = 0.0;
 		for (ci=0; ci<NCELLS; ci++){
@@ -2158,10 +2161,7 @@ int main(int argc, char const *argv[]){
 
 			// only check overlaps if contact is force-bearing, 
 			// 	i.e. if both ci and cj are non-rattlers
-			if (ci > cj)
-				inContact = cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2];
-			else
-				inContact = cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]; 
+			inContact = cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]; 
 
 			if (inContact > 0){
 
@@ -2303,7 +2303,7 @@ int main(int argc, char const *argv[]){
 	// 	vdosout << evecProj << endl;
 	// }
 	vdosout << hModes.eigenvalues() << endl;
-	// vdosout << evecs << endl;
+	vdosout << evecs << endl;
 
 
 
