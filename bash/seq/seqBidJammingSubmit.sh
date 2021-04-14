@@ -34,12 +34,7 @@ startSeed="${11}"
 # other variables
 dphi=5e-4
 Ptol=1e-7
-if [[ "$kbb" == 0 ]]
-then
-    Ftol=1e-12
-else
-    Ftol=1e-11
-fi
+Ftol=1e-11
 
 let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1

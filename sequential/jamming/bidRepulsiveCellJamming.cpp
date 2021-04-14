@@ -37,13 +37,13 @@ using namespace Eigen;
 using namespace std;
 
 // GLOBAL CONSTANTS
-const double PI 			= 4*atan(1);
+const double PI 			= 4.0*atan(1);
 const int w 				= 10;
 const int wnum 				= 25;
 const int pnum 				= 14;
 
 // simulation constants
-const double phiInit 		= 0.05;
+const double phiInit 		= 0.2;
 const double phiJMin 		= 0.6;
 const double timeStepMag 	= 0.005;
 const double sizeRatio 		= 1.4;
@@ -321,6 +321,8 @@ int main(int argc, char const *argv[]){
 	int NCTCS = 0.5*NCELLS*(NCELLS-1);
 	vector<int> cij(NCTCS,0);
 
+
+
 	/* * * * * * * * * * * * * * * * * * 
 
 			INITIALIZE
@@ -331,7 +333,8 @@ int main(int argc, char const *argv[]){
 
 
 	// Cell-linked-list variables
-	double boxLengthScale = 4.0;
+	double boxLengthScale = 2.0;
+	double llscale = l0.at(NCELLS-1);
 
 	// box lengths in each direction
 	vector<int> sb(NDIM,0);
@@ -339,7 +342,7 @@ int main(int argc, char const *argv[]){
 	int NBX = 1;
 	for (d=0; d<NDIM; d++){
 		// determine number of cells along given dimension by rmax
-		sb[d] = round(L[d]/(boxLengthScale*l0.at(NCELLS-1)));
+		sb[d] = round(L[d]/(boxLengthScale*llscale));
 
 		// just in case, if < 3, change to 3 so box neighbor checking will work
 		if (sb[d] < 3)
@@ -382,6 +385,13 @@ int main(int argc, char const *argv[]){
 	vector<int> head(NBX,0);
 	vector<int> last(NBX,0);
 	vector<int> list(NVTOT+1,0);
+
+
+
+
+
+
+
 
 
 
@@ -739,6 +749,75 @@ int main(int argc, char const *argv[]){
 	while (!jammed && k < kmax){
 		// update iterator
 		k++;
+
+		// check to see if cell linked-list needs to be redrawn
+		if ((l0[NCELLS-1]/llscale) > 0.9*boxLengthScale){
+			// print to console
+			cout << "\t ** Resetting linked-list: old llscale = " << llscale << ", new llscale = " << l0[NCELLS-1] << endl;
+			cout << "\t ** Resetting linked-list: old NBX = " << NBX; 
+
+
+			// reset linked list for larger particles
+			llscale = l0[NCELLS-1];
+
+			// reset box length info
+			fill(sb.begin(), sb.end(), 0);
+			fill(lb.begin(), lb.end(), 0.0);
+			for (i=0; i < NBX; i++)
+				nn[i].clear();
+
+
+			NBX = 1;
+			for (d=0; d<NDIM; d++){
+				// determine number of cells along given dimension by rmax
+				sb[d] = round(L[d]/(boxLengthScale*llscale));
+
+				// just in case, if < 3, change to 3 so box neighbor checking will work
+				if (sb[d] < 3)
+					sb[d] = 3;
+
+				// determine box length by number of cells
+				lb[d] = L[d]/sb[d];
+
+				// count total number of cells
+				NBX *= sb[d];
+			}
+			cout << ", new NBX = " << NBX << endl;
+
+			// neighboring boxes for each box (4 neighbors / box)
+			scx = sb[0];
+			nn.clear();
+			nn.resize(NBX);
+
+			// loop over cells, save forward neighbors for each box
+			for (i=0; i<NBX; i++){
+				// reshape entry
+				nn[i].resize(NNN);
+				
+				// neighbors
+				nn[i][0] 			= (i + 1) % NBX; 			// right neighbor (i+1)
+				nn[i][1] 			= (i + scx) % NBX;			// top neighbor (j+1)
+				nntmp 				= (i + NBX - scx) % NBX;	// bottom neighbor (j-1)
+				nn[i][2] 			= (nn[i][1] + 1) % NBX;		// top-right neighbor (i+1, j+1)
+				nn[i][3] 			= nntmp + 1;				// bottom-right neighbor (i+1, j-1)
+
+				// right-hand bc (periodic)
+				if ((i+1) % scx == 0){
+					nn[i][0] = i - scx + 1;
+					nn[i][2] = nn[i][1]  - scx + 1;
+					nn[i][3] = nntmp - scx + 1;
+				}
+			}
+
+			// reset head/last/list
+			head.clear();
+			head.resize(NBX);
+
+			last.clear();
+			last.resize(NBX);
+
+			fill(list.begin(), list.end(), 0);
+		}
 
 		// // update tolerance
 		if (phi0 > 0.6)
@@ -2058,7 +2137,7 @@ int main(int argc, char const *argv[]){
 		            Hbb(lybb,kybb) = Hbb(kybb,lybb);
 		            Hbb(lxbb,kybb) = Hbb(kybb,lxbb);
 		            Hbb(lybb,kxbb) = Hbb(kxbb,lybb);
-		      //   }
+		      	}
     		}
 		}
 
