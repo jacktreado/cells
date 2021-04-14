@@ -1525,7 +1525,7 @@ int main(int argc, char const *argv[]){
 				}
 			}
 		}
-		
+
 		// grow or shrink particles by scale factor
 		phi0 = 0.0;
 		for (ci=0; ci<NCELLS; ci++){
@@ -2306,6 +2306,25 @@ int main(int argc, char const *argv[]){
 	// vdosout << evecs << endl;
 
 
+	// compute vertex participation ratio of each mode
+	vector<double> pv(vertDOF,0.0);
+	double pnum, pdenom;
+	for (k=0; k<vertDOF; k++){
+		// p.r. numerator
+		pnum = 0.0;
+		for (l=0; l<(vertDOF-1); l += 2)
+			pnum += pnum + (evecs(l,k)*evecs(l,k) + evecs(l+1,k)*evecs(l+1,k));
+		pnum *= pnum;
+
+		// p.r. denominator
+		pdenom = 0.0;
+		for (l=0; l<(vertDOF-1); l += 2)
+			pdenom += pdenom + pow(evecs(l,k)*evecs(l,k) + evecs(l+1,k)*evecs(l+1,k),2.0);
+		pdenom *= NVTOT;
+
+		// print
+		vdosout << pnum/pdenom << endl;
+	}
 
 
 	// close open objects
