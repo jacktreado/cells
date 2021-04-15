@@ -43,7 +43,7 @@ const int wnum 				= 25;
 const int pnum 				= 14;
 
 // simulation constants
-const double phiInit 		= 0.05;
+const double phiInit 		= 0.5;
 const double phiJMin 		= 0.6;
 const double timeStepMag 	= 0.005;
 const double sizeRatio 		= 1.4;
@@ -2303,27 +2303,19 @@ int main(int argc, char const *argv[]){
 	// 	vdosout << evecProj << endl;
 	// }
 	vdosout << hModes.eigenvalues() << endl;
-	// vdosout << evecs << endl;
-
 
 	// compute vertex participation ratio of each mode
-	vector<double> pv(vertDOF,0.0);
 	double pnum, pdenom;
 	for (k=0; k<vertDOF; k++){
-		// p.r. numerator
-		pnum = 0.0;
-		for (l=0; l<(vertDOF-1); l += 2)
-			pnum += pnum + (evecs(l,k)*evecs(l,k) + evecs(l+1,k)*evecs(l+1,k));
-		pnum *= pnum;
-
-		// p.r. denominator
+		// p.r. denominator ONLY, numerator always = 1
 		pdenom = 0.0;
-		for (l=0; l<(vertDOF-1); l += 2)
-			pdenom += pdenom + pow(evecs(l,k)*evecs(l,k) + evecs(l+1,k)*evecs(l+1,k),2.0);
+		for (l=0; l<(vertDOF-1); l += 2){
+			pdenom += pow(evecs(l,k)*evecs(l,k) + evecs(l+1,k)*evecs(l+1,k),2.0);
+		}
 		pdenom *= NVTOT;
 
 		// print
-		vdosout << pnum/pdenom << endl;
+		vdosout << 1.0/pdenom << endl;
 	}
 
 

@@ -26,9 +26,10 @@ l0List              = cell(NSIM,1);         % vertex size list
 calAList            = cell(NSIM,2);         % instaneous shape parameter of each particle at jamming
 phiJList            = cell(NSIM,2);         % packing fractions (both from a and a0) at jamming
 
-% VDOS list
+% VDOS info
 evalsList           = cell(NSIM,1);         % list of eigenvalues at jamming
 hvalsList           = cell(NSIM,1);         % list of projections of eigenvectors onto H
+pratioList          = cell(NSIM,1);         % list of participation ratios
 
 %% Loop over simulations
 
@@ -147,6 +148,11 @@ for ss = 1:NSIM
     % stiffness eval data
     hvals = textscan(fid,'%f',dof);
     hvals = hvals{1};
+    
+    % check end of file, it not finished then
+    % assume rest of data is vertex participation
+    % ratio
+    if eof(fid)
 
     % close the file
     fclose(fid);
