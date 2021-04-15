@@ -1244,7 +1244,7 @@ int main(int argc, char const *argv[]){
 			vnorm = sqrt(vnorm);
 
 			// update fcheck based on fnorm (= force per degree of freedom)
-			fcheck = fnorm/(NDIM*NCELLS*smallNV);
+			fcheck = fnorm/(sqrt(NCELLS*smallNV));
 
 			// update npPMin
 			if (fcheck < Ftoltmp)

@@ -152,7 +152,12 @@ for ss = 1:NSIM
     % check end of file, it not finished then
     % assume rest of data is vertex participation
     % ratio
-    if eof(fid)
+    % check for participation ratio
+    if ~feof(fid)
+        prtmp = textscan(fid,'%f',dof);
+        pr = prtmp{1};
+        pratioList{ss} = pr;
+    end
 
     % close the file
     fclose(fid);
@@ -175,10 +180,11 @@ calAList(simSkip,:)     = [];
 phiJList(simSkip,:)     = [];
 evalsList(simSkip)      = [];
 hvalsList(simSkip)      = [];
+pratioList(simSkip)     = [];
 
 % save to matfile
 save(saveStr,'simList','NCELLSList','NvList','LList','zcList','zvList','a0List',...
-    'l0List','calAList','phiJList','evalsList','hvalsList');
+    'l0List','calAList','phiJList','evalsList','hvalsList','pratioList');
 
 
 end
