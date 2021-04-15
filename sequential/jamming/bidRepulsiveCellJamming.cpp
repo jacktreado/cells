@@ -43,7 +43,7 @@ const int wnum 				= 25;
 const int pnum 				= 14;
 
 // simulation constants
-const double phiInit 		= 0.5;
+const double phiInit 		= 0.1;
 const double phiJMin 		= 0.6;
 const double timeStepMag 	= 0.005;
 const double sizeRatio 		= 1.4;
