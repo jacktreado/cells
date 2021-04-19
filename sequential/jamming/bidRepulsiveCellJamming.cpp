@@ -970,7 +970,7 @@ int main(int argc, char const *argv[]){
 
 									if (ci > cj)
 										cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
-									else
+									else if (ci < cj)
 										cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++; 
 								}
 							}
@@ -994,7 +994,6 @@ int main(int argc, char const *argv[]){
 								pj = list[pj];
 								continue;
 							}
-
 							// contact distance
 							sij = vrad[gi] + vrad[gj];
 
@@ -1031,7 +1030,7 @@ int main(int argc, char const *argv[]){
 
 										if (ci > cj)
 											cij[NCELLS*cj + ci - (cj+1)*(cj+2)/2]++;
-										else
+										else if (ci < cj)
 											cij[NCELLS*ci + cj - (ci+1)*(ci+2)/2]++; 
 									}
 								}
