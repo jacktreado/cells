@@ -29,15 +29,16 @@ kl=$6
 kb=$7
 att=$8
 partition=$9
-time=$10
+time="${10}"
 numRuns="${11}"
 startSeed="${12}"
 
+numSeedsPerRun=1
 let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=seqbidcells_N"$NCELLS"_NV"$NV"_calA"$calA0"_kl"$kl"_kb"$kb"_kbb"$kbb"
+basestr=conf_N"$NCELLS"_NV"$NV"_calA"$calA0"_kl"$kl"_kb"$kb"_kbb"$kbb"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation
@@ -46,13 +47,13 @@ mkdir -p $simdatadir
 
 # compile into binary using packing.h
 binf=bin/"$runstr".o
-mainf=$maindir/jamming/bidRepulsiveCellJamming.cpp
-echo Running $numSeeds jamming sims of $NCELLS cells with $NV verts, bidisperse , calA0 = $calA0 , and bending energy kb = $kb, kbb = $kbb
+mainf=$maindir/meso/confluence.cpp
+echo Running $numSeeds confluence sims of $NCELLS cells with $NV verts, bidisperse , calA0 = $calA0 and attraction parameter att = $att
 
 # run compiler
 rm -f $binf
-g++ --std=c++11 -O3 -I $srcdir $mainf -o $binf 
-echo compiling with : g++ --std=c++11 -O3 -I $srcdir $mainf -o $binf 
+g++ --std=c++11 -O3 $mainf -o $binf 
+echo compiling with : g++ --std=c++11 -O3 $mainf -o $binf 
 
 # check compilation
 if [[ ! -f $binf ]]
@@ -90,11 +91,11 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         filestr="$basestr"_seed"$seed"
 
         # create output files
-        jamf=$simdatadir/$filestr.jam
-        vdosf=$simdatadir/$filestr.vdos
+        posf=$simdatadir/$filestr.pos
+        shapef=$simdatadir/$filestr.shape
 
         # append to runString
-        runString="$runString ; ./$binf $NCELLS $NV $calA0 $dphi $kl $kb $kbb $Ptol $Ftol $runseed $jamf $vdosf"
+        runString="$runString ; ./$binf $NCELLS $NV $calA0 $phiMin $phiMax $kl $kb $att $runseed $posf $shapef"
     done
 
     # finish off run string
@@ -146,14 +147,15 @@ sbatch -t $time $slurmf
 # 1. NCELLS
 # 2. NV
 # 3. calA0
-# 4. perimeter energy (kl)
-# 5. bending energy (kb)
-# 6. belt energy (kbb)
-# 7. partition
-# 8. time
-# 9. num seeds per run (for each entry in array)
-# 10. number of runs (number of array entries, i.e. arraynum)
-# 11. start seed (end seed determined by number of runs)
+# 4. phiMin
+# 5. phiMax
+# 6. kl
+# 7. kb
+# 8. att
+# 9. partition
+# 10. time
+# 11. number of runs (number of array entries, i.e. arraynum)
+# 12. start seed (end seed determined by number of runs)
 
 
 
