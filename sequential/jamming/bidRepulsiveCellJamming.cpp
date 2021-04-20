@@ -509,7 +509,7 @@ int main(int argc, char const *argv[]){
 		vnorm = sqrt(vnorm);
 
 		// update fcheck based on fnorm (= force per degree of freedom)
-		fcheck = fnorm/(NDIM*NCELLS);
+		fcheck = fnorm/sqrt(NDIM*NVTOT);
 
 		// update npPMin
 		if (fcheck < Ftol && fireit > NDELAY){
@@ -1243,7 +1243,7 @@ int main(int argc, char const *argv[]){
 			vnorm = sqrt(vnorm);
 
 			// update fcheck based on fnorm (= force per degree of freedom)
-			fcheck = fnorm/(sqrt(NCELLS));
+			fcheck = fnorm/(sqrt(NDIM*NVTOT));
 
 			// update npPMin
 			if (fcheck < Ftoltmp)

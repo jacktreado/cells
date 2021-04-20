@@ -28,7 +28,7 @@ v0=$5
 dDr=$6
 partition=$7
 time=$8
-numRuns="${9}"
+numRuns=$9
 startSeed="${10}"
 
 # other variables

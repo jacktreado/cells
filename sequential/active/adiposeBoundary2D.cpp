@@ -47,7 +47,7 @@ const double alpha0      	= 0.25;
 const double finc        	= 1.1;
 const double fdec        	= 0.5;
 const double falpha      	= 0.99;
-const double Ftol 			= 1e-10;
+const double Ftol 			= 1e-8;
 
 const int NSKIP 			= 1e3;
 const int NMIN        		= 10;
@@ -1109,7 +1109,7 @@ int main(int argc, char const *argv[]){
 			vnorm = sqrt(vnorm);
 
 			// update fcheck based on fnorm (= force per degree of freedom)
-			fcheck = fnorm/(NDIM*NCELLS);
+			fcheck = fnorm/sqrt(NDIM*NVTOT);
 
 			// update npPMin
 			if (fcheck < Ftol)
