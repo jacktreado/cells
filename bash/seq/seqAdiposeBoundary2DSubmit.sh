@@ -42,7 +42,7 @@ let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=invasion_aN"$aN"_tc"$tcalA0"__l1"$l1"_l2"$l2"_v0"$v0"_dDr"$dDr"
+basestr=invasion_aN"$aN"_tc"$tcalA0"_l1"$l1"_l2"$l2"_v0"$v0"_dDr"$dDr"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation
