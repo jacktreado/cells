@@ -29,25 +29,25 @@
 using namespace std;
 
 // GLOBAL CONSTANTS
-const double PI 			= 4*atan(1);
+const double PI 			= 4.0*atan(1);
 const int w 				= 10;
 const int wnum 				= 25;
 const int pnum 				= 8;
 
 // simulation constants
-const double timeStepMag 	= 0.01;
+const double timeStepMag 	= 0.005;
 const double polyd 			= 0.1;
 const int nvmin 			= 12;
 const double phi0 			= 0.6;
 const double phiT 			= 1.0;
-const double dphi 			= 0.01;
+const double dphi 			= 0.005;
 
 // FIRE constants for initial minimizations (SP + DP)
 const double alpha0      	= 0.25;
 const double finc        	= 1.1;
 const double fdec        	= 0.5;
 const double falpha      	= 0.99;
-const double Ftol 			= 1e-8;
+const double Ftol 			= 1e-10;
 
 const int NSKIP 			= 1e3;
 const int NMIN        		= 10;
@@ -58,17 +58,17 @@ const int itmax       		= 5e7;
 // DP force constants
 const double ka 			= 1.0;			// area spring (should be = 1)
 const double kl 			= 0.5;			// contractility
-const double kb 			= 1e-4;			// bending modulus
+const double kb 			= 0;			// bending modulus
 const double eint 			= 0.5;			// interaction energy scale
 const double del 			= 1.0;			// radius of vertices in units of l0
-const double aCalA0 		= 1.001;		// adipocyte deformability
+const double aCalA0 		= 0.9;			// adipocyte deformability
 
 // tumor invasion variables
 const double Ds 			= 0.05;			// spread of velocity coupling along tumor cell boundary
-const double Dr 			= 0.01;			// angular diffusion
-const double Drmin 			= 1e-4;			// min angular diffusion, mimics aligned collagen
+const double Dr 			= 0.01;			// bare angular diffusion
+const double Drmin 			= 1e-4;			// min angular diffusion, mimics aligning to collagen
 const double pinbreak 		= 2.0; 			// fraction of rho0 that breaks a WAT pin spring
-const double kpin 			= 1.0;			// pinning spring stiffness
+const double kpin 			= 0.1;			// pinning spring stiffness
 
 // FUNCTION PROTOTYPES
 int gindex(int ci, int vi, vector<int>& szList);
