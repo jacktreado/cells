@@ -58,7 +58,7 @@ echo - - - tumor cells shape param      $tcalA0
 echo - - - l1                           $l1
 echo - - - l2                           $l2
 echo - - - v0                           $v0
-echo - - - Dr                           $Dr, runs for $NT time steps
+echo - - - NT                           $NT
 echo - - - dDr                          $dDr
 echo - - - NT                           $NT
 echo - - - NASKIP                       $NASKIP
