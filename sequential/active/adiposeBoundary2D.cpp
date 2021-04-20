@@ -39,7 +39,7 @@ const double timeStepMag 	= 0.005;
 const double polyd 			= 0.1;
 const int nvmin 			= 12;
 const double phi0 			= 0.6;
-const double phiT 			= 1.0;
+const double phiT 			= 0.95;
 const double dphi 			= 0.005;
 
 // FIRE constants for initial minimizations (SP + DP)
