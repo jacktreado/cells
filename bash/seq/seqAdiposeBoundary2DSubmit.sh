@@ -6,15 +6,7 @@ srcdir=$cellsdir/src
 maindir=$cellsdir/sequential
 
 # directory for all output for cell simulations
-# * * *
-# NEED TO CHANGE ONCE GRACE MAINTENANCE IS COMPLETED ON 02/04/21
-# REVERT BACK TO: outputdir=/gpfs/loomis/project/fas/ohern/jdt45/cells
-# * * *
-outputdir=~/project/cells
-# * * *
-# NEED TO CHANGE ONCE GRACE MAINTENANCE IS COMPLETED ON 02/04/21: 
-# REVERT BACK TO: outputdir=/gpfs/loomis/project/fas/ohern/jdt45/cells
-# * * *
+outputdir=/gpfs/loomis/project/fas/ohern/jdt45/cells
 
 # directory for simulations specific to sims
 simtypedir=$outputdir/adiposeBoundary2D
@@ -30,9 +22,9 @@ mkdir -p out
 # inputs
 aN=$1
 tcalA0=$2
-ascale=$3
-v0=$4
-Dr=$5
+l1=$3
+l2=$4
+v0=$5
 dDr=$6
 partition=$7
 time=$8
@@ -41,7 +33,7 @@ startSeed="${10}"
 
 # other variables
 areaRatio=15
-NV=32
+NV=16
 NT=5e6
 NASKIP=1e4
 numSeedsPerRun=1
@@ -50,7 +42,7 @@ let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=invasion_aN"$aN"_tc"$tcalA0"_a"$ascale"_v0"$v0"_Dr"$Dr"_dDr"$dDr"
+basestr=invasion_aN"$aN"_tc"$tcalA0"__l1"$l1"_l2"$l2"_v0"$v0"_dDr"$dDr"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation
@@ -63,7 +55,8 @@ mainf=$maindir/active/adiposeBoundary2D.cpp
 echo Running $numSeeds adipose boundary invasion sims of $aN adipocytes 
 echo - - - Area ratio                   $areaRatio
 echo - - - tumor cells shape param      $tcalA0
-echo - - - ascale                       $ascale
+echo - - - l1                           $l1
+echo - - - l2                           $l2
 echo - - - v0                           $v0
 echo - - - Dr                           $Dr, runs for $NT time steps
 echo - - - dDr                          $dDr
@@ -114,7 +107,7 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         posf=$simdatadir/$filestr.pos
 
         # append to runString
-        runString="$runString ; ./$binf $aN $areaRatio $NV $tcalA0 $ascale $v0 $Dr $dDr $NT $NASKIP $seed $posf"
+        runString="$runString ; ./$binf $aN $areaRatio $NV $tcalA0 $l1 $l2 $v0 $dDr $NT $NASKIP $seed $posf"
     done
 
     # finish off run string
@@ -167,9 +160,9 @@ sbatch -t $time $slurmf
 # ====================
 # 1.    aN
 # 2.    tumor calA0
-# 3.    ascale
-# 4.    v0 
-# 5.    Dr
+# 3.    l1
+# 4.    l2
+# 5.    v0 
 # 6.    dDr
 # 7.    partition
 # 8.    time

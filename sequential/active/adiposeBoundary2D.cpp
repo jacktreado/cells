@@ -39,11 +39,11 @@ const double timeStepMag 	= 0.01;
 const double polyd 			= 0.1;
 const int nvmin 			= 12;
 const double phi0 			= 0.6;
-const double phiT 			= 0.9;
+const double phiT 			= 1.0;
 const double dphi 			= 0.01;
 
 // FIRE constants for initial minimizations (SP + DP)
-const double alpha0      	= 0.2;
+const double alpha0      	= 0.25;
 const double finc        	= 1.1;
 const double fdec        	= 0.5;
 const double falpha      	= 0.99;
@@ -58,13 +58,15 @@ const int itmax       		= 5e7;
 // DP force constants
 const double ka 			= 1.0;			// area spring (should be = 1)
 const double kl 			= 0.5;			// contractility
-const double kb 			= 1e-3;			// bending modulus
+const double kb 			= 1e-4;			// bending modulus
 const double eint 			= 0.5;			// interaction energy scale
 const double del 			= 1.0;			// radius of vertices in units of l0
 const double aCalA0 		= 1.001;		// adipocyte deformability
 
 // tumor invasion variables
 const double Ds 			= 0.05;			// spread of velocity coupling along tumor cell boundary
+const double Dr 			= 0.01;			// angular diffusion
+const double Drmin 			= 1e-4;			// min angular diffusion, mimics aligned collagen
 const double pinbreak 		= 2.0; 			// fraction of rho0 that breaks a WAT pin spring
 const double kpin 			= 1.0;			// pinning spring stiffness
 
@@ -86,7 +88,7 @@ int main(int argc, char const *argv[]){
 
 	// parameters to be read in 
 	int aN, tN, NCELLS, NT, NACTIVESKIP, NV, NVTOT, cellDOF, vertDOF, seed;
-	double NT_dbl, NACTIVESKIP_dbl, areaRatio, tCalA0, ascale, v0, vmin, Dr, dDr, phi;
+	double NT_dbl, NACTIVESKIP_dbl, areaRatio, tCalA0, l1, l2, kint, v0, vmin, Dr, dDr, phi;
 
 	// read in parameters from command line input
 	// test: ./tumor.o 8 2 24 1.2 0.01 0.05 0.05 0.5 1e5 5e2 1 pos.test
@@ -94,9 +96,9 @@ int main(int argc, char const *argv[]){
 	string areaRatio_str 		= argv[2];
 	string NV_str 				= argv[3];
 	string tumorCalA0_str 		= argv[4];
-	string ascale_str 			= argv[5];
-	string v0_str 				= argv[6];
-	string Dr_str 				= argv[7];
+	string l1_str 				= argv[5];
+	string l2_str 				= argv[6];
+	string v0_str 				= argv[7];
 	string dDr_str 				= argv[8];
 	string NT_str 				= argv[9];
 	string NACTIVESKIP_str 		= argv[10];
@@ -107,9 +109,9 @@ int main(int argc, char const *argv[]){
 	stringstream areaRatioss(areaRatio_str);
 	stringstream NVss(NV_str);
 	stringstream tCalA0ss(tumorCalA0_str);
-	stringstream ascaless(ascale_str);
+	stringstream l1ss(l1_str);
+	stringstream l2ss(l2_str);
 	stringstream v0ss(v0_str);
-	stringstream Drss(Dr_str);
 	stringstream dDrss(dDr_str);
 	stringstream NTss(NT_str);
 	stringstream NAss(NACTIVESKIP_str);
@@ -119,14 +121,21 @@ int main(int argc, char const *argv[]){
 	areaRatioss >> areaRatio;
 	NVss >> NV;
 	tCalA0ss >> tCalA0;
-	ascaless >> ascale;
+	l1ss >> l1;
+	l2ss >> l2;
 	v0ss >> v0;
-	Drss >> Dr;
 	dDrss >> dDr;
 	NTss >> NT_dbl;
 	NAss >> NACTIVESKIP_dbl;
 	seedss >> seed;
 
+
+	// interaction parameter based on l1 and l2
+	if (l1 > l2){
+		cout << "	** ERROR: l1 = " << l1 << " which is > l2 = " << l2 << ". Ending." << endl;
+		return 1;
+	}
+	kint = (eint*l1)/(l2 - l1);
 
 
 	// seed random number generator
@@ -923,8 +932,8 @@ int main(int argc, char const *argv[]){
 				}
 			}
 
-			// normalize pressure by box area and number of particles
-			pcheck /= NCELLS*L[0]*L[1];
+			// normalize pressure by box area (make dimensionless with extra factor of rho)
+			pcheck *= (rho0/(2.0*L[0]*L[1]));
 
 
 
@@ -1236,9 +1245,9 @@ int main(int argc, char const *argv[]){
 		adiposePhi = 0.0;
 		for (ci=0; ci<NCELLS; ci++){
 			if (ci < tN)
-				tumorPhi += area(vpos,ci,L,nv,szList) + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1);
+				tumorPhi += a0[ci] + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1);
 			else
-				adiposePhi += area(vpos,ci,L,nv,szList) + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1);
+				adiposePhi += a0[ci] + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1);
 		}
 		tumorPhi /= L[1]*L[1];
 		adiposePhi /= L[1]*L[1];
@@ -1362,7 +1371,7 @@ int main(int argc, char const *argv[]){
 	NBX = 1;
 	for (d=0; d<NDIM; d++){
 		// determine number of cells along given dimension by rmax
-		sb[d] = round(L[d]/(1.25*l0max));
+		sb[d] = round(L[d]/(2.0*l0max));
 
 		// just in case, if < 3, change to 3 so box neighbor checking will work
 		if (sb[d] < 3)
@@ -1583,8 +1592,8 @@ int main(int argc, char const *argv[]){
 					sij = vrad[gi] + vrad[gj];
 
 					// attraction distances
-					shellij = (1.0 + ascale)*sij;
-					cutij = (1.0 + 0.5*ascale)*sij;
+					shellij = (1.0 + l2)*sij;
+					cutij = (1.0 + l1)*sij;
 
 					// particle distance
 					dx = vpos[NDIM*gj] - vpos[NDIM*gi];
@@ -1596,7 +1605,7 @@ int main(int argc, char const *argv[]){
 							// if two tumor cells, check for attraction
 							if (rij < shellij && rij > cutij && gi < NVtumor && gj < NVtumor){
 								// force scale
-								ftmp 				= eint*((rij/sij) - 1.0 - ascale)/sij;
+								ftmp 				= kint*((rij/sij) - 1.0 - l2)/sij;
 								fx 					= ftmp*(dx/rij);
 								fy 					= ftmp*(dy/rij);
 
@@ -1687,8 +1696,8 @@ int main(int argc, char const *argv[]){
 						sij = vrad[gi] + vrad[gj];
 
 						// attraction distances
-						shellij = (1.0 + ascale)*sij;
-						cutij = (1.0 + 0.5*ascale)*sij;
+						shellij = (1.0 + l2)*sij;
+						cutij = (1.0 + l1)*sij;
 
 						// particle distance
 						dx = vpos[NDIM*gj] - vpos[NDIM*gi];
@@ -1700,7 +1709,7 @@ int main(int argc, char const *argv[]){
 								// if two tumor cells, check for attraction
 								if (rij < shellij && rij > cutij && gi < NVtumor && gj < NVtumor){
 									// force scale
-									ftmp 				= eint*((rij/sij) - 1.0 - ascale)/sij;
+									ftmp 				= kint*((rij/sij) - 1.0 - l2)/sij;
 									fx 					= ftmp*(dx/rij);
 									fy 					= ftmp*(dy/rij);
 
@@ -2006,10 +2015,10 @@ int main(int argc, char const *argv[]){
 
 			// scale Dr based on tumor-adipocyte contacts
 			Drtmp = Dr*(1 - (zta/nv[ci])*dDr);
-			if (Drtmp > 0)
+			if (Drtmp > Drmin)
 				DrList[ci] = Drtmp;
 			else
-				DrList[ci] = 0.0;
+				DrList[ci] = Drmin;
 		}
 
 		// print message console, print position to file
