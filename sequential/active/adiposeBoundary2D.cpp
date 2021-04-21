@@ -35,11 +35,11 @@ const int wnum 				= 25;
 const int pnum 				= 8;
 
 // simulation constants
-const double timeStepMag 	= 0.005;
+const double timeStepMag 	= 0.0025;
 const double polyd 			= 0.1;
 const int nvmin 			= 12;
 const double phi0 			= 0.6;
-const double phiT 			= 0.95;
+const double phiT 			= 0.9;
 const double dphi 			= 0.005;
 
 // FIRE constants for initial minimizations (SP + DP)
@@ -48,8 +48,10 @@ const double finc        	= 1.1;
 const double fdec        	= 0.5;
 const double falpha      	= 0.99;
 const double Ftol 			= 1e-8;
+const double Ptol 			= 1e-8;
+const double minDelA 		= 1e-2;
 
-const int NSKIP 			= 1e3;
+const int NSKIP 			= 2e4;
 const int NMIN        		= 10;
 const int NNEGMAX     		= 1000;
 const int NDELAY      		= 50;
@@ -65,7 +67,7 @@ const double aCalA0 		= 0.9;			// adipocyte deformability
 
 // tumor invasion variables
 const double Ds 			= 0.05;			// spread of velocity coupling along tumor cell boundary
-const double Dr 			= 0.01;			// bare angular diffusion
+const double Dr 			= 0.1;			// bare angular diffusion
 const double Drmin 			= 1e-4;			// min angular diffusion, mimics aligning to collagen
 const double pinbreak 		= 2.0; 			// fraction of rho0 that breaks a WAT pin spring
 const double kpin 			= 0.1;			// pinning spring stiffness
@@ -91,7 +93,8 @@ int main(int argc, char const *argv[]){
 	double NT_dbl, NACTIVESKIP_dbl, areaRatio, tCalA0, l1, l2, kint, v0, vmin, Dr, dDr, phi;
 
 	// read in parameters from command line input
-	// test: ./tumor.o 8 2 24 1.2 0.01 0.05 0.05 0.5 1e5 5e2 1 pos.test
+	// test g++ -O3 sequential/active/adiposeBoundary2D.cpp -o tumor.o
+	// test: ./tumor.o 8 2 24 1.10 0.01 0.011 0.05 0.1 1e5 2e3 1 pos.tes
 	string aN_str 				= argv[1];
 	string areaRatio_str 		= argv[2];
 	string NV_str 				= argv[3];
@@ -299,6 +302,7 @@ int main(int argc, char const *argv[]){
 	vector<double> dpos(cellDOF,0.0);
 
 	vector<double> a0(NCELLS,1.0);
+	vector<double> aMin(NCELLS,1.0);
 	vector<double> l0(NCELLS,1.0);
 
 	// initialize effective disk radius (for minimization), and l0 parameter
@@ -724,6 +728,12 @@ int main(int argc, char const *argv[]){
 	else
 		phiMin = adiposePhi;
 
+	// // area stress parameters
+	// double minTumorDelA, minAdiposeDelA, minTotalDelA;
+	// minTumorDelA = 0.0;
+	// minAdiposeDelA = 0.0;
+	// minTotalDelA = 0.0;
+
 	// size scaling variables
 	int k, kmax, xind, yind;
 	double pcheck, scaleFactor;
@@ -735,6 +745,7 @@ int main(int argc, char const *argv[]){
 	// compress to jamming, relax U and F using FIRE
 	cout << endl << endl << endl;
 	cout << "	** Compressing to target packing fraction phiT = " << phiT << endl;
+	// while (minTotalDelA < minDelA && k < kmax){
 	while (phiMin < phiT && k < kmax){
 
 		// increment counter
@@ -1234,12 +1245,18 @@ int main(int argc, char const *argv[]){
 		cout << "	* dr 				= " << scaleFactor << endl;
 		cout << "	* tumorPhi 			= " << tumorPhi << endl;
 		cout << "	* adiposePhi 		= " << adiposePhi << endl;
-		cout << "	* phiMin			= " << phiMin << endl;
 		cout << "	* fcheck 			= " << fcheck << endl;
 		cout << "	* pcheck 			= " << pcheck << endl;
+		// cout << "	* minTotalDelA 		= " << minTotalDelA << endl;
 		cout << endl;
 
+		// // if first min, get aMin for each cell
+		// if (k == 1){
+		// 	for (ci=0; ci<NCELLS; ci++)
+		// 		aMin[ci] = area(vpos,ci,L,nv,szList);
+		// }
 
+		
 		// grow or shrink particles by scale factor
 		tumorPhi = 0.0;
 		adiposePhi = 0.0;
@@ -1247,7 +1264,7 @@ int main(int argc, char const *argv[]){
 			if (ci < tN)
 				tumorPhi += a0[ci] + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1);
 			else
-				adiposePhi += a0[ci] + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1);
+				adiposePhi += area(vpos,ci,L,nv,szList) + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1);
 		}
 		tumorPhi /= L[1]*L[1];
 		adiposePhi /= L[1]*L[1];
@@ -1257,6 +1274,38 @@ int main(int argc, char const *argv[]){
 		else
 			phiMin = adiposePhi;
 
+		// // get minimum fractional area strains
+		// minTumorDelA = abs((area(vpos,0,L,nv,szList)/aMin[0]) - 1.0);
+		// minAdiposeDelA = abs((area(vpos,tN,L,nv,szList)/aMin[tN]) - 1.0);
+		// for (ci=0; ci<NCELLS; ci++){
+		// 	da = abs((area(vpos,ci,L,nv,szList)/aMin[ci]) - 1.0);
+		// 	if (ci < tN){
+		// 		if (da < minTumorDelA)
+		// 			minTumorDelA = da;
+		// 	}
+		// 	else{
+		// 		if (da < minAdiposeDelA)
+		// 			minAdiposeDelA = da;
+		// 	}
+		// }
+
+		// // check total min delA
+		// if (minTumorDelA < minAdiposeDelA)
+		// 	minTotalDelA = minTumorDelA;
+		// else
+		// 	minTotalDelA = minAdiposeDelA;
+
+		// // break if satisfies
+		// if (minTotalDelA > minDelA){
+		// 	for (ci=0; ci<NCELLS; ci++){
+		// 		da = abs((area(vpos,ci,L,nv,szList)/aMin[ci]) - 1.0);
+		// 		cout << "	** ci = " << ci << ", da = " << da << endl;
+		// 	}
+		// 	cout << "	** minTotalDelA = " << minTotalDelA << ", less than minDelA = " << minDelA << ", calling confluent and ending. " << endl;
+		// 	break;
+		// }
+
+		// grow particles by scale factor
 		for (ci=0; ci<NCELLS; ci++){
 			// check whether or not to scale particles
 			if (ci < tN){
@@ -1275,6 +1324,7 @@ int main(int argc, char const *argv[]){
 			// scale preferred lengths
 			l0[ci] *= scaleFactor;
 			a0[ci] *= scaleFactor*scaleFactor;
+			// aMin[ci] *= scaleFactor*scaleFactor;
 
 			// first global index for ci
 			gi = szList.at(ci);
@@ -1456,6 +1506,10 @@ int main(int argc, char const *argv[]){
 			WITH ACTIVE TUMOR CELL
 
 	 * * * * * * * * * * * * * * * * * */
+
+	// print vertex positions to check placement
+	cout << "\t** PRINTING INITIAL POSITIONS TO FILE... " << endl;
+	printPos(posout, vpos, vF, a0, l0, L, nv, szList, phi, NCELLS, tN);
 
 	// DYNAMICS VARIABLES
 	int tt, tcells; 

@@ -53,7 +53,7 @@ const int itmax       		= 5e7;
 
 // DP force constants
 const double ka 			= 1.0;			// area spring (should be = 1)
-const double eint 			= 1.0;			// baseline interaction energy 
+const double eint 			= 0.5;			// baseline interaction energy 
 const double del 			= 1.0;			// radius of vertices in units of l0
 
 // FUNCTION PROTOTYPES
