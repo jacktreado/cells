@@ -1315,8 +1315,8 @@ int main(int argc, char const *argv[]){
 			// update fcheck based on fnorm (= force per degree of freedom)
 			fcheck = 0.0;
 			for (i=0; i<vertDOF; i++)
-				fnorm += vF[i]*vF[i];
-			fnorm = sqrt(fnorm/vertDOF);
+				fcheck += vF[i]*vF[i];
+			fcheck = sqrt(fcheck/vertDOF);
 
 			// update iterator
 			fireit++;
