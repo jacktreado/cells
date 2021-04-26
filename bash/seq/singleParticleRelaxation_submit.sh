@@ -125,14 +125,13 @@ sbatch -t $time $slurmf
 #       INPUTS
 # ====================
 # 1. NV
-# 2. calA0
-# 3. kl
-# 4. kb
-# 5. partition
-# 6. time
-# 7. start DCalA0 (= 1 - calA0)
-# 8. end DCalA0
-# 9. step DCalA0
+# 2. kl
+# 3. kb
+# 4. partition
+# 5. time
+# 6. start DCalA0 (= 1 - calA0)
+# 7. end DCalA0
+# 8. step DCalA0
 
 
 
