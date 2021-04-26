@@ -16,13 +16,13 @@ mkdir -p out
 
 # inputs
 NV=$1
-kl=$3
-kb=$4
-partition=$5
-time=$6
-startDCalA0=$7
-endDCalA0=$8
-dDCalA0=$9
+kl=$2
+kb=$3
+partition=$4
+time=$5
+startDCalA0=$6
+endDCalA0=$7
+dDCalA0=$8
 
 # create numerical counters for calA0
 catmp=$(echo "scale=8; $startDCalA0" | bc)
