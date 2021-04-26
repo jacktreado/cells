@@ -16,7 +16,6 @@ mkdir -p out
 
 # inputs
 NV=$1
-calA0=$2
 kl=$3
 kb=$4
 partition=$5
@@ -28,7 +27,7 @@ dDCalA0=$9
 # create numerical counters for calA0
 catmp=$(echo "scale=8; $startDCalA0" | bc)
 camax=$(echo "scale=8; $endDCalA0" | bc)
-dca=$(echo "scale=8; dDCalA0" | bc)
+dca=$(echo "scale=8; $dDCalA0" | bc)
 
 # name strings
 basestr=singleDP_NV"$NV"_kl"$kl"_kb"$kb"
@@ -40,9 +39,12 @@ mkdir -p $simdatadir
 
 echo Running $numSeeds sims of single particle relaxation
 echo - - - NV                           $NV
-echo - - - calA0 						$calA0
 echo - - - kl 							$kl
 echo - - - kb                           $kb
+echo - - - start DCalA0                 $startDCalA0
+echo - - - end DCalA0                   $endDCalA0
+echo - - - step DCalA0                  $dDCalA0
+
 
 # create task file
 taskf=tasks/"$runstr".task
