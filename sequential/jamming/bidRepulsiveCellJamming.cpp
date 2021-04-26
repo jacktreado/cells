@@ -43,7 +43,7 @@ const int wnum 				= 25;
 const int pnum 				= 14;
 
 // simulation constants
-const double phiInit 		= 0.1;
+const double phiInit 		= 0.4;
 const double phiJMin 		= 0.6;
 const double timeStepMag 	= 0.005;
 const double sizeRatio 		= 1.4;
@@ -59,7 +59,7 @@ const double falpha      	= 0.99;
 const int NSKIP 			= 2e4;
 const int NMIN        		= 10;
 const int NNEGMAX     		= 1000;
-const int NDELAY      		= 50;
+const int NDELAY      		= 20;
 const int itmax       		= 5e7;
 
 
@@ -680,7 +680,6 @@ int main(int argc, char const *argv[]){
 	// initialize disk velocity and force vectors
 	vector<double> vvel(vertDOF,0.0);
 	vector<double> vF(vertDOF,0.0);
-	vector<double> vFold(vertDOF,0.0);
 
 	// jamming check variables
 	bool undercompressed, overcompressed, jammed;
@@ -829,8 +828,8 @@ int main(int argc, char const *argv[]){
 		vnorm 		= 0;
 		alpha   	= alpha0;
 
-		dtmax   	= 5.0*dt0;
-		dtmin   	= 1e-8*dt0;
+		dtmax   	= 10.0*dt0;
+		dtmin   	= 1e-2*dt0;
 		dt 			= dt0;
 
 		npPos      	= 0;
@@ -841,21 +840,115 @@ int main(int argc, char const *argv[]){
 		fcheck  	= 10*Ftoltmp;
 
 		// reset forces
-		for (i=0; i<vertDOF; i++){
-			vF[i] = 0.0;
-			vFold[i] = 0.0;
-			vvel[i] = 0.0;
-		}
+		fill(vF.begin(), vF.end(), 0.0);
+		fill(vvel.begin(), vvel.end(), 0.0);
 
 		// set length constant (variable due to particle growth)
 		rho0 = sqrt(a0.at(0));
 
 		// RELAX FORCES USING FIRE
-		while ((fcheck > Ftoltmp || npPMin < NMIN) && fireit < itmax){
+		while (fcheck > Ftoltmp && fireit < itmax){
+			// compute P
+			P = 0.0;
+			for (i=0; i<vertDOF; i++)
+				P += vvel[i]*vF[i];
+
+			// print to console
+			if (fireit % NSKIP == 0){
+				cout << endl << endl;
+				cout << "===========================================" << endl;
+				cout << " 	F I R E 						" << endl;
+				cout << "		M I N I M I Z A T I O N 	" << endl;
+				cout << "===========================================" << endl;
+				cout << endl;
+				cout << "	** fireit 	= " << fireit << endl;
+				cout << "	** fcheck 	= " << fcheck << endl;
+				cout << "	** pcheck 	= " << pcheck << endl;
+				cout << "	** U 		= " << U << endl;
+
+				cout << "	** dt 		= " << dt << endl;
+				cout << "	** P 		= " << P << endl;
+				cout << "	** alpha 	= " << alpha << endl;
+				cout << "	** npPos 	= " << npPos << endl;
+				cout << "	** npNeg 	= " << npNeg << endl;
+			}
+
+			// Step 1. adjust simulation based on net motion of degrees of freedom
+			if (P > 0){
+				// increase positive counter
+				npPos++;
+
+				// reset negative counter
+				npNeg = 0;
+
+				// alter simulation if enough positive steps have been taken
+				if (npPos > NDELAY){
+					// change time step
+					if (dt*finc < dtmax)
+						dt *= finc;
+
+					// decrease alpha
+					alpha *= falpha;
+				}
+			}
+			else{
+				// reset positive counter
+				npPos = 0;
+
+				// increase negative counter
+				npNeg++;
+
+				// check if simulation is stuck
+				if (npNeg > NNEGMAX){
+					cout << "	** ERROR: During initial FIRE minimization, P < 0 for too long, so ending." << endl;
+					return 1;
+				}
+
+				// take half step backwards, reset velocities
+				for (i=0; i<vertDOF; i++){
+					// take half step backwards
+					vpos[i] -= 0.5*dt*vvel[i];
+
+					// reset vertex velocities
+					vvel[i] = 0.0;
+				}
+
+				// decrease time step if past initial delay
+				if (fireit > NDELAY){
+					// decrease time step 
+					if (dt*fdec > dtmin)
+						dt *= fdec;
+
+					// reset alpha
+					alpha = alpha0;
+				}
+			}
+
+			// VV VELOCITY UPDATE #1
+			for (i=0; i<vertDOF; i++)
+				vvel[i] += 0.5*dt*vF[i];
+
+			// compute fnorm, vnorm and P
+			fnorm = 0.0;
+			vnorm = 0.0;
+			for (i=0; i<vertDOF; i++){
+				fnorm 	+= vF[i]*vF[i];
+				vnorm 	+= vvel[i]*vvel[i];
+			}
+			fnorm = sqrt(fnorm);
+			vnorm = sqrt(vnorm);
+
+			// update velocities (s.d. vs inertial dynamics) only if forces are acting
+			if (fnorm > 0){
+				for (i=0; i<vertDOF; i++)
+					vvel[i] = (1 - alpha)*vvel[i] + alpha*(vF[i]/fnorm)*vnorm;
+			}
+
+
 			// VV POSITION UPDATE
 			for (i=0; i<vertDOF; i++){
 				// update position
-				vpos[i] += dt*vvel[i] + 0.5*dt*dt*vF[i];
+				vpos[i] += dt*vvel[i];
 
 				// recenter in box
 				if (vpos[i] > L[i % NDIM])
@@ -867,15 +960,10 @@ int main(int argc, char const *argv[]){
 				vF[i] = 0;
 			}
 
-			// reset linked list 
-			for (gi=0; gi<NVTOT+1; gi++)
-				list[gi] = 0;
-
-			// reset linked list head
-			for (i=0; i<NBX; i++){
-				head[i] = 0;
-				last[i] = 0;
-			}
+			// reset linked list info
+			fill(list.begin(), list.end(), 0);
+			fill(head.begin(), head.end(), 0);
+			fill(last.begin(), last.end(), 0);
 
 			// sort vertices into linked list
 			for (gi=0; gi<NVTOT; gi++){
@@ -903,8 +991,7 @@ int main(int argc, char const *argv[]){
 			}
 
 			// reset contact network
-			for (i=0; i<NCTCS; i++)
-				cij[i] = 0;
+			fill(cij.begin(), cij.end(), 0);
 
 			// FORCE UPDATE
 
@@ -1222,112 +1309,14 @@ int main(int argc, char const *argv[]){
 
 
 			// VV VELOCITY UPDATE
-			for (i=0; i<vertDOF; i++){
-				vvel[i] += 0.5*(vF[i] + vFold[i])*dt;
-				vFold[i] = vF[i];
-			}
-
-
-
-			// FIRE UPDATE
-			// compute fnorm, vnorm and P
-			fnorm = 0.0;
-			vnorm = 0.0;
-			P = 0.0;
-			for (i=0; i<vertDOF; i++){
-				fnorm 	+= vF[i]*vF[i];
-				vnorm 	+= vvel[i]*vvel[i];
-				P 		+= vvel[i]*vF[i];
-			}
-			fnorm = sqrt(fnorm);
-			vnorm = sqrt(vnorm);
+			for (i=0; i<vertDOF; i++)
+				vvel[i] += 0.5*vF[i]*dt;
 
 			// update fcheck based on fnorm (= force per degree of freedom)
-			fcheck = fnorm/(sqrt(NDIM*NVTOT));
-
-			// update npPMin
-			if (fcheck < Ftoltmp)
-				npPMin++;
-			else
-				npPMin = 0;
-
-			// print to console
-			if (fireit % NSKIP == 0){
-				cout << endl << endl;
-				cout << "===========================================" << endl;
-				cout << " 	F I R E 						" << endl;
-				cout << "		M I N I M I Z A T I O N 	" << endl;
-				cout << "===========================================" << endl;
-				cout << endl;
-				cout << "	** fireit 	= " << fireit << endl;
-				cout << "	** fcheck 	= " << fcheck << endl;
-				cout << "	** pcheck 	= " << pcheck << endl;
-				cout << "	** U 		= " << U << endl;
-
-				cout << "	** vnorm 	= " << vnorm << endl;
-				cout << "	** dt 		= " << dt << endl;
-				cout << "	** P 		= " << P << endl;
-				cout << "	** Pdir 	= " << P/(fnorm*vnorm) << endl;
-				cout << "	** alpha 	= " << alpha << endl;
-			}
-
-			// Step 1. adjust simulation based on net motion of degrees of freedom
-			if (P > 0){
-				// increase positive counter
-				npPos++;
-
-				// reset negative counter
-				npNeg = 0;
-
-				// alter simulation if enough positive steps have been taken
-				if (npPos > NDELAY){
-					// change time step
-					if (dt*finc < dtmax)
-						dt *= finc;
-
-					// decrease alpha
-					alpha *= falpha;
-				}
-			}
-			else{
-				// reset positive counter
-				npPos = 0;
-
-				// increase negative counter
-				npNeg++;
-
-				// check if simulation is stuck
-				if (npNeg > NNEGMAX){
-					cout << "	** ERROR: During initial FIRE minimization, P < 0 for too long, so ending." << endl;
-					return 1;
-				}
-
-				// take half step backwards, reset velocities
-				for (i=0; i<vertDOF; i++){
-					// take half step backwards
-					vpos[i] -= 0.5*dt*vvel[i] + 0.25*dt*dt*vF[i];
-
-					// reset vertex velocities
-					vvel[i] = 0.0;
-				}
-
-				// decrease time step if past initial delay
-				if (fireit > NDELAY){
-					// decrease time step 
-					if (dt*fdec > dtmin)
-						dt *= fdec;
-
-					// reset alpha
-					alpha = alpha0;
-				}
-			}
-
-
-			// update velocities (s.d. vs inertial dynamics) only if forces are acting
-			if (fnorm > 0){
-				for (i=0; i<vertDOF; i++)
-					vvel[i] = (1 - alpha)*vvel[i] + alpha*(vnorm/fnorm)*vF[i];
-			}
+			fcheck = 0.0;
+			for (i=0; i<vertDOF; i++)
+				fnorm += vF[i]*vF[i];
+			fnorm = sqrt(fnorm/vertDOF);
 
 			// update iterator
 			fireit++;
