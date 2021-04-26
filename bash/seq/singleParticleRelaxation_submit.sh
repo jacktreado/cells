@@ -74,12 +74,16 @@ while [[ $(echo "$catmp < $camax" | bc -l) -eq 1  && $k -lt $kmax ]]; do
 
     # append to runString
     runString="$runString ; matlab -nodisplay -r \"singleParticleRelaxation($NV,$kl,$kb,$calA0,'$savef')\"; quit"
+    echo "$runString" >> $taskf
 
     # print to console
     echo k = $k, catmp = $catmp, calA0 = $calA0, condition = $(echo "$catmp < $camax" | bc -l)
 
     # update DCalA0
     catmp=$(echo "scale=8; $catmp*$dca" | bc)
+
+    # update k
+    let k=$k+1
 done
 
 # test if task file was created
