@@ -5,8 +5,8 @@ function singleParticleRelaxation(NV,Kl,Kb,calA0param,savestr)
 rng('shuffle');
 
 % relaxation parameters
-Ftol        = 1e-14;
-dt0         = 0.005;
+Ftol        = 5e-15;
+dt0         = 0.001;
 itmax       = 5e7;
 plotskip    = 20000;
 phi0        = 0.1;
