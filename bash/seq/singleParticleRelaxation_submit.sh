@@ -74,6 +74,7 @@ while [[ $(echo "$catmp < $camax" | bc -l) -eq 1  && $k -lt $kmax ]]; do
 
     # append to runString
     runString="$runString ; matlab -nodisplay -r \"singleParticleRelaxation($NV,$kl,$kb,$calA0,'$savef')\"; quit"
+    runString="$runString ;"
     echo "$runString" >> $taskf
 
     # print to console
