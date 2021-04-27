@@ -105,6 +105,9 @@ vlist = zeros(itmax,1);
 tlist = zeros(itmax,1);
 t = 0.0;
 
+% print to console
+fprintf('** Relaxing shape for calA0 = %0.5g...\n',calA0);
+
 % loop over FIRE protocol while fcheck and kcheck are above minimum
 while(fcheck > Ftol && it < itmax)
     % update iterate
@@ -275,6 +278,7 @@ tlist(it+1:end) = [];
 %% Compute final eigenvalues
 
 % project onto hessian
+fprintf('** Shape is relaxed, computing eigenvalues...\n');
 [Ha, Sa, Hl, Sl, Hb, Sb, Hbb, Sbb] = beltModelVDOS(x,y,a0,l0,1.0,Kl,Kb,0.0);
 
 % compute eigenvalues for DM decomposition
@@ -324,6 +328,8 @@ end
 
 
 %% Save
+
+fprintf('** Saving data to %s, ending...\n',savestr);
 save(savestr,'NV','x','y','vM','m','h','H','S','a0','l0','Kl','Kb','flist','vlist','tlist');
     
 
