@@ -4,7 +4,7 @@
 outputdir=/gpfs/loomis/project/fas/ohern/jdt45/cells
 
 # directory for simulations specific to jamming
-simtypedir=$outputdir/activeBrownianCrawler
+simtypedir=$outputdir/singleDP
 
 # make directories, unless they already exist
 mkdir -p $outputdir
@@ -73,8 +73,7 @@ while [[ $(echo "$catmp < $camax" | bc -l) -eq 1  && $k -lt $kmax ]]; do
     savef=$simdatadir/$filestr.mat
 
     # append to runString
-    runString="$runString ; matlab -nodisplay -r \"singleParticleRelaxation($NV,$kl,$kb,$calA0,'$savef')\"; quit"
-    runString="$runString ;"
+    runString="$runString ; matlab -nodisplay -r \"singleParticleRelaxation($NV,$kl,$kb,$calA0,'$savef')\";"
     echo "$runString" >> $taskf
 
     # print to console
