@@ -98,6 +98,7 @@ fcheck = 10*Ftol;
 
 % USE FIRE to relax forces
 it = 0;
+t = 0.0;
 
 % print to console
 fprintf('** Relaxing shape for calA0 = %0.5g...\n',calA0);
@@ -256,6 +257,9 @@ while(fcheck > Ftol && it < itmax)
     
     % update Fcheck
     fcheck = sqrt(sum(fx.^2 + fy.^2)/dof);
+    
+    % update total time spent
+    t = t + dt;
 end
 
 %% Compute final eigenvalues
@@ -313,7 +317,7 @@ end
 %% Save
 
 fprintf('** Saving data to %s, ending.\n',savestr);
-save(savestr,'NV','x','y','vM','m','h','H','S','a0','l0','Kl','Kb');
+save(savestr,'NV','x','y','vM','m','h','H','S','a0','l0','Kl','Kb','it','t');
     
 
 end
