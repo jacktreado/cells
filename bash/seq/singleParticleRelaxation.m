@@ -7,7 +7,7 @@ rng('shuffle');
 % relaxation parameters
 Ftol        = 5e-15;
 dt0         = 0.001;
-itmax       = 5e7;
+itmax       = 2e8;
 plotskip    = 20000;
 phi0        = 0.1;
 calA0       = calA0param*NV*tan(pi/NV)/pi;
@@ -85,7 +85,7 @@ finc        = 1.1;
 fdec        = 0.5;
 falpha      = 0.99;
 dtmax       = 10*dt0;
-dtmin       = 0.02*dt0;
+dtmin       = 0.01*dt0;
 dt          = dt0;
 NNEGMAX     = 500;
 NDELAY      = 20;
@@ -98,12 +98,6 @@ fcheck = 10*Ftol;
 
 % USE FIRE to relax forces
 it = 0;
-
-% save data
-flist = zeros(itmax,1);
-vlist = zeros(itmax,1);
-tlist = zeros(itmax,1);
-t = 0.0;
 
 % print to console
 fprintf('** Relaxing shape for calA0 = %0.5g...\n',calA0);
@@ -262,18 +256,7 @@ while(fcheck > Ftol && it < itmax)
     
     % update Fcheck
     fcheck = sqrt(sum(fx.^2 + fy.^2)/dof);
-    vcheck = sqrt(sum(vx.^2 + vy.^2)/dof);
-    
-    % save
-    flist(it) = fcheck;
-    vlist(it) = vcheck;
-    t = t + dt;
-    tlist(it) = t;
 end
-
-flist(it+1:end) = [];
-vlist(it+1:end) = [];
-tlist(it+1:end) = [];
 
 %% Compute final eigenvalues
 
@@ -329,8 +312,8 @@ end
 
 %% Save
 
-fprintf('** Saving data to %s, ending...\n',savestr);
-save(savestr,'NV','x','y','vM','m','h','H','S','a0','l0','Kl','Kb','flist','vlist','tlist');
+fprintf('** Saving data to %s, ending.\n',savestr);
+save(savestr,'NV','x','y','vM','m','h','H','S','a0','l0','Kl','Kb');
     
 
 end
