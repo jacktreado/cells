@@ -33,7 +33,7 @@ numRuns="${10}"
 startSeed="${11}"
 
 # other variables
-calA0=1.06
+calA0=1.001
 polyd=0.05
 phiMax=1.1
 phiMin=0.4
