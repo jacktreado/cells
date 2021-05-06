@@ -67,9 +67,9 @@ const double aCalA0 		= 0.9;			// adipocyte deformability
 
 // tumor invasion variables
 const double Ds 			= 0.2;			// spread of velocity coupling along tumor cell boundary
-const double Dr 			= 0.1;			// bare angular diffusion
-const double Drmin 			= 1e-4;			// min angular diffusion, mimics aligning to collagen
-const double pinbreak 		= 2.0; 			// fraction of rho0 that breaks a WAT pin spring
+const double Dr 			= 0.2;			// bare angular diffusion
+const double Drmin 			= 1e-3;			// min angular diffusion, mimics aligning to collagen
+const double pinbreak 		= 1.0; 			// fraction of rho0 that breaks a WAT pin spring
 const double kpin 			= 0.1;			// pinning spring stiffness
 
 // FUNCTION PROTOTYPES
@@ -1561,8 +1561,6 @@ int main(int argc, char const *argv[]){
 	double Drtmp = Dr;
 	vector<double> DrList(tN,Dr);
 	vector<double> psi(tN,0.0);
-	for (ci=0; ci<NCELLS; ci++)
-		psi[ci] = 2.0*PI*drand48() - PI;
 
 	// reset for active dynamocs
 	dt = dt0;
