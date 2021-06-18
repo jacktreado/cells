@@ -35,11 +35,11 @@ const int wnum 				= 25;
 const int pnum 				= 8;
 
 // simulation constants
-const double timeStepMag 	= 0.0025;
+const double timeStepMag 	= 0.005;
 const double polyd 			= 0.1;
 const int nvmin 			= 12;
-const double phi0 			= 0.6;
-const double phiT 			= 0.9;
+const double phi0 			= 0.1;
+const double Ptol 			= 1e-6;
 const double dphi 			= 0.005;
 
 // FIRE constants for initial minimizations (SP + DP)
@@ -47,8 +47,7 @@ const double alpha0      	= 0.25;
 const double finc        	= 1.1;
 const double fdec        	= 0.5;
 const double falpha      	= 0.99;
-const double Ftol 			= 1e-8;
-const double Ptol 			= 1e-8;
+const double Ftol 			= 1e-12;
 const double minDelA 		= 1e-2;
 
 const int NSKIP 			= 2e4;
@@ -63,13 +62,12 @@ const double kl 			= 0.5;			// contractility
 const double kb 			= 0;			// bending modulus
 const double eint 			= 0.5;			// interaction energy scale
 const double del 			= 1.0;			// radius of vertices in units of l0
-const double aCalA0 		= 0.9;			// adipocyte deformability
 
 // tumor invasion variables
 const double Ds 			= 0.2;			// spread of velocity coupling along tumor cell boundary
-const double Dr 			= 0.2;			// bare angular diffusion
+const double dDr 			= 0.01;			// change in angular diffusion near adipocytes
 const double Drmin 			= 1e-3;			// min angular diffusion, mimics aligning to collagen
-const double pinbreak 		= 1.0; 			// fraction of rho0 that breaks a WAT pin spring
+const double pinbreak 		= 0.5; 			// fraction of rho0 that breaks a WAT pin spring
 const double kpin 			= 0.1;			// pinning spring stiffness
 
 // FUNCTION PROTOTYPES
@@ -90,32 +88,34 @@ int main(int argc, char const *argv[]){
 
 	// parameters to be read in 
 	int aN, tN, NCELLS, NT, NACTIVESKIP, NV, NVTOT, cellDOF, vertDOF, seed;
-	double NT_dbl, NACTIVESKIP_dbl, areaRatio, tCalA0, l1, l2, kint, v0, vmin, Dr, dDr, phi;
+	double NT_dbl, NACTIVESKIP_dbl, areaRatio, aCalA0, tCalA0, l1, l2, kint, v0, vmin, Dr0, phi;
 
 	// read in parameters from command line input
 	// test g++ -O3 sequential/active/adiposeBoundary2D.cpp -o tumor.o
-	// test: ./tumor.o 8 2 24 1.10 0.01 0.011 0.05 0.1 1e5 2e3 1 pos.tes
+	// test: ./tumor.o 8 2 20 1.10 0.9 0.01 0.011 0.05 0.1 1e5 2e3 1 pos.tes
 	string aN_str 				= argv[1];
 	string areaRatio_str 		= argv[2];
 	string NV_str 				= argv[3];
-	string tumorCalA0_str 		= argv[4];
-	string l1_str 				= argv[5];
-	string l2_str 				= argv[6];
-	string v0_str 				= argv[7];
-	string dDr_str 				= argv[8];
-	string NT_str 				= argv[9];
-	string NACTIVESKIP_str 		= argv[10];
-	string seed_str 			= argv[11];
-	string positionFile 		= argv[12];
+	string adipocyteCalA0_str 	= argv[4];
+	string tumorCalA0_str 		= argv[5];
+	string l1_str 				= argv[6];
+	string l2_str 				= argv[7];
+	string v0_str 				= argv[8];
+	string Dr0_str 				= argv[9];
+	string NT_str 				= argv[10];
+	string NACTIVESKIP_str 		= argv[11];
+	string seed_str 			= argv[12];
+	string positionFile 		= argv[13];
 
 	stringstream aNss(aN_str);
 	stringstream areaRatioss(areaRatio_str);
 	stringstream NVss(NV_str);
+	stringstream aCalA0ss(adipocyteCalA0_str);
 	stringstream tCalA0ss(tumorCalA0_str);
 	stringstream l1ss(l1_str);
 	stringstream l2ss(l2_str);
 	stringstream v0ss(v0_str);
-	stringstream dDrss(dDr_str);
+	stringstream Dr0ss(Dr0_str);
 	stringstream NTss(NT_str);
 	stringstream NAss(NACTIVESKIP_str);
 	stringstream seedss(seed_str);
@@ -123,11 +123,12 @@ int main(int argc, char const *argv[]){
 	aNss >> aN;
 	areaRatioss >> areaRatio;
 	NVss >> NV;
+	aCalA0ss >> aCalA0;
 	tCalA0ss >> tCalA0;
 	l1ss >> l1;
 	l2ss >> l2;
 	v0ss >> v0;
-	dDrss >> dDr;
+	Dr0ss >> Dr0;
 	NTss >> NT_dbl;
 	NAss >> NACTIVESKIP_dbl;
 	seedss >> seed;
@@ -241,13 +242,6 @@ int main(int argc, char const *argv[]){
 		}
 	}
 
-	// fundamental MD time units
-	double dtMD, dt0, dt;
-
-	dtMD 	= 1.0;
-	dt0 	= timeStepMag*dtMD;
-	dt 		= dt0;
-
 	// output opening statement to console
 	cout << "=======================================================" << endl << endl;
 
@@ -274,7 +268,7 @@ int main(int argc, char const *argv[]){
 	cout << "		ka 			= " << ka << "						" << endl;
 	cout << "		kl 			= " << kl << "						" << endl;
 	cout << "		v0 			= " << v0 << " 						" << endl;
-	cout << "		Dr 			= " << Dr << " 						" << endl;
+	cout << "		Dr0 		= " << Dr0 << " 					" << endl;
 	cout << "		seed 		= " << seed << "					" << endl << endl;
 
 	cout << "		pos file 	= " << positionFile << "			" << endl << endl;;
@@ -366,6 +360,27 @@ int main(int argc, char const *argv[]){
 		dpos.at(NDIM*ci + 1) 	= L[1]*drand48();
 	}
 
+	// fundamental MD time units
+	double tmin, dt0, dt, ta, tl;
+
+	// typical length
+	double rho0 = sqrt(a0.at(0));
+
+	// set typical time scales
+	ta = rho0/sqrt(ka);
+	tl = (rho0*l0.at(0))/sqrt(ka*kl);
+
+	// set main time scale as min
+	tmin = 1e8;
+	if (ta < tmin)
+		tmin = ta;
+	if (tl < tmin)
+		tmin = tl;
+
+	// set dt
+	dt0 = timeStepMag*tmin;
+	dt = dt0;
+
 
 	/* * * * * * * * * * * * * * * * * * 
 
@@ -387,7 +402,7 @@ int main(int argc, char const *argv[]){
 	double alpha   	= alpha0;
 
 	double dtmax   	= 10*dt0;
-	double dtmin   	= 1e-8*dt0;
+	double dtmin   	= 1e-2*dt0;
 
 	int npPos      	= 0;
 	int npNeg      	= 0;
@@ -707,36 +722,14 @@ int main(int argc, char const *argv[]){
 	int boxid, bi, bj, pi, pj, sbtmp;
 
 	// shape force variables
-	double rho0, fa, fl, fb, l0tmp, atmp, ri, li, lim1, cx, cy;
+	double fa, fl, fb, l0tmp, atmp, ri, li, lim1, cx, cy;
 	double da, dli, dlim1;
 	double lim2x, lim2y, lim1x, lim1y, lix, liy, lip1x, lip1y;
 	double rim2x, rim2y, rim1x, rim1y, rix, riy, rip1x, rip1y, rip2x, rip2y;
 
-	// packing fractions for different cell types
-	double tumorPhi, adiposePhi, phiMin;
-	tumorPhi = 0.0;
-	adiposePhi = 0.0;
-	for (ci=0; ci<tN; ci++)
-		tumorPhi += area(vpos,ci,L,nv,szList) + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1.0);
-	for (ci=tN+1; ci<NCELLS; ci++)
-		adiposePhi += area(vpos,ci,L,nv,szList) + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1.0);
-	tumorPhi /= L[1]*L[1];
-	adiposePhi /= L[1]*L[1];
-
-	if (tumorPhi < adiposePhi)
-		phiMin = tumorPhi;
-	else
-		phiMin = adiposePhi;
-
-	// // area stress parameters
-	// double minTumorDelA, minAdiposeDelA, minTotalDelA;
-	// minTumorDelA = 0.0;
-	// minAdiposeDelA = 0.0;
-	// minTotalDelA = 0.0;
-
 	// size scaling variables
 	int k, kmax, xind, yind;
-	double pcheck, scaleFactor;
+	double pcheck=0.0, scaleFactor;
 
 	// determine number of steps
 	k = 0;
@@ -744,12 +737,8 @@ int main(int argc, char const *argv[]){
 
 	// compress to jamming, relax U and F using FIRE
 	cout << endl << endl << endl;
-	cout << "	** Compressing to target packing fraction phiT = " << phiT << endl;
-	// while (minTotalDelA < minDelA && k < kmax){
-	while (phiMin < phiT && k < kmax){
-
-		// increment counter
-		k++;
+	cout << "	** Compressing to target pressure Ptol = " << Ptol << endl;
+	while (pcheck < Ptol && k < kmax){
 
 		// RESET FIRE VARIABLES
 		P  			= 0;	
@@ -758,7 +747,7 @@ int main(int argc, char const *argv[]){
 		alpha   	= alpha0;
 
 		dtmax   	= 10.0*dt0;
-		dtmin   	= 1e-6*dt0;
+		dtmin   	= 1e-2*dt0;
 		dt 			= dt0;
 
 		npPos      	= 0;
@@ -838,6 +827,22 @@ int main(int argc, char const *argv[]){
 				while (pi > 0){
 					// real particle index
 					gi = pi - 1;
+
+					// check boundary forces
+					xi = vpos[NDIM*gi];
+					ri = vrad[gi];
+
+					// if near a wall, add to force
+					if (xi < ri){
+						fx = eint*(1.0 - (xi/ri))/ri;
+						vF[NDIM*gi] += fx;
+						pcheck += fx*xi;
+					}
+					else if (xi > L[0] - ri){
+						fx = -eint*(1.0 - ((L[0] - xi)/ri))/ri;
+						vF[NDIM*gi] += fx;
+						pcheck += fx*(xi - L[0]);
+					}
 
 					// next particle in list
 					pj = list[pi];
@@ -1004,35 +1009,10 @@ int main(int argc, char const *argv[]){
 						rim2y = vpos[NDIM*im1[im1[gi]] + 1] - cy;
 						rim2y -= L[1]*round(rim2y/L[1]);
 
-						// boundary forces
-						for (vi=0; vi<nvtmp; vi++){
-							// positions using global indexing
-							xi = vpos[NDIM*(gi+vi)];
-							ri = vrad[gi+vi];
-
-							// if near a wall, add to force
-
-							// tumors
-							if (ci < tN){
-								if (xi < ri)
-									vF[NDIM*(gi+vi)] += eint*(1.0 - (xi/ri))/ri;
-								else if (xi > L[1] - ri)
-									vF[NDIM*(gi+vi)] -= eint*(1.0 - ((L[1] - xi)/ri))/ri;
-							}
-							// adipocytes
-							else{
-								if (xi < L[1] + ri)
-									vF[NDIM*(gi+vi)] += eint*(1.0 - ((xi - L[1])/ri))/ri;
-								else if (xi > L[0] - ri)
-									vF[NDIM*(gi+vi)] -= eint*(1.0 - ((L[0] - xi)/ri))/ri;
-							}
-						}
-
 						// increment cell index
 						ci++;
 					}
 				}
-
 
 				// get next adjacent vertices
 				rip1x = vpos[NDIM*ip1[gi]] - cx;
@@ -1232,6 +1212,9 @@ int main(int argc, char const *argv[]){
 			cout << "	** alpha 	= " << alpha << endl << endl;
 		}
 
+		// get scaleFactor for particle size growth
+		scaleFactor = sqrt((phi + dphi)/phi);
+
 		// output to console
 		cout << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&" << endl;
 		cout << "===============================================" << endl << endl;
@@ -1242,89 +1225,19 @@ int main(int argc, char const *argv[]){
 		cout << "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&" << endl;
 		cout << endl;
 		cout << "	* k 				= " << k << endl;
-		cout << "	* dr 				= " << scaleFactor << endl;
-		cout << "	* tumorPhi 			= " << tumorPhi << endl;
-		cout << "	* adiposePhi 		= " << adiposePhi << endl;
+		cout << "	* scaleFactor 		= " << scaleFactor << endl;
+		cout << "	* phi 				= " << phi << endl;
 		cout << "	* fcheck 			= " << fcheck << endl;
 		cout << "	* pcheck 			= " << pcheck << endl;
-		// cout << "	* minTotalDelA 		= " << minTotalDelA << endl;
 		cout << endl;
-
-		// // if first min, get aMin for each cell
-		// if (k == 1){
-		// 	for (ci=0; ci<NCELLS; ci++)
-		// 		aMin[ci] = area(vpos,ci,L,nv,szList);
-		// }
-
-		
-		// grow or shrink particles by scale factor
-		tumorPhi = 0.0;
-		adiposePhi = 0.0;
-		for (ci=0; ci<NCELLS; ci++){
-			if (ci < tN)
-				tumorPhi += a0[ci] + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1);
-			else
-				adiposePhi += area(vpos,ci,L,nv,szList) + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1);
-		}
-		tumorPhi /= L[1]*L[1];
-		adiposePhi /= L[1]*L[1];
-
-		if (tumorPhi < adiposePhi)
-			phiMin = tumorPhi;
-		else
-			phiMin = adiposePhi;
-
-		// // get minimum fractional area strains
-		// minTumorDelA = abs((area(vpos,0,L,nv,szList)/aMin[0]) - 1.0);
-		// minAdiposeDelA = abs((area(vpos,tN,L,nv,szList)/aMin[tN]) - 1.0);
-		// for (ci=0; ci<NCELLS; ci++){
-		// 	da = abs((area(vpos,ci,L,nv,szList)/aMin[ci]) - 1.0);
-		// 	if (ci < tN){
-		// 		if (da < minTumorDelA)
-		// 			minTumorDelA = da;
-		// 	}
-		// 	else{
-		// 		if (da < minAdiposeDelA)
-		// 			minAdiposeDelA = da;
-		// 	}
-		// }
-
-		// // check total min delA
-		// if (minTumorDelA < minAdiposeDelA)
-		// 	minTotalDelA = minTumorDelA;
-		// else
-		// 	minTotalDelA = minAdiposeDelA;
-
-		// // break if satisfies
-		// if (minTotalDelA > minDelA){
-		// 	for (ci=0; ci<NCELLS; ci++){
-		// 		da = abs((area(vpos,ci,L,nv,szList)/aMin[ci]) - 1.0);
-		// 		cout << "	** ci = " << ci << ", da = " << da << endl;
-		// 	}
-		// 	cout << "	** minTotalDelA = " << minTotalDelA << ", less than minDelA = " << minDelA << ", calling confluent and ending. " << endl;
-		// 	break;
-		// }
+		printPos(posout, vpos, vF, a0, l0, L, nv, szList, phi, NCELLS, tN);
 
 		// grow particles by scale factor
+		phi = 0.0;
 		for (ci=0; ci<NCELLS; ci++){
-			// check whether or not to scale particles
-			if (ci < tN){
-				if (tumorPhi > phiT)
-					continue;
-				else
-					scaleFactor = sqrt((tumorPhi + dphi)/tumorPhi);
-			}
-			else {
-				if (adiposePhi > phiT)
-					continue;
-				else
-					scaleFactor = sqrt((adiposePhi + dphi)/adiposePhi);
-			}
-
 			// scale preferred lengths
 			l0[ci] *= scaleFactor;
 			a0[ci] *= scaleFactor*scaleFactor;
-			// aMin[ci] *= scaleFactor*scaleFactor;
 
 			// first global index for ci
 			gi = szList.at(ci);
@@ -1367,7 +1280,14 @@ int main(int argc, char const *argv[]){
 				// scale vertex radii
 				vrad.at(gi+vi) 		*= scaleFactor;
 			}
+
+			// update phi
+			phi += a0[ci] + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1);
 		}
+		phi /= L[0]*L[1];
+
+		// increment counter
+		k++;
 	}
 	if (k == kmax){
 		cout << "	** ERROR: In adipose/tumor compression step, k reached kmax without getting to phiT. Ending." << endl;
@@ -1408,6 +1328,24 @@ int main(int argc, char const *argv[]){
 				BOX-LINKED-LIST
 
 	 * * * * * * * * * * * * * * * * * */
+
+
+	// rescale all lengths based on rho0
+	rho0 = sqrt(a0[0]);
+
+	// divide all lengths
+	L[0] /= rho0;
+	L[1] /= rho0;
+	for (ci=0; ci<NCELLS; ci++){
+		a0[ci] /= (rho0*rho0);
+		l0[ci] /= rho0;
+		for(vi=0; vi<nv[ci]; vi++){
+			gi = szList[ci] + vi;
+			vrad[gi] /= rho0;
+			vpos[NDIM*gi] /= rho0;
+			vpos[NDIM*gi + 1] /= rho0;
+		}
+	}
 
 
 	// re-determine l0max
@@ -1511,6 +1449,9 @@ int main(int argc, char const *argv[]){
 	cout << "\t** PRINTING INITIAL POSITIONS TO FILE... " << endl;
 	printPos(posout, vpos, vF, a0, l0, L, nv, szList, phi, NCELLS, tN);
 
+	posout.close();
+	return 0;
+
 	// DYNAMICS VARIABLES
 	int tt, tcells; 
 	double ux, uy, rnorm, psitmp, dpsi, v0tmp, psiMean, psiStd;
@@ -1558,8 +1499,8 @@ int main(int argc, char const *argv[]){
 	vector<bool> gij(NVVCTCS,0);
 
 	// initialize directors
-	double Drtmp = Dr;
-	vector<double> DrList(tN,Dr);
+	double Drtmp = Dr0;
+	vector<double> DrList(tN,Dr0);
 	vector<double> psi(tN,0.0);
 
 	// reset for active dynamocs
@@ -1628,6 +1569,22 @@ int main(int argc, char const *argv[]){
 			while (pi > 0){
 				// real particle index
 				gi = pi - 1;
+
+				// check boundary forces
+				xi = vpos[NDIM*gi];
+				ri = vrad[gi];
+
+				// if near a wall, add to force
+				if (xi < ri){
+					fx = eint*(1.0 - (xi/ri))/ri;
+					vF[NDIM*gi] += fx;
+					pcheck += fx*xi;
+				}
+				else if (xi > L[0] - ri){
+					fx = -eint*(1.0 - ((L[0] - xi)/ri))/ri;
+					vF[NDIM*gi] += fx;
+					pcheck += fx*(xi - L[0]);
+				}
 
 				// next particle in list
 				pj = list[pi];
@@ -1841,8 +1798,8 @@ int main(int argc, char const *argv[]){
 			}
 		}
 
-		// normalize pressure by box area and number of particles
-		pcheck /= NCELLS*L[0]*L[1];
+		// normalize pressure by box area (make dimensionless with extra factor of rho)
+		pcheck *= (rho0/(2.0*L[0]*L[1]));
 
 		// shape forces (loop over global vertex labels)
 		ci = 0;
@@ -1930,20 +1887,11 @@ int main(int argc, char const *argv[]){
 						psiStd += psi[ci]*psi[ci];
 					}
 
-					// boundary forces
+					// pin forces on each vertex
 					for (vi=0; vi<nvtmp; vi++){
 						// positions using global indexing
 						xind = NDIM*(gi+vi);
 						yind = xind + 1;
-
-						xi = vpos[xind];
-						ri = vrad[gi+vi];
-
-						// if near a wall, add to force
-						if (xi < ri)
-							vF[xind] += eint*(1.0 - (xi/ri))/ri;
-						else if (xi > L[0] - ri)
-							vF[xind] -= eint*(1.0 - ((L[0] - xi)/ri))/ri;
 
 						// if an adipocyte and pin is intact, compute force due to pinning spring
 						if (ci >= tN && pinattached[pinCellInd] == 1){
@@ -2068,7 +2016,7 @@ int main(int argc, char const *argv[]){
 			}
 
 			// scale Dr based on tumor-adipocyte contacts
-			Drtmp = Dr*(1 - (zta/nv[ci])*dDr);
+			Drtmp = Dr0*(1 - (zta/nv[ci])*dDr);
 			if (Drtmp > Drmin)
 				DrList[ci] = Drtmp;
 			else
@@ -2090,7 +2038,7 @@ int main(int argc, char const *argv[]){
 			// compute instantaneous packing fraction
 			phi = 0.0;
 			for (ci=0; ci<NCELLS; ci++)
-				phi += area(vpos,ci,L,nv,szList) + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1);
+				phi += a0[ci] + 0.25*PI*pow(l0[ci]*del,2.0)*(0.5*nv[ci] - 1);
 			phi /= L[0]*L[1];
 
 			// print vertex positions to check placement

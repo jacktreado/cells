@@ -50,19 +50,6 @@ const double sizeRatio 		= 1.4;
 const double sizeFraction 	= 0.5;
 
 
-// FIRE constants for initial minimizations (SP + DP)
-const double alpha0      	= 0.2;
-const double finc        	= 1.1;
-const double fdec        	= 0.5;
-const double falpha      	= 0.99;
-
-const int NSKIP 			= 2e4;
-const int NMIN        		= 10;
-const int NNEGMAX     		= 1000;
-const int NDELAY      		= 20;
-const int itmax       		= 5e7;
-
-
 // DP force constants
 const double eint 			= 1.0;			// interaction energy
 const double del 			= 1.0;			// radius of vertices in units of l0
@@ -2267,6 +2254,7 @@ int main(int argc, char const *argv[]){
 	cout << "\t** Computing eigenvalues and eigenvectors of M, H and S matrices" << endl;
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> allModes(M);
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> hModes(H);
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> sModes(S);
 
 	// // define eigenvector matrix
 	Eigen::MatrixXd evecs = allModes.eigenvectors();
@@ -2275,7 +2263,8 @@ int main(int argc, char const *argv[]){
 	cout << "\t** Printing evals to file" << endl;
 	vdosout << vertDOF << endl;
 	vdosout << allModes.eigenvalues() << endl;
-	// vdosout << sModes.eigenvalues() << endl;
+	vdosout << hModes.eigenvalues() << endl;
+	vdosout << sModes.eigenvalues() << endl;
 
 	// computing projections onto H
 	// cout << "\t** Computing eigenvector projections on stiffness matrix H" << endl;
@@ -2290,7 +2279,6 @@ int main(int argc, char const *argv[]){
 	// 	}
 	// 	vdosout << evecProj << endl;
 	// }
-	vdosout << hModes.eigenvalues() << endl;
 
 	// compute vertex participation ratio of each mode
 	double pnum, pdenom;
