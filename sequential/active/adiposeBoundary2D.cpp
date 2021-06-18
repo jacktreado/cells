@@ -35,12 +35,13 @@ const int wnum 				= 25;
 const int pnum 				= 8;
 
 // simulation constants
-const double timeStepMag 	= 0.005;
+const double timeStepMag 	= 0.02;
 const double polyd 			= 0.1;
 const int nvmin 			= 12;
-const double phi0 			= 0.1;
+const double phi0 			= 0.3;
 const double Ptol 			= 1e-6;
 const double dphi 			= 0.005;
+const double boxLenScale 	= 2.5;
 
 // FIRE constants for initial minimizations (SP + DP)
 const double alpha0      	= 0.25;
@@ -332,9 +333,8 @@ int main(int argc, char const *argv[]){
 		if (l0.at(ci) > l0max)
 			l0max = l0.at(ci);
 
-		// add to sum of tumor cell areas (including contribution from vertices)
-		if (ci < tN)
-			areaSum += a0tmp + 0.25*PI*pow(l0.at(ci)*del,2.0)*(0.5*nvtmp - 1);
+		// add to area sum
+		areaSum += a0tmp + 0.25*PI*pow(l0.at(ci)*del,2.0)*(0.5*nvtmp - 1);
 
 		// output info
 		cout << "\t ** ci = " << ci << ";  nv = " << nvtmp << ";  drad = " << drad.at(ci) << ";  disk area = " << PI*pow(drad.at(ci),2.0) << ", l0 = " << l0.at(ci) << ", a0 = " << a0tmp << endl;
@@ -342,11 +342,11 @@ int main(int argc, char const *argv[]){
 
 	// determine box lengths from particle sizes and input packing fraction
 	vector<double> L(NDIM,0.0);
-	L.at(1) = sqrt(areaSum/phi0);
+	L.at(1) = sqrt(areaSum/(2.0*phi0));
 	L.at(0) = 2.0*L[1];
 
 	// initial packing fraction
-	phi = areaSum/(L[1]*L[1]);
+	phi = areaSum/(L[0]*L[1]);
 
 	// initialize tumor cell centers in left side of the box
 	for (ci=0; ci<tN; ci++){
@@ -645,7 +645,7 @@ int main(int argc, char const *argv[]){
 	int NBX = 1;
 	for (d=0; d<NDIM; d++){
 		// determine number of cells along given dimension by rmax
-		sb[d] = round(L[d]/(1.5*l0max));
+		sb[d] = round(L[d]/(boxLenScale*l0max));
 
 		// just in case, if < 3, change to 3 so box neighbor checking will work
 		if (sb[d] < 3)
@@ -747,7 +747,7 @@ int main(int argc, char const *argv[]){
 		alpha   	= alpha0;
 
 		dtmax   	= 10.0*dt0;
-		dtmin   	= 1e-2*dt0;
+		dtmin   	= 1e-1*dt0;
 		dt 			= dt0;
 
 		npPos      	= 0;
@@ -1226,11 +1226,11 @@ int main(int argc, char const *argv[]){
 		cout << endl;
 		cout << "	* k 				= " << k << endl;
 		cout << "	* scaleFactor 		= " << scaleFactor << endl;
+		cout << "	* rho0 				= " << rho0 << endl;
 		cout << "	* phi 				= " << phi << endl;
 		cout << "	* fcheck 			= " << fcheck << endl;
 		cout << "	* pcheck 			= " << pcheck << endl;
 		cout << endl;
-		printPos(posout, vpos, vF, a0, l0, L, nv, szList, phi, NCELLS, tN);
 
 		// grow particles by scale factor
 		phi = 0.0;
@@ -1359,7 +1359,7 @@ int main(int argc, char const *argv[]){
 	NBX = 1;
 	for (d=0; d<NDIM; d++){
 		// determine number of cells along given dimension by rmax
-		sb[d] = round(L[d]/(2.0*l0max));
+		sb[d] = round(L[d]/(boxLenScale*l0max));
 
 		// just in case, if < 3, change to 3 so box neighbor checking will work
 		if (sb[d] < 3)
@@ -1448,9 +1448,6 @@ int main(int argc, char const *argv[]){
 	// print vertex positions to check placement
 	cout << "\t** PRINTING INITIAL POSITIONS TO FILE... " << endl;
 	printPos(posout, vpos, vF, a0, l0, L, nv, szList, phi, NCELLS, tN);
-
-	posout.close();
-	return 0;
 
 	// DYNAMICS VARIABLES
 	int tt, tcells; 
