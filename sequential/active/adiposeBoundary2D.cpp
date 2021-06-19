@@ -38,7 +38,7 @@ const int pnum 				= 8;
 const double timeStepMag 	= 0.02;
 const double polyd 			= 0.1;
 const int nvmin 			= 12;
-const double phi0 			= 0.3;
+const double phi0 			= 0.5;
 const double Ptol 			= 1e-6;
 const double dphi 			= 0.005;
 const double boxLenScale 	= 2.5;
@@ -48,7 +48,7 @@ const double alpha0      	= 0.25;
 const double finc        	= 1.1;
 const double fdec        	= 0.5;
 const double falpha      	= 0.99;
-const double Ftol 			= 1e-12;
+const double Ftol 			= 1e-8;
 const double minDelA 		= 1e-2;
 
 const int NSKIP 			= 2e4;
