@@ -43,6 +43,9 @@ const double Ptol 			= 1e-6;
 const double dphi 			= 0.005;
 const double boxLenScale 	= 2.5;
 
+// fraction of box partitioned for adipocytes
+const double prt 			= 1.0/3.0; 
+
 // FIRE constants for initial minimizations (SP + DP)
 const double alpha0      	= 0.25;
 const double finc        	= 1.1;
@@ -93,7 +96,7 @@ int main(int argc, char const *argv[]){
 
 	// read in parameters from command line input
 	// test g++ -O3 sequential/active/adiposeBoundary2D.cpp -o tumor.o
-	// test: ./tumor.o 8 2 20 1.10 0.9 0.01 0.011 0.05 0.1 1e5 2e3 1 pos.tes
+	// test: ./tumor.o 8 2 20 1.10 0.9 0.01 0.011 0.05 0.1 1e5 2e3 1 pos.test
 	string aN_str 				= argv[1];
 	string areaRatio_str 		= argv[2];
 	string NV_str 				= argv[3];
@@ -162,7 +165,7 @@ int main(int argc, char const *argv[]){
 	}
 
 	// determine number of tumor cells by area ratio
-	tN = round(aN * areaRatio);
+	tN = round(aN * areaRatio * (prt/(1 - prt)));
 	if (tN < 1){
 		cout << "	** ERROR: tN = " << tN << ", which is less than 1. Ending." << endl;
 		return 1;
@@ -268,6 +271,8 @@ int main(int argc, char const *argv[]){
 	cout << "		phi0 		= " << phi0 << " 					" << endl;
 	cout << "		ka 			= " << ka << "						" << endl;
 	cout << "		kl 			= " << kl << "						" << endl;
+	cout << "		l1 			= " << l1 << "						" << endl;
+	cout << "		l2 			= " << l2 << "						" << endl;
 	cout << "		v0 			= " << v0 << " 						" << endl;
 	cout << "		Dr0 		= " << Dr0 << " 					" << endl;
 	cout << "		seed 		= " << seed << "					" << endl << endl;
@@ -348,15 +353,15 @@ int main(int argc, char const *argv[]){
 	// initial packing fraction
 	phi = areaSum/(L[0]*L[1]);
 
-	// initialize tumor cell centers in left side of the box
+	// initialize tumor cell centers in left-hand partition of the box
 	for (ci=0; ci<tN; ci++){
-		dpos.at(NDIM*ci) 		= (L[1] - 2.0*drad[ci])*drand48() + drad[ci];
+		dpos.at(NDIM*ci) 		= (prt*L[0] - 2.0*drad[ci])*drand48() + drad[ci];
 		dpos.at(NDIM*ci + 1) 	= L[1]*drand48();
 	}
 
 	// initialize WAT cell centers to the right
 	for (ci=tN; ci<NCELLS; ci++){
-		dpos.at(NDIM*ci) 		= (L[0] - L[1] - 2.0*drad[ci])*drand48() + L[1] + drad[ci];
+		dpos.at(NDIM*ci) 		= (L[0]*(1 - prt) - 2.0*drad[ci])*drand48() + prt*L[0] + drad[ci];
 		dpos.at(NDIM*ci + 1) 	= L[1]*drand48();
 	}
 
@@ -1432,11 +1437,6 @@ int main(int argc, char const *argv[]){
 
 
 
-
-
-
-
-
 	/* * * * * * * * * * * * * * * * * * 
 
 		OVERDAMPED DYNAMICS
@@ -1450,7 +1450,6 @@ int main(int argc, char const *argv[]){
 	printPos(posout, vpos, vF, a0, l0, L, nv, szList, phi, NCELLS, tN);
 
 	// DYNAMICS VARIABLES
-	int tt, tcells; 
 	double ux, uy, rnorm, psitmp, dpsi, v0tmp, psiMean, psiStd;
 
 	// attractive shell for tumor vertices
@@ -1499,6 +1498,8 @@ int main(int argc, char const *argv[]){
 	double Drtmp = Dr0;
 	vector<double> DrList(tN,Dr0);
 	vector<double> psi(tN,0.0);
+	for (ci=0; ci<tN; ci++)
+		psi.at(ci) = 2.0*pi*drand48();
 
 	// reset for active dynamocs
 	dt = dt0;
@@ -1507,7 +1508,7 @@ int main(int argc, char const *argv[]){
 	cout << endl;
 	cout << "--  BEGINNING ACTIVE TUMOR CELL DYNAMICS" << endl;
 	cout << "--  Looping over time for NT = " << NT << " time steps with dt = " << dt << endl;
-	for(tt=0; tt<NT; tt++){
+	for(k=0; k<NT; k++){
 
 		// pbcs and reset forces
 		for (i=0; i<vertDOF; i++){
@@ -1630,7 +1631,7 @@ int main(int argc, char const *argv[]){
 								// add to contact network
 								if (gj > gi)
 									gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 1;
-								else
+								else if (gi > gj)
 									gij[NVTOT*gj + gi - (gj+1)*(gj+2)/2] = 1;
 							}
 							else if (rij < cutij && rij > sij && gi < NVtumor && gj < NVtumor){
@@ -1652,7 +1653,7 @@ int main(int argc, char const *argv[]){
 								// add to contact network
 								if (gj > gi)
 									gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 1;
-								else
+								else if (gi > gj)
 									gij[NVTOT*gj + gi - (gj+1)*(gj+2)/2] = 1;
 							}
 							// otherwise, check for two overlapping purely-repulsive vertices
@@ -1675,7 +1676,7 @@ int main(int argc, char const *argv[]){
 								// add to contact network
 								if (gj > gi)
 									gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 1;
-								else
+								else if (gi > gj)
 									gij[NVTOT*gj + gi - (gj+1)*(gj+2)/2] = 1;
 							}
 						}
@@ -1687,6 +1688,10 @@ int main(int argc, char const *argv[]){
 
 				// test overlaps with forward neighboring cells
 				for (bj=0; bj<NNN; bj++){
+					// skip if adjacent cell is across fixed boundary
+					if (nn[bi][bj] == -1)
+						continue;
+
 					// get first particle in neighboring cell
 					pj = head[nn[bi][bj]];
 
@@ -1734,7 +1739,7 @@ int main(int argc, char const *argv[]){
 									// add to contact network
 									if (gj > gi)
 										gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 1;
-									else
+									else if (gi > gj)
 										gij[NVTOT*gj + gi - (gj+1)*(gj+2)/2] = 1;
 								}
 								else if (rij < cutij && rij > sij && gi < NVtumor && gj < NVtumor){
@@ -1756,7 +1761,7 @@ int main(int argc, char const *argv[]){
 									// add to contact network
 									if (gj > gi)
 										gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 1;
-									else
+									else if (gi > gj)
 										gij[NVTOT*gj + gi - (gj+1)*(gj+2)/2] = 1;
 								}
 								// otherwise, check for two overlapping purely-repulsive vertices
@@ -1779,7 +1784,7 @@ int main(int argc, char const *argv[]){
 									// add to contact network
 									if (gj > gi)
 										gij[NVTOT*gi + gj - (gi+1)*(gi+2)/2] = 1;
-									else
+									else if (gi > gj)
 										gij[NVTOT*gj + gi - (gj+1)*(gj+2)/2] = 1;
 								}
 							}
@@ -2021,13 +2026,13 @@ int main(int argc, char const *argv[]){
 		}
 
 		// print message console, print position to file
-		if (tt % NACTIVESKIP == 0){
+		if (k % NACTIVESKIP == 0){
 			cout << endl << endl;
 			cout << "===========================================" << endl;
 			cout << "			active tumor cells 				" << endl;
 			cout << "===========================================" << endl;
 			cout << endl;
-			cout << "	** tt 			= " << tt << endl;
+			cout << "	** k 			= " << k << endl;
 			cout << "	** p 			= " << pcheck << endl;
 			cout << "	** psiMean 		= " << psiMean << endl;
 			cout << "	** psiStd 		= " << psiStd << endl;
