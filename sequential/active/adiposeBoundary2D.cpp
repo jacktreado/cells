@@ -66,6 +66,7 @@ const double kl 			= 0.5;			// contractility
 const double kb 			= 0;			// bending modulus
 const double eint 			= 0.5;			// interaction energy scale
 const double del 			= 1.0;			// radius of vertices in units of l0
+const double l1Frac			= 0.9; 			// l1 = l1Frac*l2
 
 // tumor invasion variables
 const double Ds 			= 0.2;			// spread of velocity coupling along tumor cell boundary
@@ -96,27 +97,25 @@ int main(int argc, char const *argv[]){
 
 	// read in parameters from command line input
 	// test g++ -O3 sequential/active/adiposeBoundary2D.cpp -o tumor.o
-	// test: ./tumor.o 8 2 20 1.10 0.9 0.01 0.011 0.05 0.1 1e5 2e3 1 pos.test
+	// test: ./tumor.o 6 2 16 1.01 1.10 0.01 0.05 0.1 1e5 2e3 1 pos.test
 	string aN_str 				= argv[1];
 	string areaRatio_str 		= argv[2];
 	string NV_str 				= argv[3];
 	string adipocyteCalA0_str 	= argv[4];
 	string tumorCalA0_str 		= argv[5];
-	string l1_str 				= argv[6];
-	string l2_str 				= argv[7];
-	string v0_str 				= argv[8];
-	string Dr0_str 				= argv[9];
-	string NT_str 				= argv[10];
-	string NACTIVESKIP_str 		= argv[11];
-	string seed_str 			= argv[12];
-	string positionFile 		= argv[13];
+	string l2_str 				= argv[6];
+	string v0_str 				= argv[7];
+	string Dr0_str 				= argv[8];
+	string NT_str 				= argv[9];
+	string NACTIVESKIP_str 		= argv[10];
+	string seed_str 			= argv[11];
+	string positionFile 		= argv[12];
 
 	stringstream aNss(aN_str);
 	stringstream areaRatioss(areaRatio_str);
 	stringstream NVss(NV_str);
 	stringstream aCalA0ss(adipocyteCalA0_str);
 	stringstream tCalA0ss(tumorCalA0_str);
-	stringstream l1ss(l1_str);
 	stringstream l2ss(l2_str);
 	stringstream v0ss(v0_str);
 	stringstream Dr0ss(Dr0_str);
@@ -129,7 +128,6 @@ int main(int argc, char const *argv[]){
 	NVss >> NV;
 	aCalA0ss >> aCalA0;
 	tCalA0ss >> tCalA0;
-	l1ss >> l1;
 	l2ss >> l2;
 	v0ss >> v0;
 	Dr0ss >> Dr0;
@@ -139,10 +137,7 @@ int main(int argc, char const *argv[]){
 
 
 	// interaction parameter based on l1 and l2
-	if (l1 > l2){
-		cout << "	** ERROR: l1 = " << l1 << " which is > l2 = " << l2 << ". Ending." << endl;
-		return 1;
-	}
+	l1 = l1Frac*l2;
 	kint = (eint*l1)/(l2 - l1);
 
 
