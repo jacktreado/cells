@@ -32,7 +32,7 @@ numRuns=$9
 startSeed="${10}"
 
 # other variables
-areaRatio=30
+areaRatio=35
 NV=24
 NT=1e7
 NASKIP=5e4
