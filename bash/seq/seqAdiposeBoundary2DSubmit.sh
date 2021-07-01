@@ -21,18 +21,18 @@ mkdir -p out
 
 # inputs
 aN=$1
-aCalA0=$2
-tCalA0=$3
-l2=$4
-v0=$5
-Dr=$6
-partition=$7
-time=$8
-numRuns=$9
-startSeed="${10}"
+areaRatio=$2
+aCalA0=$3
+tCalA0=$4
+l2=$5
+v0=$6
+Dr=$7
+partition=$8
+time=$9
+numRuns="${10}"
+startSeed="${11}"
 
 # other variables
-areaRatio=35
 NV=24
 NT=1e7
 NASKIP=5e4
@@ -42,7 +42,7 @@ let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=invasion_aN"$aN"_ac"$aCalA0"_tc"$tCalA0"_l2"$l2"_v0"$v0"_Dr"$Dr"
+basestr=invasion_aN"$aN"_aR"$areaRatio"_ac"$aCalA0"_tc"$tCalA0"_l2"$l2"_v0"$v0"_Dr"$Dr"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation
@@ -158,15 +158,16 @@ sbatch -t $time $slurmf
 #       INPUTS
 # ====================
 # 1.    aN
-# 2.    adipocyte calA0
-# 3.    tumor calA0
-# 4.    l2
-# 5.    v0 
-# 6.    Dr
-# 7.    partition
-# 8.    time
-# 9.    number of runs (number of array entries, i.e. arraynum)
-# 10.   start seed (end seed determined by number of runs)
+# 2.    areaRatio
+# 3.    adipocyte calA0
+# 4.    tumor calA0
+# 5.    l2
+# 6.    v0 
+# 7.    Dr
+# 8.    partition
+# 9.    time
+# 10.   number of runs (number of array entries, i.e. arraynum)
+# 11.   start seed (end seed determined by number of runs)
 
 
 

@@ -71,6 +71,7 @@ const double l1Frac			= 0.9; 			// l1 = l1Frac*l2
 // tumor invasion variables
 const double Ds 			= 0.2;			// spread of velocity coupling along tumor cell boundary
 const double dDr 			= 0.5;			// change in angular diffusion near adipocytes
+const double dPsi 			= 0.1;			// change in direction toward the adipocytes
 const double Drmin 			= 1e-4;			// min angular diffusion, mimics aligning to collagen
 const double pinbreak 		= 0.5; 			// fraction of rho0 that breaks a WAT pin spring
 const double kpin 			= 0.1;			// pinning spring stiffness
@@ -2018,6 +2019,9 @@ int main(int argc, char const *argv[]){
 				DrList[ci] = Drtmp;
 			else
 				DrList[ci] = Drmin;
+
+			// also relax psi back toward 0 if in contact with adipocytes
+			psi[ci] += dt * (zta/nv[ci]) * dPsi;
 		}
 
 		// print message console, print position to file
