@@ -1495,7 +1495,7 @@ int main(int argc, char const *argv[]){
 	vector<double> DrList(tN,Dr0);
 	vector<double> psi(tN,0.0);
 	for (ci=0; ci<tN; ci++)
-		psi.at(ci) = 2.0*pi*drand48();
+		psi.at(ci) = 0.5*PI*drand48() - 0.25*PI;
 
 	// reset for active dynamocs
 	dt = dt0;
