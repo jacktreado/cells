@@ -66,7 +66,7 @@ const double kl 			= 0.5;			// contractility
 const double kb 			= 0;			// bending modulus
 const double eint 			= 0.5;			// interaction energy scale
 const double del 			= 1.0;			// radius of vertices in units of l0
-const double l1Frac			= 0.9; 			// l1 = l1Frac*l2
+const double l2				= 0.01; 		// l1 = l1Frac*l2
 
 // tumor invasion variables
 const double Ds 			= 0.2;			// spread of velocity coupling along tumor cell boundary
@@ -74,7 +74,7 @@ const double dDr 			= 0.5;			// change in angular diffusion near adipocytes
 const double dPsi 			= 0.1;			// change in direction toward the adipocytes
 const double Drmin 			= 1e-4;			// min angular diffusion, mimics aligning to collagen
 const double pinbreak 		= 0.5; 			// fraction of rho0 that breaks a WAT pin spring
-const double kpin 			= 0.1;			// pinning spring stiffness
+const double kpin 			= 0.05;			// pinning spring stiffness
 
 // FUNCTION PROTOTYPES
 int gindex(int ci, int vi, vector<int>& szList);
@@ -104,7 +104,7 @@ int main(int argc, char const *argv[]){
 	string NV_str 				= argv[3];
 	string adipocyteCalA0_str 	= argv[4];
 	string tumorCalA0_str 		= argv[5];
-	string l2_str 				= argv[6];
+	string l1_str 				= argv[6];
 	string v0_str 				= argv[7];
 	string Dr0_str 				= argv[8];
 	string NT_str 				= argv[9];
@@ -117,7 +117,7 @@ int main(int argc, char const *argv[]){
 	stringstream NVss(NV_str);
 	stringstream aCalA0ss(adipocyteCalA0_str);
 	stringstream tCalA0ss(tumorCalA0_str);
-	stringstream l2ss(l2_str);
+	stringstream l1ss(l1_str);
 	stringstream v0ss(v0_str);
 	stringstream Dr0ss(Dr0_str);
 	stringstream NTss(NT_str);
@@ -129,7 +129,7 @@ int main(int argc, char const *argv[]){
 	NVss >> NV;
 	aCalA0ss >> aCalA0;
 	tCalA0ss >> tCalA0;
-	l2ss >> l2;
+	l1ss >> l1;
 	v0ss >> v0;
 	Dr0ss >> Dr0;
 	NTss >> NT_dbl;
@@ -138,7 +138,10 @@ int main(int argc, char const *argv[]){
 
 
 	// interaction parameter based on l1 and l2
-	l1 = l1Frac*l2;
+	if (l1 > l2){
+		cout << "\t** ERROR: l1 = " << l1 << ", which is > l2 = " << l2 << ". Ending here. " << endl;
+		return 1;
+	}
 	kint = (eint*l1)/(l2 - l1);
 
 

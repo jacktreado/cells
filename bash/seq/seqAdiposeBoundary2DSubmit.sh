@@ -24,7 +24,7 @@ aN=$1
 areaRatio=$2
 aCalA0=$3
 tCalA0=$4
-l2=$5
+l1=$5
 v0=$6
 Dr=$7
 partition=$8
@@ -42,7 +42,7 @@ let numSeeds=$numSeedsPerRun*$numRuns
 let endSeed=$startSeed+$numSeeds-1
 
 # name strings
-basestr=invasion_aN"$aN"_aR"$areaRatio"_ac"$aCalA0"_tc"$tCalA0"_l2"$l2"_v0"$v0"_Dr"$Dr"
+basestr=invasion_aN"$aN"_aR"$areaRatio"_ac"$aCalA0"_tc"$tCalA0"_l1"$l1"_v0"$v0"_Dr"$Dr"
 runstr="$basestr"_startseed"$startSeed"_endseed"$endSeed"
 
 # make directory specific for this simulation
@@ -55,7 +55,7 @@ mainf=$maindir/active/adiposeBoundary2D.cpp
 echo Running $numSeeds adipose boundary invasion sims of $aN adipocytes 
 echo - - - Area ratio                   $areaRatio
 echo - - - tumor cells shape param      $tCalA0
-echo - - - l2                           $l2
+echo - - - l1                           $l1
 echo - - - v0                           $v0
 echo - - - NT                           $NT
 echo - - - Dr                           $Dr
@@ -106,7 +106,7 @@ for seed in `seq $startSeed $numSeedsPerRun $endSeed`; do
         posf=$simdatadir/$filestr.pos
 
         # append to runString
-        runString="$runString ; ./$binf $aN $areaRatio $NV $aCalA0 $tCalA0 $l2 $v0 $Dr $NT $NASKIP $seed $posf"
+        runString="$runString ; ./$binf $aN $areaRatio $NV $aCalA0 $tCalA0 $l1 $v0 $Dr $NT $NASKIP $seed $posf"
     done
 
     # finish off run string
@@ -161,7 +161,7 @@ sbatch -t $time $slurmf
 # 2.    areaRatio
 # 3.    adipocyte calA0
 # 4.    tumor calA0
-# 5.    l2
+# 5.    l1
 # 6.    v0 
 # 7.    Dr
 # 8.    partition
