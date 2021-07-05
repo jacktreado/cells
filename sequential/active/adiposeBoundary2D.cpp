@@ -94,7 +94,7 @@ int main(int argc, char const *argv[]){
 
 	// parameters to be read in 
 	int aN, tN, NCELLS, NT, NACTIVESKIP, NV, NVTOT, cellDOF, vertDOF, seed;
-	double NT_dbl, NACTIVESKIP_dbl, areaRatio, aCalA0, tCalA0, l1, l2, kint, v0, vmin, Dr0, phi;
+	double NT_dbl, NACTIVESKIP_dbl, areaRatio, aCalA0, tCalA0, l1, kint, v0, vmin, Dr0, phi;
 
 	// read in parameters from command line input
 	// test g++ -O3 sequential/active/adiposeBoundary2D.cpp -o tumor.o
