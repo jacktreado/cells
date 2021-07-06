@@ -73,8 +73,8 @@ const double Ds 			= 0.2;			// spread of velocity coupling along tumor cell boun
 const double dDr 			= 0.5;			// change in angular diffusion near adipocytes
 const double dPsi 			= 0.1;			// change in direction toward the adipocytes
 const double Drmin 			= 1e-4;			// min angular diffusion, mimics aligning to collagen
-const double pinbreak 		= 0.5; 			// fraction of rho0 that breaks a WAT pin spring
-const double kpin 			= 0.05;			// pinning spring stiffness
+const double pinbreak 		= 0.25; 		// fraction of rho0 that breaks a WAT pin spring
+const double kpin 			= 0.01;			// pinning spring stiffness
 
 // FUNCTION PROTOTYPES
 int gindex(int ci, int vi, vector<int>& szList);
