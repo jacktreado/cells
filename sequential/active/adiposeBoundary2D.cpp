@@ -62,19 +62,19 @@ const int itmax       		= 5e7;
 
 // DP force constants
 const double ka 			= 1.0;			// area spring (should be = 1)
-const double kl 			= 0.5;			// contractility
-const double kb 			= 0.01;			// bending modulus
+const double kl 			= 1.0;			// contractility
+const double kb 			= 0.0;			// bending modulus
 const double eint 			= 0.5;			// interaction energy scale
 const double del 			= 1.0;			// radius of vertices in units of l0
-const double l2				= 0.01; 		// l1 = l1Frac*l2
+const double l2				= 0.05; 		// l2 fixed, vary l1
 
 // tumor invasion variables
 const double Ds 			= 0.2;			// spread of velocity coupling along tumor cell boundary
-const double dDr 			= 0.5;			// change in angular diffusion near adipocytes
-const double dPsi 			= 0.1;			// change in direction toward the adipocytes
+const double dDr 			= 0.1;			// change in angular diffusion near adipocytes
+const double dPsi 			= 0.05;			// change in direction toward the adipocytes
 const double Drmin 			= 1e-4;			// min angular diffusion, mimics aligning to collagen
-const double pinbreak 		= 0.25; 		// fraction of rho0 that breaks a WAT pin spring
-const double kpin 			= 0.01;			// pinning spring stiffness
+const double pinbreak 		= 0.5; 			// fraction of rho0 that breaks a WAT pin spring
+const double kpin 			= 0.1;			// pinning spring stiffness
 
 // FUNCTION PROTOTYPES
 int gindex(int ci, int vi, vector<int>& szList);
@@ -98,7 +98,7 @@ int main(int argc, char const *argv[]){
 
 	// read in parameters from command line input
 	// test g++ -O3 sequential/active/adiposeBoundary2D.cpp -o tumor.o
-	// test: ./tumor.o 6 2 16 1.01 1.10 0.01 0.05 0.1 1e5 2e3 1 pos.test
+	// test: ./tumor.o 6 4 24 1.01 1.15 0.01 0.1 0.01 1e6 1e4 1 pos.test
 	string aN_str 				= argv[1];
 	string areaRatio_str 		= argv[2];
 	string NV_str 				= argv[3];
@@ -2024,7 +2024,7 @@ int main(int argc, char const *argv[]){
 				DrList[ci] = Drmin;
 
 			// also relax psi back toward 0 if in contact with adipocytes
-			psi[ci] += dt * (zta/nv[ci]) * dPsi;
+			psi[ci] -= dt * (zta/nv[ci]) * dPsi * psi[ci];
 		}
 
 		// print message console, print position to file
