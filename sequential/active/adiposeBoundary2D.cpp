@@ -63,7 +63,7 @@ const int itmax       		= 5e7;
 // DP force constants
 const double ka 			= 1.0;			// area spring (should be = 1)
 const double kl 			= 1.0;			// contractility
-const double kb 			= 0.0;			// bending modulus
+const double kb 			= 0.01;			// bending modulus
 const double eint 			= 0.5;			// interaction energy scale
 const double del 			= 1.0;			// radius of vertices in units of l0
 const double l2				= 0.05; 		// l2 fixed, vary l1
