@@ -668,6 +668,11 @@ int main(int argc, char const *argv[]){
 	vector< vector<int> > nn;
 	nn.resize(NBX);
 
+	cout << "NBX = " << NBX << endl;
+	cout << "L_x = " << L[0] << ",  L_y = " << L[1] << endl;
+	cout << "sb_x = " << sb[0] << ",  sb_y = " << sb[1] << endl;
+	cout << "lb_x = " << lb[0] << ",  lb_y = " << lb[1] << endl;
+
 	// loop over cells, save forward neighbors for each box
 	for (i=0; i<NBX; i++){
 		// reshape entry
@@ -686,7 +691,13 @@ int main(int argc, char const *argv[]){
 			nn[i][2] = -1;
 			nn[i][3] = -1;
 		}
+
+		cout << "nn[" << i << "]: ";
+		for (d=0; d<NNN; d++)
+			cout << nn[i][d] << "   ";
+		cout << endl;
 	} 
+	return 1;
 
 	// linked-list variables
 	vector<int> head(NBX,0);
